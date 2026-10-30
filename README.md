@@ -9,7 +9,7 @@ Application Qt Quick / QML (Windows et Android) pour organiser les entraînement
 
 ## Compilation
 
-Avec Qt Creator : ouvrir `CMakeLists.txt`, choisir le kit Qt 6.9+, compiler. La cible `FootCoach` est l'application QML (tactique et effectif ; les autres pages affichent « Bientôt disponible »). La cible `FootCoachWidgets` est l'ancienne version complète en Widgets, conservée jusqu'à la fin du portage.
+Avec Qt Creator : ouvrir `CMakeLists.txt`, choisir le kit Qt 6.9+, compiler. La cible `FootCoach` est l'application QML (tactique, effectif, calendrier et suivi ; les autres pages affichent « Bientôt disponible »). La cible `FootCoachWidgets` est l'ancienne version complète en Widgets, conservée jusqu'à la fin du portage.
 
 En ligne de commande (adapter le chemin du kit Qt) :
 

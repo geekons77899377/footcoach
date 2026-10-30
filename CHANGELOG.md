@@ -1,6 +1,11 @@
 # Journal des modifications
 
-## 0.5.0 — en cours
+## 0.5.0 — 2026-10-30
+- Calendrier en QML : mois avec points sur les jours de séance, liste Jour / Semaine / Mois, création et modification d'une séance (sélecteurs de date et d'heure, durée, lieu, thème, statut, notes), alerte en cas de chevauchement, changement de statut, suppression, séances récurrentes avec aperçu du nombre de séances.
+- Appel : un statut par joueur (présent, absent, excusé, blessé), « Tous présents / absents », note par joueur, option « marquer la séance comme réalisée ».
+- Suivi (présences) : taux par joueur sur Tout / 30 jours / 3 mois / 12 mois, détail séance par séance au toucher. Taux = présents ÷ (présents + absents).
+- L'équipe choisie est la même dans Effectif, Calendrier et Suivi.
+- Non vérifié ici : compilation Qt Quick et affichage sur appareil.
 - Backend : séances (`sessions`, `sessionDates`, `saveSession`, `setSessionStatus`, `deleteSession`), séances récurrentes (`previewRecurrence`, `createRecurring`), appel (`attendanceSheet`, `saveAttendance`) et statistiques de présence (`attendanceStats`), avec test. Mêmes règles que la version Widgets : chevauchements signalés (confirmation), pas d'appel pour une séance annulée, joueurs inactifs gardés dans les appels existants.
 
 ## 0.4.3 — 2026-10-30

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.4.3 LANGUAGES CXX)
+project(FootCoach VERSION 0.5.0 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -152,10 +152,10 @@ if(FOOTCOACH_HAVE_QML)
     )
 
     set(QML_FILES
-        ActionSheet.qml AppButton.qml BoardEditor.qml BoardModel.qml BoardThumb.qml BoardToken.qml
+        ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml BoardThumb.qml BoardToken.qml
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml TacticsPage.qml Theme.qml
-        DatePicker.qml SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml
+        CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml
         BoardGeometry.js Icons.js
     )
     set(QML_FILES_PATHS)
@@ -163,7 +163,7 @@ if(FOOTCOACH_HAVE_QML)
         list(APPEND QML_FILES_PATHS qml/${f})
         set_source_files_properties(qml/${f} PROPERTIES QT_RESOURCE_ALIAS ${f})
     endforeach()
-    set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+    set_source_files_properties(qml/Theme.qml qml/AppState.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
     qt_add_qml_module(FootCoach
         URI FootCoachUi
@@ -184,7 +184,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 7
+            QT_ANDROID_VERSION_CODE 8
         )
     endif()
 endif()

@@ -7,7 +7,18 @@ Item {
     id: page
 
     property var teams: []
-    property int teamId: -1
+    property int teamId: AppState.teamId           // partagé avec les autres pages
+    onTeamIdChanged: if (AppState.teamId !== teamId) AppState.teamId = teamId
+    Connections {
+        target: AppState
+        function onTeamIdChanged() {
+            if (page.teamId !== AppState.teamId) {
+                page.teamId = AppState.teamId;
+                page.closeForm();
+                page.refreshPlayers();
+            }
+        }
+    }
     property var players: []
     property string query: ""
     property string positionFilter: ""

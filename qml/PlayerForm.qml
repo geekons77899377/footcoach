@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "DateUtil.js" as DateUtil
 
 // Fiche d'un joueur : création ou modification. Les erreurs de validation viennent du backend.
 Item {
@@ -38,28 +39,9 @@ Item {
         return now - 12;
     }
 
-    // Saisie libre : "02062016", "02/06/2016", "2.6.2016", "2-6-2016"… -> "AAAA-MM-JJ" ("" si vide, texte brut si
-    // illisible : le backend le refusera). Un jour ou un mois impossible (31/02) est rejeté.
-    function parseDate(text) {
-        var t = text.trim();
-        if (t === "")
-            return "";
-        var d, mo, y, m;
-        if (/^\d{8}$/.test(t)) {
-            d = t.substring(0, 2); mo = t.substring(2, 4); y = t.substring(4, 8);
-        } else if ((m = /^(\d{1,2})[\s\/.\-](\d{1,2})[\s\/.\-](\d{4})$/.exec(t))) {
-            d = m[1]; mo = m[2]; y = m[3];
-        } else {
-            return t;
-        }
-        var dn = parseInt(d, 10), mn = parseInt(mo, 10), yn = parseInt(y, 10);
-        var check = new Date(yn, mn - 1, dn);
-        if (check.getFullYear() !== yn || check.getMonth() !== mn - 1 || check.getDate() !== dn)
-            return t;
-        return y + "-" + ("0" + mn).slice(-2) + "-" + ("0" + dn).slice(-2);
-    }
+    function parseDate(text) { return DateUtil.parse(text); }
 
-    function isoFromDisplay(text) { return parseDate(text); }
+    function isoFromDisplay(text) { return DateUtil.parse(text); }
 
     // Met en forme la saisie en JJ/MM/AAAA quand elle est valide.
     function normalizeBirth() {
@@ -68,9 +50,7 @@ Item {
             birth.text = displayFromIso(iso);
     }
 
-    function displayFromIso(iso) {
-        return iso && iso.length === 10 ? iso.substring(8, 10) + "/" + iso.substring(5, 7) + "/" + iso.substring(0, 4) : "";
-    }
+    function displayFromIso(iso) { return DateUtil.display(iso); }
 
     function openNew(team) {
         teamId = team;

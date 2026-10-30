@@ -205,8 +205,8 @@ ApplicationWindow {
                 onNavigate: (section, boardId) => win.go(section, boardId)
             }
             SquadPage { }
-            PlaceholderPage { title: "Calendrier"; iconName: "calendar" }
-            PlaceholderPage { title: "Présences"; iconName: "check" }
+            CalendarPage { }
+            AttendancePage { }
             PlaceholderPage { title: "Exercices"; iconName: "dumbbell" }
             PlaceholderPage { title: "Séances"; iconName: "clipboard" }
             TacticsPage { id: tactics }

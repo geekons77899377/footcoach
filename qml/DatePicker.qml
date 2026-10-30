@@ -8,14 +8,16 @@ Popup {
 
     property int startYear: new Date().getFullYear() - 12
     readonly property int thisYear: new Date().getFullYear()
-    readonly property int yearCount: 70
+    property int maxYear: new Date().getFullYear()   // année la plus récente proposée
+    property int yearCount: 70                         // nombre d'années proposées, en remontant
     readonly property var monthNames: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
                                        "septembre", "octobre", "novembre", "décembre"]
     // Roues : jour 1..n, mois 0..11, année thisYear - index.
-    readonly property int year: thisYear - yearT.currentIndex
+    readonly property int year: maxYear - yearT.currentIndex
     readonly property int month: monthT.currentIndex + 1
     readonly property int dayCount: new Date(year, month, 0).getDate()
 
+    property string title: "Date"
     signal picked(string iso)
 
     // iso : "AAAA-MM-JJ" déjà saisi ("" : on part de l'année conseillée, au 1er janvier).
@@ -26,7 +28,7 @@ Popup {
             m = parseInt(iso.substring(5, 7), 10);
             d = parseInt(iso.substring(8, 10), 10);
         }
-        pending = { y: Math.max(thisYear - yearCount + 1, Math.min(thisYear, y)), m: m, d: d };
+        pending = { y: Math.max(maxYear - yearCount + 1, Math.min(maxYear, y)), m: m, d: d };
         open();
     }
 
@@ -35,7 +37,7 @@ Popup {
     onOpened: {
         if (!pending)
             return;
-        yearT.currentIndex = thisYear - pending.y;
+        yearT.currentIndex = maxYear - pending.y;
         monthT.currentIndex = pending.m - 1;
         dayT.currentIndex = Math.min(pending.d, new Date(pending.y, pending.m, 0).getDate()) - 1;
         yearT.positionViewAtIndex(yearT.currentIndex, Tumbler.Center);
@@ -86,7 +88,7 @@ Popup {
 
         Text {
             width: parent.width
-            text: "Date"
+            text: root.title
             font.pixelSize: 20
             font.weight: Font.Bold
             color: Theme.text
@@ -132,7 +134,7 @@ Popup {
                     model: root.yearCount
                     delegate: Text {
                         required property int index
-                        text: root.thisYear - index
+                        text: root.maxYear - index
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         font.pixelSize: 20
