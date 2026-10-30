@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.6.0 — 2026-10-30
+Préparation de la publication sur Google Play (rien n'est publié).
+- Icône : ballon rond vert (icône adaptative Android 8+ et icône classique), icône 512 × 512 pour la fiche (`store/icon-512.png`), source `store/icon.svg`, script `tools/make_icons.py`.
+- Android : `targetSdk` 36 déclaré explicitement (exigé pour les nouvelles applications depuis le 31/08/2026), `minSdk` 23, `versionCode` 12 ; les ressources d'icône viennent du dossier `android/`.
+- `.gitignore` : clés et mots de passe de signature (`*.jks`, `*.keystore`, `keystore.properties`…).
+- Documentation : `docs/publication.md` (clé d'upload, build Release APK/AAB, fiche, test interne et fermé, accès à la production), `docs/confidentialite.md` (brouillon de politique de confidentialité), `store/fiche.md` (textes de la fiche).
+- Non vérifié ici : compilation Android, affichage de l'icône, `targetSdkVersion` et permissions de l'APK produit.
+
 ## 0.5.3 — 2026-10-30
 - Tactique, écran tactile : corrige le placement des joueurs et autres éléments. Chaque toucher déclenchait aussi le « clic droit » (retour à la sélection), si bien que l'outil était remis sur « sélection » avant la pose. Ce retour à la sélection est maintenant réservé à la souris.
 - Vérifié ici avec un écran tactile simulé (QML hors écran) : avant, aucun élément posé ; après, un élément par toucher. Non vérifié sur l'émulateur ni sur un appareil.

@@ -5,3 +5,10 @@ build*/
 .vscode/
 *.autosave
 CMakeLists.txt.user*
+
+# Signature Android : ne jamais versionner les clés ni les mots de passe
+*.jks
+*.keystore
+*.p12
+keystore.properties
+local.properties
