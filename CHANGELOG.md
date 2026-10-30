@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.8.1 — 2026-10-30
+Aucun changement de format, de schéma ni d'interface (schéma de données 4, format de fichier 1).
+- Tests de compatibilité du format `.footcoach` (`tests/tst_dataformat.cpp`) : structure de la version 1 figée, import de fichiers de référence des schémas 1 à 4, seize fichiers invalides refusés sans toucher aux données, sauvegarde automatique valide.
+- Fichiers de référence dans `tests/fixtures/` : le schéma 4 est un export réel de la 0.8.0 ; les schémas 1 à 3 sont reconstitués (aucune version publiée n'a écrit de fichier avec ces schémas).
+- Nouvelle documentation `docs/versionnage.md` : numéros de version, règles de migration et de compatibilité, exports partiels en version 2 (jamais lisibles comme remplacement complet par une ancienne version), inventaire des données personnelles pour l'option « sans données personnelles » (qui ne garantit pas l'anonymat).
+- Constaté, non corrigé : un `schema` absent ou nul affiche le message « version plus récente ».
+- Non fait : types d'export/import au choix (spécifiés dans la doc, pas implémentés).
+
 ## 0.8.0 — 2026-10-30
 - Nouvelle page « Données » (menu Plus, ou barre latérale) : « Créer le fichier » enregistre toutes les données dans un fichier `.footcoach` (équipes, joueurs, séances, plans, exercices, présences, blessures, schémas) ; « Choisir un fichier » l'importe sur un autre appareil (téléphone ↔ tablette). Le fichier peut être envoyé par WhatsApp, e-mail ou Drive.
 - L'import REMPLACE les données de l'appareil, après un récapitulatif (contenu du fichier et contenu actuel). Il est fait en une seule transaction : en cas de problème, rien n'est modifié. Les trois dernières copies de l'état précédent sont gardées dans le dossier privé de l'application (`sauvegardes`).

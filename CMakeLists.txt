@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.8.0 LANGUAGES CXX)
+project(FootCoach VERSION 0.8.1 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -187,7 +187,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 14
+            QT_ANDROID_VERSION_CODE 15
             # Google Play exige API 36 pour les nouvelles applications depuis le 31/08/2026.
             QT_ANDROID_MIN_SDK_VERSION 23
             QT_ANDROID_TARGET_SDK_VERSION 36
@@ -201,7 +201,7 @@ if(FOOTCOACH_BUILD_TESTS)
     enable_testing()
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
-    foreach(test_name repositories sessions attendance plan board backend)
+    foreach(test_name repositories sessions attendance plan board backend dataformat)
         qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
@@ -210,6 +210,7 @@ if(FOOTCOACH_BUILD_TESTS)
         )
         target_include_directories(tst_${test_name} PRIVATE src)
         target_link_libraries(tst_${test_name} PRIVATE Qt6::Sql Qt6::Test)
+        target_compile_definitions(tst_${test_name} PRIVATE FOOTCOACH_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
         add_test(NAME ${test_name} COMMAND tst_${test_name})
     endforeach()
 endif()
