@@ -37,6 +37,24 @@ function display(s) {
     return s && s.length === 10 ? s.substring(8, 10) + "/" + s.substring(5, 7) + "/" + s.substring(0, 4) : "";
 }
 
+// Saison sportive d'une date "AAAA-MM-JJ" : elle commence le 1er juillet. "2026-10-30" -> "2026-2027" ; "2027-03-01" -> "2026-2027".
+function seasonOf(s) {
+    var y = parseInt(s.substring(0, 4), 10), m = parseInt(s.substring(5, 7), 10);
+    var start = m >= 7 ? y : y - 1;
+    return start + "-" + (start + 1);
+}
+
+// Saisons proposées autour d'une date : la précédente, la courante, la suivante. [{id, text}] pour ChipRow.
+function seasonSuggestions(s) {
+    var start = parseInt(seasonOf(s).substring(0, 4), 10);
+    var out = [];
+    for (var i = -1; i <= 1; ++i) {
+        var label = (start + i) + "-" + (start + i + 1);
+        out.push({ id: label, text: label });
+    }
+    return out;
+}
+
 // "mardi 3 novembre".
 function longLabel(s) {
     var d = fromIso(s);

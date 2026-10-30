@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.8.2 — 2026-10-30
+- Équipes : le champ « Saison » propose trois pastilles (saison précédente, en cours, suivante, au format 2026-2027) et, pour une nouvelle équipe, la saison en cours est préremplie. La saison sportive commence le 1er juillet. La saisie libre reste possible.
+- Calcul vérifié ici (hors QML) pour plusieurs dates, dont les limites du 30 juin et du 1er juillet. Non vérifié : l'affichage dans Qt Quick (non disponible ici) et sur appareil.
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.1 — 2026-10-30
 Aucun changement de format, de schéma ni d'interface (schéma de données 4, format de fichier 1).
 - Tests de compatibilité du format `.footcoach` (`tests/tst_dataformat.cpp`) : structure de la version 1 figée, import de fichiers de référence des schémas 1 à 4, seize fichiers invalides refusés sans toucher aux données, sauvegarde automatique valide.

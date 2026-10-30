@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "DateUtil.js" as DateUtil
 
 // Création ou modification d'une équipe (nom, catégorie, saison).
 Popup {
@@ -13,7 +14,8 @@ Popup {
         teamId = team ? team.id : -1;
         nameField.text = team ? team.name : "";
         categoryField.text = team ? team.category : "";
-        seasonField.text = team ? team.season : "";
+        // Nouvelle équipe : la saison en cours est proposée d'office (modifiable).
+        seasonField.text = team ? team.season : DateUtil.seasonOf(DateUtil.todayIso());
         errorText = "";
         open();
     }
@@ -48,6 +50,15 @@ Popup {
         FormField { id: nameField; width: parent.width; label: "Nom"; required: true; placeholder: "Ex. FC Exemple" }
         FormField { id: categoryField; width: parent.width; label: "Catégorie"; placeholder: "Ex. U15, Seniors" }
         FormField { id: seasonField; width: parent.width; label: "Saison"; placeholder: "Ex. 2026-2027" }
+        ChipRow {
+            id: seasonChips
+            width: parent.width
+            allowClear: false
+            options: DateUtil.seasonSuggestions(DateUtil.todayIso())
+            onPicked: (id) => seasonField.text = id
+            // Binding (et non « value: … ») : ChipRow écrit lui-même dans value au toucher, ce qui casserait une liaison simple.
+            Binding { target: seasonChips; property: "value"; value: seasonField.text }
+        }
         Text {
             visible: root.errorText !== ""
             width: parent.width
