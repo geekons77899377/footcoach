@@ -1,0 +1,7 @@
+build*/
+*.user
+.cxx/
+.gradle/
+.vscode/
+*.autosave
+CMakeLists.txt.user*
