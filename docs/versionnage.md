@@ -203,8 +203,21 @@ attesté par un export réel (0.8.0).
 
 ## 9. Tags Git
 
-- Tag annoté `vX.Y.Z` sur le commit de la version, avec dans le message le schéma de données et la version du format.
-- Premier tag publié confirmé : `v0.8.0` (commit `aa65676`, schéma 4, format 1).
+Deux sortes de tags, annotés :
+
+1. **Tag de version `vX.Y.Z`** : posé seulement pour une version sur laquelle un retour de test a été donné (la version
+   installée et essayée). Une version poussée sur `main` sans retour n'est pas taguée. Le tag est créé après accord.
+2. **Tag de changement de schéma `vX.Y.Z-schN`** : posé à chaque changement du schéma de données (nouvelle migration),
+   même sans retour de test, sur le commit qui ajoute la migration. `N` est le nouveau numéro de schéma
+   (par exemple `v0.9.0-sch5`). Le message du tag indique la migration (`sql/005_….sql`) et la version du format de
+   fichier.
+
+Dans les deux cas, le message indique le schéma de données et la version du format d'échange.
+
+État :
+- Premier tag publié confirmé : `v0.8.0` (commit `aa65676`, schéma 4, format 1). Son nom n'a pas de suffixe et n'est pas
+  renommé ; le premier tag `-sch` sera celui du schéma 5.
 - Les tags `v0.5.3`, `v0.6.0`, `v0.7.0` ne sont **pas** créés : les commits sont identifiés (`b93c81e`, `0286ea7`,
   `e11165d`) mais les versions réellement distribuées ne sont pas confirmées.
-- Un tag est créé après confirmation, jamais automatiquement.
+- Pousser un tag depuis l'environnement de Claude a d'abord échoué (erreur 403 du proxy) puis fonctionné ; en cas
+  d'échec, la commande à lancer est donnée à l'utilisateur.

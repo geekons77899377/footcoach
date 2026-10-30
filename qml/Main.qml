@@ -76,6 +76,14 @@ ApplicationWindow {
         onChosen: (id) => win.go(id, -1)
     }
 
+    // Toucher en dehors d'un champ de saisie ferme le clavier. Couche transparente au-dessus des pages (et de leurs
+    // listes défilantes, qui sinon interceptent le toucher) mais sous les boîtes de dialogue, qui ont la leur.
+    Item {
+        anchors.fill: parent
+        z: 99999
+        KeyboardDismiss {}
+    }
+
     // Tout le contenu reste dans la zone sûre (barres système, encoches) quand la fenêtre les recouvre.
     Item {
         id: shell

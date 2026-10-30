@@ -53,6 +53,7 @@ Popup {
         color: Theme.surface
         border.width: 1
         border.color: Theme.border
+        KeyboardDismiss {}
     }
 
     onOpened: if (fieldVisible) field.forceActiveFocus()

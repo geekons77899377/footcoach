@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.8.2 LANGUAGES CXX)
+project(FootCoach VERSION 0.8.3 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -157,7 +157,7 @@ if(FOOTCOACH_HAVE_QML)
         ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml BoardThumb.qml BoardToken.qml
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml TacticsPage.qml Theme.qml
-        CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml
+        CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml Toast.qml DataPage.qml
         BoardGeometry.js Icons.js
     )
@@ -187,7 +187,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 16
+            QT_ANDROID_VERSION_CODE 17
             # Google Play exige API 36 pour les nouvelles applications depuis le 31/08/2026.
             QT_ANDROID_MIN_SDK_VERSION 23
             QT_ANDROID_TARGET_SDK_VERSION 36

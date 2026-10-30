@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.8.3 — 2026-10-31
+- Clavier : toucher en dehors d'un champ de saisie retire maintenant le focus au champ et ferme le clavier (signalé sur le Redmi : le clavier restait ouvert). Une couche transparente au-dessus des pages (`KeyboardDismiss.qml`) le fait pour les pages, formulaires et listes défilantes ; les boîtes de dialogue qui ont un champ (équipe, saisie de texte, durée d'un exercice, choix d'un exercice) ont la leur.
+- Toucher un bouton, un autre champ ou le champ déjà actif se comporte comme avant (le clavier reste ouvert pour un champ).
+- Limite connue : dans une boîte de dialogue qui ne se ferme pas en touchant à l'extérieur, toucher la zone assombrie autour ne ferme pas le clavier (toucher dans la boîte le ferme).
+- Vérifié ici hors écran avec de vrais événements tactiles simulés (Qt 6.12 via PySide6) : avant, le champ gardait le focus après un toucher ailleurs ; après, il le perd. Le placement, le déplacement, les flèches, le zoom et le pincement de l'éditeur tactique donnent les mêmes résultats qu'avant. Non vérifié : le comportement du clavier virtuel réel sur Android (Qt 6.9.3), qui reste à confirmer sur appareil.
+- Documentation : règles de tags (`vX.Y.Z` après retour de test, `vX.Y.Z-schN` à chaque changement de schéma) dans `docs/versionnage.md`.
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.2 — 2026-10-30
 - Équipes : le champ « Saison » propose trois pastilles (saison précédente, en cours, suivante, au format 2026-2027) et, pour une nouvelle équipe, la saison en cours est préremplie. La saison sportive commence le 1er juillet. La saisie libre reste possible.
 - Calcul vérifié ici (hors QML) pour plusieurs dates, dont les limites du 30 juin et du 1er juillet. Non vérifié : l'affichage dans Qt Quick (non disponible ici) et sur appareil.
