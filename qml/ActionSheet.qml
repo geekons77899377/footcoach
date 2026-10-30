@@ -8,6 +8,7 @@ Popup {
 
     property string title: ""
     property var model: []
+    property real navInset: 0          // espace à laisser en bas (barre de navigation)
     signal chosen(string id)
 
     parent: Overlay.overlay
@@ -16,7 +17,7 @@ Popup {
     padding: 8
     width: Math.min(parent ? parent.width - 24 : 360, 440)
     x: parent ? (parent.width - width) / 2 : 0
-    y: parent ? parent.height - height - 12 : 0
+    y: parent ? parent.height - height - 12 - navInset : 0
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     Overlay.modal: Rectangle { color: "#99000000" }

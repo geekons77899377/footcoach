@@ -44,6 +44,7 @@ Item {
         "pitch": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M3 10h3v4H3M21 10h-3v4h3"/>',
         // Outils du terrain : pictogrammes en couleur (indépendants de la couleur demandée).
         "t-select": '<path d="M6 3l13 7-6 2.2L10.5 19z" fill="C"/>',
+        "t-multi": '<rect x="3.5" y="3.5" width="11" height="11" rx="2" stroke-dasharray="2.6 2.2"/><rect x="9.5" y="9.5" width="11" height="11" rx="2"/>',
         "t-player": '<circle cx="12" cy="12" r="8" fill="#1565c0" stroke="#ffffff" stroke-width="2"/>',
         "t-opponent": '<circle cx="12" cy="12" r="8" fill="#c62828" stroke="#ffffff" stroke-width="2"/>',
         "t-ball": '<circle cx="12" cy="12" r="6.5" fill="#ffffff" stroke="#111827" stroke-width="2"/>',

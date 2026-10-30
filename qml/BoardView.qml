@@ -17,6 +17,8 @@ Item {
     property real panY: 0
     property var preview: null               // flèche en cours de tracé : {style, x1, y1, x2, y2} (normalisé)
     property var pendingArrow: null
+    property var lasso: null                 // rectangle de sélection en cours (écran) : {x1, y1, x2, y2}
+    readonly property bool multi: tool === "multi"
 
     readonly property real margin: 14
     readonly property real maxZoom: 8
@@ -254,6 +256,30 @@ Item {
         return best;
     }
 
+    // Sélectionne (en plus de l'existant) tout ce qui est dans le rectangle tracé.
+    function selectInLasso() {
+        var r = lasso;
+        lasso = null;
+        if (!r)
+            return;
+        var x0 = Math.min(r.x1, r.x2), x1 = Math.max(r.x1, r.x2);
+        var y0 = Math.min(r.y1, r.y2), y1 = Math.max(r.y1, r.y2);
+        function inside(p) { return p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1; }
+        var its = [], ars = [];
+        for (var i = 0; i < board.items.count; ++i) {
+            var it = board.items.get(i);
+            if (inside(toScreen(it.nx, it.ny)))
+                its.push(i);
+        }
+        for (var j = 0; j < board.arrows.length; ++j) {
+            var a = board.arrows[j];
+            var p1 = toScreen(a.x1, a.y1), p2 = toScreen(a.x2, a.y2);
+            if (inside(p1) || inside(p2) || inside(Qt.point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2)))
+                ars.push(j);
+        }
+        board.selectMany(its, ars);
+    }
+
     function flushArrow() {
         if (pendingArrow) {
             var a = pendingArrow;
@@ -274,6 +300,18 @@ Item {
         id: arrowTimer
         interval: 160
         onTriggered: view.flushArrow()
+    }
+
+    Rectangle {
+        visible: view.lasso !== null
+        x: view.lasso ? Math.min(view.lasso.x1, view.lasso.x2) : 0
+        y: view.lasso ? Math.min(view.lasso.y1, view.lasso.y2) : 0
+        width: view.lasso ? Math.abs(view.lasso.x2 - view.lasso.x1) : 0
+        height: view.lasso ? Math.abs(view.lasso.y2 - view.lasso.y1) : 0
+        color: "#332ecc71"
+        border.width: 2
+        border.color: Theme.accent
+        radius: 4
     }
 
     // --- Gestes ---------------------------------------------------------------------------------------
@@ -303,6 +341,11 @@ Item {
                     return;
                 }
                 var hit = view.tokenAt(press.x, press.y);
+                if (hit < 0 && view.multi) {
+                    mode = "lasso";
+                    view.lasso = { x1: press.x, y1: press.y, x2: press.x, y2: press.y };
+                    return;
+                }
                 if (hit >= 0) {
                     mode = "token";
                     index = hit;
@@ -318,7 +361,9 @@ Item {
                 startLeft = view.panX;
                 startTop = view.panY;
             } else {
-                if (mode === "token") {
+                if (mode === "lasso") {
+                    view.selectInLasso();
+                } else if (mode === "token") {
                     view.board.commit();
                 } else if (mode === "arrow" && view.preview) {
                     var p = view.preview;
@@ -339,7 +384,9 @@ Item {
                 return;
             var press = centroid.pressPosition, pos = centroid.position;
             var dx = pos.x - press.x, dy = pos.y - press.y;
-            if (mode === "pan") {
+            if (mode === "lasso") {
+                view.lasso = { x1: press.x, y1: press.y, x2: pos.x, y2: pos.y };
+            } else if (mode === "pan") {
                 view.place(view.zoom, startLeft + dx, startTop + dy);
             } else if (mode === "token") {
                 var target = view.toNorm(pressNorm.x + dx, pressNorm.y + dy);
@@ -411,14 +458,14 @@ Item {
                 if (tapCount === 2 && view.board.hasLabel(kind))
                     view.labelEditRequested(hit);
                 else
-                    view.board.selectItem(hit, false);
+                    view.board.selectItem(hit, view.multi);
                 return;
             }
-            if (view.tool === "select" || view.arrowTool) {
+            if (view.tool === "select" || view.multi || view.arrowTool) {
                 var ai = view.arrowAt(px, py);
                 if (ai >= 0)
-                    view.board.selectArrow(ai, false);
-                else
+                    view.board.selectArrow(ai, view.multi);
+                else if (!view.multi)
                     view.board.clearSelection();
                 return;
             }

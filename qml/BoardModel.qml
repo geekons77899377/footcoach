@@ -242,6 +242,28 @@ QtObject {
         _selectionChanged();
     }
 
+    // Ajoute à la sélection les éléments et flèches donnés (indices).
+    function selectMany(itemIdx, arrowIdx) {
+        for (var i = 0; i < itemIdx.length; ++i)
+            items.setProperty(itemIdx[i], "sel", true);
+        if (arrowIdx.length > 0) {
+            var list = arrows.slice();
+            for (var j = 0; j < arrowIdx.length; ++j)
+                list[arrowIdx[j]].sel = true;
+            arrows = list;
+        }
+        _selectionChanged();
+    }
+
+    function selectAll() {
+        var a = [], b = [];
+        for (var i = 0; i < items.count; ++i)
+            a.push(i);
+        for (var j = 0; j < arrows.length; ++j)
+            b.push(j);
+        selectMany(a, b);
+    }
+
     function selectArrow(index, additive) {
         if (!additive)
             clearSelection();

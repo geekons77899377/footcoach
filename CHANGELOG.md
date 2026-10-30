@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.4.2 — 2026-10-30
+- Tactique : nouvel outil « Multi » (sélection multiple) : toucher ajoute ou retire un élément ou une flèche, glisser sur le terrain entoure une zone, bouton « Tout » ; les actions (couleur, rotation, taille, suppression) et le déplacement s'appliquent au groupe.
+- Le menu « Plus » s'ouvre maintenant au-dessus de la barre de navigation du bas.
+
 ## 0.4.1 — 2026-10-30
 - Correction : erreurs QML « Cannot call method 'palette' of null » à la fermeture (le backend était détruit avant le moteur QML). Une erreur d'ouverture de la base est aussi écrite dans la console.
 

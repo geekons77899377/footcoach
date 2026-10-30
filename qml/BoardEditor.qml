@@ -28,6 +28,7 @@ Item {
 
     readonly property var tools: [
         { id: "select", text: "Sélection", icon: "t-select" },
+        { id: "multi", text: "Multi", icon: "t-multi" },
         { id: "player", text: "Joueur", icon: "t-player" },
         { id: "opponent", text: "Adversaire", icon: "t-opponent" },
         { id: "ball", text: "Ballon", icon: "t-ball" },
@@ -333,6 +334,43 @@ Item {
                 borderColor: Theme.border
                 enabled: view.zoom > 1.01
                 onClicked: view.fit()
+            }
+        }
+
+        // Aide de la sélection multiple.
+        Rectangle {
+            visible: editor.editable && editor.tool === "multi"
+            anchors.left: view.left
+            anchors.leftMargin: 12
+            anchors.top: view.top
+            anchors.topMargin: 12
+            width: Math.min(view.width - editor.zoomButton - 36, 360)
+            height: multiHint.implicitHeight + 20
+            radius: 16
+            color: "#d90f172a"
+            border.width: 1
+            border.color: Theme.border
+            Row {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 10
+                Text {
+                    id: multiHint
+                    width: parent.width - allButton.width - 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    wrapMode: Text.Wrap
+                    font.pixelSize: Math.round(13 * editor.u)
+                    color: Theme.text
+                    text: "Touchez pour ajouter ou retirer · glissez sur le terrain pour entourer"
+                }
+                AppButton {
+                    id: allButton
+                    anchors.verticalCenter: parent.verticalCenter
+                    kind: "outline"
+                    text: "Tout"
+                    implicitHeight: 40
+                    onClicked: board.selectAll()
+                }
             }
         }
 
