@@ -202,7 +202,7 @@ ApplicationWindow {
             HomePage {
                 onNavigate: (section, boardId) => win.go(section, boardId)
             }
-            PlaceholderPage { title: "Effectif"; iconName: "users" }
+            SquadPage { }
             PlaceholderPage { title: "Calendrier"; iconName: "calendar" }
             PlaceholderPage { title: "Présences"; iconName: "check" }
             PlaceholderPage { title: "Exercices"; iconName: "dumbbell" }

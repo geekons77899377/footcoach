@@ -6,13 +6,14 @@ Item {
 
     property string title: ""
     property string subtitle: ""
+    property int leftInset: 0             // place pour un bouton retour posé par la page
     default property alias actions: actionRow.data
 
     implicitHeight: 76
 
     Column {
         anchors.left: parent.left
-        anchors.leftMargin: Theme.gutter + 4
+        anchors.leftMargin: Theme.gutter + 4 + root.leftInset
         anchors.right: actionRow.left
         anchors.rightMargin: 8
         anchors.verticalCenter: parent.verticalCenter

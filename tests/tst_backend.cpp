@@ -156,6 +156,59 @@ private slots:
         QCOMPARE(spy.count(), 2);        // effacé
         QVERIFY(b.lastError().isEmpty());
     }
+
+    void teamsAndPlayers()
+    {
+        Backend b(m_db.handle());
+        QVERIFY(b.teams().isEmpty());
+        QVERIFY(!b.saveTeam({{"name", "  "}}).value("ok").toBool());
+        const QVariantMap t = b.saveTeam({{"name", "U15"}, {"category", "U15"}, {"season", "2026-2027"}});
+        QVERIFY(t.value("ok").toBool());
+        const int team = t.value("id").toInt();
+        QVERIFY(team > 0);
+        QCOMPARE(b.teams().size(), 1);
+
+        auto player = [&](const QString &first, const QString &last, int jersey) {
+            return QVariantMap{{"teamId", team}, {"firstName", first}, {"lastName", last},
+                               {"jerseyNumber", jersey}, {"position", "MID"}, {"birthDate", "2012-05-04"}};
+        };
+        const QVariantMap a = b.savePlayer(player("Léo", "Martin", 10));
+        QVERIFY2(a.value("ok").toBool(), qPrintable(a.value("error").toString()));
+        const int idA = a.value("id").toInt();
+
+        // Numéro déjà pris, nom vide, date invalide, poste inconnu : refus.
+        QVERIFY(!b.savePlayer(player("Max", "Durand", 10)).value("ok").toBool());
+        QVERIFY(!b.savePlayer(player("", "Durand", 7)).value("ok").toBool());
+        QVariantMap bad = player("Max", "Durand", 7);
+        bad["birthDate"] = "31/02/2012";
+        QVERIFY(!b.savePlayer(bad).value("ok").toBool());
+        bad = player("Max", "Durand", 7);
+        bad["position"] = "XXX";
+        QVERIFY(!b.savePlayer(bad).value("ok").toBool());
+        QCOMPARE(b.players(team, true).size(), 1);
+
+        // Modifier le joueur sans changer son numéro reste possible.
+        QVariantMap edit = player("Léo", "Martin", 10);
+        edit["id"] = idA;
+        edit["phone"] = "0600000000";
+        QVERIFY(b.savePlayer(edit).value("ok").toBool());
+        const QVariantMap read = b.players(team, true).first().toMap();
+        QCOMPARE(read.value("phone").toString(), QStringLiteral("0600000000"));
+        QCOMPARE(read.value("birthDate").toString(), QStringLiteral("2012-05-04"));
+        QVERIFY(read.value("age").toInt() >= 13);
+
+        // Désactivé : son numéro se libère ; la réactivation est refusée si le numéro a été repris.
+        QVERIFY(b.setPlayerActive(idA, false).value("ok").toBool());
+        QCOMPARE(b.players(team, false).size(), 0);
+        QVERIFY(b.savePlayer(player("Max", "Durand", 10)).value("ok").toBool());
+        QVERIFY(!b.setPlayerActive(idA, true).value("ok").toBool());
+
+        QVERIFY(b.deletePlayer(idA).value("ok").toBool());
+        QCOMPARE(b.players(team, true).size(), 1);
+        QCOMPARE(b.teams().first().toMap().value("playerCount").toInt(), 1);
+        QVERIFY(b.deleteTeam(team).value("ok").toBool());
+        QVERIFY(b.teams().isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(BackendTest)

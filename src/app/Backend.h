@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/BoardRepository.h"
+#include "core/PlayerRepository.h"
+#include "core/TeamRepository.h"
 
 #include <QObject>
 #include <QSqlDatabase>
@@ -45,6 +47,21 @@ public:
     // Couleurs proposées : [{name, color}].
     Q_INVOKABLE QVariantList palette() const;
 
+    // --- Équipes et joueurs ---------------------------------------------------------------------
+    // Équipes : [{id, name, category, season, playerCount}], triées comme dans la base.
+    Q_INVOKABLE QVariantList teams();
+    // Crée (id absent ou <= 0) ou modifie une équipe : {id, name, category, season}. Résultat {ok, id, error}.
+    Q_INVOKABLE QVariantMap saveTeam(const QVariantMap &team);
+    Q_INVOKABLE QVariantMap deleteTeam(int id);         // supprime aussi joueurs, séances et présences (cascade)
+    // Joueurs d'une équipe : [{id, teamId, firstName, lastName, fullName, birthDate (yyyy-MM-dd ou vide),
+    // age (-1 si inconnu), jerseyNumber (0 = aucun), position, preferredFoot, phone, email, notes, active}].
+    Q_INVOKABLE QVariantList players(int teamId, bool includeInactive);
+    // Crée (id absent ou <= 0) ou modifie un joueur. Refus : nom ou prénom vide, date invalide, numéro hors 0..99
+    // ou déjà porté par un autre joueur actif de l'équipe, poste ou pied inconnu. Résultat {ok, id, error}.
+    Q_INVOKABLE QVariantMap savePlayer(const QVariantMap &player);
+    Q_INVOKABLE QVariantMap setPlayerActive(int id, bool active);   // la réactivation vérifie le numéro
+    Q_INVOKABLE QVariantMap deletePlayer(int id);                   // définitif (présences et blessures aussi)
+
 signals:
     void lastErrorChanged();
 
@@ -54,5 +71,7 @@ private:
 
     QSqlDatabase m_db;
     BoardRepository m_repo;
+    TeamRepository m_teams;
+    PlayerRepository m_players;
     QString m_lastError;
 };

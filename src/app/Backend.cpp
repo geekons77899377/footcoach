@@ -2,12 +2,13 @@
 
 #include "core/TacticalBoard.h"
 
+#include <QDate>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
 Backend::Backend(const QSqlDatabase &db, QObject *parent)
-    : QObject(parent), m_db(db), m_repo(db)
+    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_players(db)
 {
 }
 
@@ -196,4 +197,183 @@ QVariantList Backend::palette() const
         result.append(m);
     }
     return result;
+}
+
+// --- Équipes et joueurs -------------------------------------------------------------------------------
+
+namespace {
+
+QVariantMap result(bool ok, int id = -1, const QString &error = QString())
+{
+    QVariantMap m;
+    m.insert(QStringLiteral("ok"), ok);
+    m.insert(QStringLiteral("id"), id);
+    m.insert(QStringLiteral("error"), error);
+    return m;
+}
+
+int ageOf(const QDate &birth)
+{
+    if (!birth.isValid())
+        return -1;
+    const QDate today = QDate::currentDate();
+    int age = today.year() - birth.year();
+    if (today.month() < birth.month() || (today.month() == birth.month() && today.day() < birth.day()))
+        --age;
+    return age < 0 ? -1 : age;
+}
+
+QVariantMap toMap(const Player &p)
+{
+    QVariantMap m;
+    m.insert(QStringLiteral("id"), p.id);
+    m.insert(QStringLiteral("teamId"), p.teamId);
+    m.insert(QStringLiteral("firstName"), p.firstName);
+    m.insert(QStringLiteral("lastName"), p.lastName);
+    m.insert(QStringLiteral("fullName"), p.fullName());
+    m.insert(QStringLiteral("birthDate"), p.birthDate.isValid() ? p.birthDate.toString(Qt::ISODate) : QString());
+    m.insert(QStringLiteral("age"), ageOf(p.birthDate));
+    m.insert(QStringLiteral("jerseyNumber"), p.jerseyNumber);
+    m.insert(QStringLiteral("position"), p.position);
+    m.insert(QStringLiteral("preferredFoot"), p.preferredFoot);
+    m.insert(QStringLiteral("phone"), p.phone);
+    m.insert(QStringLiteral("email"), p.email);
+    m.insert(QStringLiteral("notes"), p.notes);
+    m.insert(QStringLiteral("active"), p.active);
+    return m;
+}
+
+} // namespace
+
+QVariantList Backend::teams()
+{
+    QVariantList list;
+    QString error;
+    const QList<Team> all = m_teams.all(&error);
+    setError(error);
+    for (const Team &t : all) {
+        QVariantMap m;
+        m.insert(QStringLiteral("id"), t.id);
+        m.insert(QStringLiteral("name"), t.name);
+        m.insert(QStringLiteral("category"), t.category);
+        m.insert(QStringLiteral("season"), t.season);
+        m.insert(QStringLiteral("playerCount"), m_teams.playerCount(t.id));
+        list.append(m);
+    }
+    return list;
+}
+
+QVariantMap Backend::saveTeam(const QVariantMap &team)
+{
+    Team t;
+    t.id = team.value(QStringLiteral("id"), -1).toInt();
+    t.name = team.value(QStringLiteral("name")).toString().trimmed();
+    t.category = team.value(QStringLiteral("category")).toString().trimmed();
+    t.season = team.value(QStringLiteral("season")).toString().trimmed();
+    if (t.name.isEmpty()) {
+        setError(tr("Le nom de l'équipe est obligatoire."));
+        return result(false, -1, m_lastError);
+    }
+    QString error;
+    const bool ok = t.id > 0 ? m_teams.update(t, &error) : m_teams.insert(t, &error);
+    setError(error);
+    return ok ? result(true, t.id) : result(false, -1, error);
+}
+
+QVariantMap Backend::deleteTeam(int id)
+{
+    QString error;
+    const bool ok = m_teams.remove(id, &error);
+    setError(error);
+    return result(ok, id, error);
+}
+
+QVariantList Backend::players(int teamId, bool includeInactive)
+{
+    QVariantList list;
+    QString error;
+    const QList<Player> all = m_players.list(teamId, includeInactive, &error);
+    setError(error);
+    for (const Player &p : all)
+        list.append(toMap(p));
+    return list;
+}
+
+QVariantMap Backend::savePlayer(const QVariantMap &in)
+{
+    Player p;
+    p.id = in.value(QStringLiteral("id"), -1).toInt();
+    p.teamId = in.value(QStringLiteral("teamId"), -1).toInt();
+    p.firstName = in.value(QStringLiteral("firstName")).toString().trimmed();
+    p.lastName = in.value(QStringLiteral("lastName")).toString().trimmed();
+    p.jerseyNumber = in.value(QStringLiteral("jerseyNumber"), 0).toInt();
+    p.position = in.value(QStringLiteral("position")).toString();
+    p.preferredFoot = in.value(QStringLiteral("preferredFoot")).toString();
+    p.phone = in.value(QStringLiteral("phone")).toString().trimmed();
+    p.email = in.value(QStringLiteral("email")).toString().trimmed();
+    p.notes = in.value(QStringLiteral("notes")).toString().trimmed();
+    p.active = in.value(QStringLiteral("active"), true).toBool();
+
+    const QString birth = in.value(QStringLiteral("birthDate")).toString().trimmed();
+    if (!birth.isEmpty()) {
+        p.birthDate = QDate::fromString(birth, Qt::ISODate);
+        if (!p.birthDate.isValid() || p.birthDate > QDate::currentDate()) {
+            setError(tr("La date de naissance n'est pas valide."));
+            return result(false, -1, m_lastError);
+        }
+    }
+
+    QString problem;
+    if (p.teamId <= 0)
+        problem = tr("Aucune équipe sélectionnée.");
+    else if (p.firstName.isEmpty() || p.lastName.isEmpty())
+        problem = tr("Le nom et le prénom sont obligatoires.");
+    else if (p.jerseyNumber < 0 || p.jerseyNumber > 99)
+        problem = tr("Le numéro de maillot doit être compris entre 1 et 99.");
+    else if (!p.position.isEmpty() && p.position != QLatin1String("GK") && p.position != QLatin1String("DEF")
+             && p.position != QLatin1String("MID") && p.position != QLatin1String("FWD"))
+        problem = tr("Poste inconnu.");
+    else if (!p.preferredFoot.isEmpty() && p.preferredFoot != QLatin1String("R")
+             && p.preferredFoot != QLatin1String("L") && p.preferredFoot != QLatin1String("B"))
+        problem = tr("Pied fort inconnu.");
+    else if (p.active && p.jerseyNumber > 0 && m_players.jerseyTaken(p.teamId, p.jerseyNumber, p.id))
+        problem = tr("Le numéro %1 est déjà porté par un autre joueur actif de l'équipe.").arg(p.jerseyNumber);
+    if (!problem.isEmpty()) {
+        setError(problem);
+        return result(false, -1, problem);
+    }
+
+    QString error;
+    const bool ok = p.id > 0 ? m_players.update(p, &error) : m_players.insert(p, &error);
+    setError(error);
+    return ok ? result(true, p.id) : result(false, -1, error);
+}
+
+QVariantMap Backend::setPlayerActive(int id, bool active)
+{
+    QString error;
+    if (active) {
+        // Réactivation : le numéro ne doit pas avoir été repris entre-temps.
+        for (const Team &t : m_teams.all(&error)) {
+            for (const Player &p : m_players.list(t.id, true, &error)) {
+                if (p.id == id && p.jerseyNumber > 0 && m_players.jerseyTaken(p.teamId, p.jerseyNumber, id)) {
+                    const QString msg = tr("Le numéro %1 est maintenant porté par un autre joueur actif. "
+                                           "Changez-le avant de réactiver ce joueur.").arg(p.jerseyNumber);
+                    setError(msg);
+                    return result(false, id, msg);
+                }
+            }
+        }
+    }
+    const bool ok = m_players.setActive(id, active, &error);
+    setError(error);
+    return result(ok, id, error);
+}
+
+QVariantMap Backend::deletePlayer(int id)
+{
+    QString error;
+    const bool ok = m_players.remove(id, &error);
+    setError(error);
+    return result(ok, id, error);
 }
