@@ -1,3 +1,4 @@
+#include <QDebug>
 #include <QDir>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -27,11 +28,15 @@ int main(int argc, char *argv[])
     QString error;
     const bool opened = db.open(dbPath, &error);
 
-    QQmlApplicationEngine engine;
+    // Déclaré AVANT le moteur QML : il est détruit après lui (sinon les liaisons QML lisent un « backend » nul
+    // pendant la fermeture).
     QScopedPointer<Backend> backend;
     if (opened) {
         backend.reset(new Backend(db.handle()));
+    } else {
+        qWarning().noquote() << "Base de données :" << error;
     }
+    QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("backend"), backend.data());
     engine.rootContext()->setContextProperty(QStringLiteral("startupError"),
                                              opened ? QString() : QObject::tr("Impossible d'ouvrir la base de données :\n%1").arg(error));
