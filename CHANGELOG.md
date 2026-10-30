@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.5.3 — 2026-10-30
+- Tactique, écran tactile : corrige le placement des joueurs et autres éléments. Chaque toucher déclenchait aussi le « clic droit » (retour à la sélection), si bien que l'outil était remis sur « sélection » avant la pose. Ce retour à la sélection est maintenant réservé à la souris.
+- Vérifié ici avec un écran tactile simulé (QML hors écran) : avant, aucun élément posé ; après, un élément par toucher. Non vérifié sur l'émulateur ni sur un appareil.
+
 ## 0.5.2 — 2026-10-30
 - Calendrier : mois et séances côte à côte dès 640 px de large (tablette 10 pouces en portrait), au lieu de 760 px.
 

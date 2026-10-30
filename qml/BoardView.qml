@@ -474,8 +474,11 @@ Item {
         }
     }
 
+    // Clic droit (souris) : retour à la sélection. Sur écran tactile, acceptedButtons est ignoré : sans cette
+    // condition, chaque toucher remettait l'outil sur « sélection » et rien ne se posait.
     TapHandler {
         acceptedButtons: Qt.RightButton
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onTapped: view.selectToolRequested()
     }
 
