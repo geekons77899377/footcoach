@@ -2,6 +2,8 @@
 
 #include "core/BoardRepository.h"
 #include "core/AttendanceRepository.h"
+#include "core/ExerciseRepository.h"
+#include "core/PlanRepository.h"
 #include "core/PlayerRepository.h"
 #include "core/SessionRepository.h"
 #include "core/TeamRepository.h"
@@ -95,6 +97,27 @@ public:
     // séance, "" si non concerné]}]}, classés par taux décroissant.
     Q_INVOKABLE QVariantMap attendanceStats(int teamId, const QString &from, const QString &to);
 
+    // --- Exercices ------------------------------------------------------------------------------------
+    // Catégories : [{id, text}] (échauffement, technique…).
+    Q_INVOKABLE QVariantList exerciseCategories() const;
+    // Bibliothèque triée par titre : [{id, title, category, categoryLabel, objective, durationMin, playersMin,
+    // playersMax, equipment, description, archived, usage}] ; les archivés seulement sur demande.
+    Q_INVOKABLE QVariantList exercises(bool includeArchived);
+    Q_INVOKABLE QVariantMap saveExercise(const QVariantMap &exercise);   // id < 0 : création
+    Q_INVOKABLE QVariantMap setExerciseArchived(int id, bool archived);
+    Q_INVOKABLE QVariantMap deleteExercise(int id);      // refusé si l'exercice est dans un plan
+
+    // --- Plan de séance -------------------------------------------------------------------------------
+    // {ok, error, session: {...}, entries: [{itemId, position, start, end (HH:mm), durationMin, notes, exerciseId,
+    // title, category, categoryLabel, objective, equipment, description, archived}], totalMin, sessionMin,
+    // equipment: [matériel à prévoir, sans doublon]}.
+    Q_INVOKABLE QVariantMap plan(int sessionId);
+    // durationMin <= 0 : la durée conseillée de l'exercice, ou 15 min à défaut.
+    Q_INVOKABLE QVariantMap addToPlan(int sessionId, int exerciseId, int durationMin);
+    Q_INVOKABLE QVariantMap updatePlanItem(int itemId, int durationMin, const QString &notes);
+    Q_INVOKABLE QVariantMap removePlanItem(int itemId);
+    Q_INVOKABLE QVariantMap movePlanItem(int itemId, int delta);       // -1 : monte, +1 : descend
+
 signals:
     void lastErrorChanged();
 
@@ -108,5 +131,7 @@ private:
     PlayerRepository m_players;
     SessionRepository m_sessions;
     AttendanceRepository m_attendance;
+    ExerciseRepository m_exercises;
+    PlanRepository m_plan;
     QString m_lastError;
 };

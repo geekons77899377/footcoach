@@ -8,7 +8,7 @@
 #include <QJsonObject>
 
 Backend::Backend(const QSqlDatabase &db, QObject *parent)
-    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_players(db), m_sessions(db), m_attendance(db)
+    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_players(db), m_sessions(db), m_attendance(db), m_exercises(db), m_plan(db)
 {
 }
 

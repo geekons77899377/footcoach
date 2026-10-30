@@ -210,6 +210,73 @@ private slots:
         QVERIFY(b.teams().isEmpty());
     }
 
+    void exercisesAndPlan()
+    {
+        Backend b(m_db.handle());
+
+        // Bibliothèque de départ, catégories, validation.
+        const QVariantList base = b.exercises(false);
+        QVERIFY(base.size() >= 10);
+        QCOMPARE(b.exerciseCategories().size(), 6);
+        QVERIFY(!b.saveExercise({{"title", "  "}}).value("ok").toBool());
+        QVERIFY(!b.saveExercise({{"title", "X"}, {"category", "inconnu"}}).value("ok").toBool());
+        QVERIFY(!b.saveExercise({{"title", "X"}, {"playersMin", 8}, {"playersMax", 4}}).value("ok").toBool());
+
+        const QVariantMap e1 = b.saveExercise({{"title", " Rondo 5 contre 2 "}, {"category", "technical"},
+                                               {"durationMin", 20}, {"equipment", "Ballons, plots; chasubles"}});
+        QVERIFY2(e1.value("ok").toBool(), qPrintable(e1.value("error").toString()));
+        const int ex1 = e1.value("id").toInt();
+        const QVariantMap e2 = b.saveExercise({{"title", "Jeu réduit"}, {"category", "game"},
+                                               {"equipment", "ballons, Cages"}});
+        const int ex2 = e2.value("id").toInt();
+        QCOMPARE(b.exercises(false).size(), base.size() + 2);
+
+        // Séance + plan : durée par défaut (conseillée, sinon 15), horaires, total, matériel sans doublon.
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        const int sess = b.saveSession({{"teamId", team}, {"date", "2026-11-03"}, {"time", "18:30"},
+                                        {"durationMin", 30}}, false).value("id").toInt();
+        QVERIFY(sess > 0);
+        const int i1 = b.addToPlan(sess, ex1, 0).value("id").toInt();
+        const int i2 = b.addToPlan(sess, ex2, 0).value("id").toInt();
+        QVERIFY(i1 > 0 && i2 > 0);
+
+        QVariantMap plan = b.plan(sess);
+        QVERIFY(plan.value("ok").toBool());
+        QVariantList rows = plan.value("entries").toList();
+        QCOMPARE(rows.size(), 2);
+        QCOMPARE(rows.at(0).toMap().value("durationMin").toInt(), 20);     // conseillée
+        QCOMPARE(rows.at(1).toMap().value("durationMin").toInt(), 15);     // à défaut
+        QCOMPARE(rows.at(0).toMap().value("start").toString(), QStringLiteral("18:30"));
+        QCOMPARE(rows.at(1).toMap().value("start").toString(), QStringLiteral("18:50"));
+        QCOMPARE(rows.at(1).toMap().value("end").toString(), QStringLiteral("19:05"));
+        QCOMPARE(plan.value("totalMin").toInt(), 35);
+        QCOMPARE(plan.value("sessionMin").toInt(), 30);
+        const QStringList gear = plan.value("equipment").toStringList();
+        QCOMPARE(gear, (QStringList{"Ballons", "plots", "chasubles", "Cages"}));
+
+        // Modification, ordre, retrait.
+        QVERIFY(b.updatePlanItem(i2, 10, "Deux touches").value("ok").toBool());
+        QVERIFY(!b.updatePlanItem(i2, 999, "").value("ok").toBool());
+        QVERIFY(b.movePlanItem(i2, -1).value("ok").toBool());
+        rows = b.plan(sess).value("entries").toList();
+        QCOMPARE(rows.at(0).toMap().value("itemId").toInt(), i2);
+        QCOMPARE(rows.at(0).toMap().value("notes").toString(), QStringLiteral("Deux touches"));
+        QCOMPARE(b.plan(sess).value("totalMin").toInt(), 30);
+
+        // Un exercice utilisé ne se supprime pas : on l'archive ; il reste lisible dans le plan.
+        QVERIFY(!b.deleteExercise(ex1).value("ok").toBool());
+        QVERIFY(b.setExerciseArchived(ex1, true).value("ok").toBool());
+        QCOMPARE(b.exercises(false).size(), base.size() + 1);
+        QCOMPARE(b.plan(sess).value("entries").toList().size(), 2);
+        QVERIFY(b.removePlanItem(i1).value("ok").toBool());
+        QVERIFY(b.deleteExercise(ex1).value("ok").toBool());
+
+        // Séance annulée : pas d'ajout au plan ; séance inconnue : erreur.
+        QVERIFY(b.setSessionStatus(sess, "cancelled", false).value("ok").toBool());
+        QVERIFY(!b.addToPlan(sess, ex2, 10).value("ok").toBool());
+        QVERIFY(!b.plan(9999).value("ok").toBool());
+    }
+
     void sessionsAttendanceAndStats()
     {
         Backend b(m_db.handle());

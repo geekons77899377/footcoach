@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.7.0 — 2026-10-30
+- Exercices en QML : bibliothèque (recherche, filtre par catégorie, archivés), fiche d'un exercice (titre, catégorie, objectif, durée, joueurs, matériel, description), archivage, suppression refusée si l'exercice est dans un plan.
+- Séances en QML : séances de l'équipe (à venir / passées) avec résumé du plan, plan de la séance : ajout d'un exercice de la bibliothèque, ordre (monter / descendre), durée et notes de la séance, horaires calculés, total comparé à la durée de la séance (avertissement s'il dépasse), matériel à prévoir sans doublon.
+- Backend : API exercices et plan (`exercises`, `saveExercise`, `plan`, `addToPlan`…), 11 tests dont un nouveau couvrant exercices et plan.
+- Pas encore fait : export PDF de la fiche de séance (sur Android, il demande l'enregistrement dans un dossier choisi ou le partage), liaison d'un schéma tactique à un exercice.
+- Non vérifié ici : compilation Qt Quick et affichage sur appareil ; l'affichage a été contrôlé hors écran (téléphone et tablette) avec un backend simulé.
+- Doc de publication : un seul ABI (arm64-v8a) suffit pour Google Play.
+
 ## 0.6.0 — 2026-10-30
 Préparation de la publication sur Google Play (rien n'est publié).
 - Icône : ballon rond vert (icône adaptative Android 8+ et icône classique), icône 512 × 512 pour la fiche (`store/icon-512.png`), source `store/icon.svg`, script `tools/make_icons.py`.

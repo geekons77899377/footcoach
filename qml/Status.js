@@ -25,3 +25,10 @@ function rateColor(rate) {
     if (rate >= 0.6) return "#f59e0b";
     return "#ef4444";
 }
+
+// Catégories d'exercice : couleur d'accompagnement.
+var CATEGORY = {
+    warmup: "#f59e0b", technical: "#60a5fa", tactical: "#a78bfa",
+    physical: "#ef4444", game: "#2ecc71", cooldown: "#38bdf8"
+};
+function categoryColor(code) { return CATEGORY[code] || "#64748b"; }

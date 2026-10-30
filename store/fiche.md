@@ -14,8 +14,10 @@ FootCoach aide les entraîneurs de football à 11 à préparer et suivre leurs e
 • Calendrier : vue jour, semaine ou mois, séances ponctuelles ou récurrentes, alerte en cas de chevauchement.
 • Appel : présent, absent, excusé ou blessé, en quelques touches.
 • Suivi : taux de présence par joueur sur 30 jours, 3 mois ou 12 mois.
+• Exercices : bibliothèque de départ, vos propres exercices (catégorie, durée, joueurs, matériel, description).
+• Séances : composez le plan de chaque séance, avec horaires calculés, durée totale et matériel à prévoir.
 
 Vos données restent sur votre appareil : aucun compte, aucune publicité, aucune connexion Internet.
 
-*À vérifier avant publication : n'écrire que ce que la version publiée sait faire (Exercices et Séances, export PDF
-ne sont pas encore disponibles en QML).*
+*À vérifier avant publication : n'écrire que ce que la version publiée sait faire (l'export PDF de la fiche de séance
+n'est pas encore disponible en QML).*

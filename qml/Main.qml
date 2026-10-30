@@ -212,8 +212,8 @@ ApplicationWindow {
             SquadPage { }
             CalendarPage { }
             AttendancePage { }
-            PlaceholderPage { title: "Exercices"; iconName: "dumbbell" }
-            PlaceholderPage { title: "Séances"; iconName: "clipboard" }
+            ExercisesPage { }
+            SessionsPage { }
             TacticsPage { id: tactics }
         }
 

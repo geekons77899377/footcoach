@@ -10,9 +10,9 @@ Sources : [niveau d'API cible](https://developer.android.com/google/play/require
 |---|---|---|
 | Identifiant | `org.footcoach.app` | Ne plus changer après la première publication. |
 | `minSdk` / `targetSdk` | 23 / **36** | API 36 exigée pour les nouvelles applications depuis le 31/08/2026. |
-| `versionCode` | 12 | À augmenter à chaque envoi sur Google Play. |
+| `versionCode` | 13 | À augmenter à chaque envoi sur Google Play. |
 | Version | `project(FootCoach VERSION …)` | Source unique : `versionName` en découle. |
-| ABI | arm64-v8a **et** armeabi-v7a | Voir §3. |
+| ABI | arm64-v8a seule | Google Play exige le 64 bits ; le 32 bits est facultatif ([règle](https://developer.android.com/google/play/requirements/64-bit)). |
 | Qt | 6.9.3 minimum | Première version 6.9 compatible avec les pages de 16 Ko. |
 
 À vérifier sur l'AAB ou l'APK produit (Release) :
@@ -32,8 +32,7 @@ keytool -genkeypair -v -keystore D:\Secrets\footcoach-upload.jks -alias footcoac
 
 ## 3. Compilation Release dans Qt Creator
 1. Kit **Android Qt 6.9.3 Clang arm64-v8a** ; configuration **Release**.
-2. *Projets → Construire → Paramètres de construction Android* : cocher les ABI **arm64-v8a** et **armeabi-v7a**
-   (installer le kit armv7 de Qt si besoin via la Maintenance Tool).
+2. ABI : le kit **arm64-v8a** suffit (un seul APK / AAB 64 bits).
 3. Étape *Build Android APK* : cocher **Sign package**, choisir le `.jks` et l'alias ; cocher
    **Build Android App Bundle (*.aab)** pour la production.
 4. Résultats : `…/android-build-FootCoach/build/outputs/bundle/release/*.aab` (pour Google Play) et
