@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtCore
 
 // Éditeur d'un schéma tactique : en-tête, terrain, barre d'outils (en bas en portrait, à gauche en paysage)
 // et barre d'actions sur la sélection. Enregistrement automatique après chaque modification.
@@ -274,9 +275,27 @@ Item {
             }
         }
 
-        // Aide, tant que le schéma est vide.
+        // Aide : affichée une seule fois (quelques secondes), tant que le schéma est vide ; disparaît dès qu'on
+        // choisit un outil, qu'on la touche ou qu'on place quelque chose.
+        Settings {
+            id: prefs
+            category: "board"
+            property bool hintSeen: false
+        }
+        Timer {
+            id: hintTimer
+            interval: 8000
+            running: hintBox.visible
+            onTriggered: prefs.hintSeen = true
+        }
+        Connections {
+            target: editor
+            function onToolChanged() { if (editor.tool !== "select") prefs.hintSeen = true; }
+        }
         Rectangle {
-            visible: editor.editable && board.items.count === 0 && board.arrows.length === 0
+            id: hintBox
+            visible: editor.editable && !prefs.hintSeen && board.items.count === 0 && board.arrows.length === 0
+            MouseArea { anchors.fill: parent; onClicked: prefs.hintSeen = true }
             anchors.left: view.left
             anchors.leftMargin: 12
             anchors.top: view.top

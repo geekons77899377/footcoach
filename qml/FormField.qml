@@ -12,6 +12,10 @@ Column {
     property int maxLength: 100
     property int inputHints: Qt.ImhNone
     property bool required: false
+    property string actionIcon: ""          // bouton rond à droite du champ (ex. calendrier)
+    property string actionName: ""
+    signal actionClicked()
+    signal editingFinished()
 
     function focusField() { field.forceActiveFocus(); }
 
@@ -31,6 +35,18 @@ Column {
         border.width: 1
         border.color: field.activeFocus ? Theme.accent : Theme.border
 
+        IconButton {
+            visible: root.actionIcon !== ""
+            z: 2
+            anchors.right: parent.right
+            anchors.rightMargin: 3
+            anchors.verticalCenter: parent.verticalCenter
+            diameter: 42
+            iconName: root.actionIcon
+            iconColor: Theme.accent
+            accessibleName: root.actionName
+            onClicked: root.actionClicked()
+        }
         Flickable {
             anchors.fill: parent
             anchors.margins: 2
@@ -47,13 +63,14 @@ Column {
                 selectByMouse: true
                 background: null
                 leftPadding: 12
-                rightPadding: 12
+                rightPadding: root.actionIcon !== "" ? 52 : 12
                 verticalAlignment: root.multiline ? TextEdit.AlignTop : TextEdit.AlignVCenter
                 inputMethodHints: root.inputHints
                 onTextChanged: {
                     if (text.length > root.maxLength)
                         text = text.substring(0, root.maxLength);
                 }
+                onActiveFocusChanged: if (!activeFocus) root.editingFinished()
                 Keys.onReturnPressed: (event) => {
                     if (root.multiline)
                         event.accepted = false;

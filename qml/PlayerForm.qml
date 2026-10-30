@@ -24,15 +24,48 @@ Item {
         { id: "R", text: "Droit" }, { id: "L", text: "Gauche" }, { id: "B", text: "Les deux" }
     ]
 
-    // "JJ/MM/AAAA" <-> "AAAA-MM-JJ".
-    function isoFromDisplay(text) {
+    property string category: ""           // catégorie de l'équipe (ex. U15, Seniors) : choisit l'année proposée
+
+    // Année de naissance proposée par le sélecteur : milieu de la tranche d'âge de la catégorie, ou d'environ
+    // 12 ans (entre U6 et seniors) si elle est inconnue.
+    readonly property int suggestedYear: {
+        var now = new Date().getFullYear();
+        var m = /U\s*(\d+)/i.exec(category);
+        if (m)
+            return now - Math.max(4, parseInt(m[1], 10) - 1);
+        if (/s[ée]nior|v[ée]t[ée]ran/i.test(category))
+            return now - 25;
+        return now - 12;
+    }
+
+    // Saisie libre : "02062016", "02/06/2016", "2.6.2016", "2-6-2016"… -> "AAAA-MM-JJ" ("" si vide, texte brut si
+    // illisible : le backend le refusera). Un jour ou un mois impossible (31/02) est rejeté.
+    function parseDate(text) {
         var t = text.trim();
         if (t === "")
             return "";
-        var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(t);
-        if (!m)
-            return t;                      // laissé tel quel : le backend le refusera
-        return m[3] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2);
+        var d, mo, y, m;
+        if (/^\d{8}$/.test(t)) {
+            d = t.substring(0, 2); mo = t.substring(2, 4); y = t.substring(4, 8);
+        } else if ((m = /^(\d{1,2})[\s\/.\-](\d{1,2})[\s\/.\-](\d{4})$/.exec(t))) {
+            d = m[1]; mo = m[2]; y = m[3];
+        } else {
+            return t;
+        }
+        var dn = parseInt(d, 10), mn = parseInt(mo, 10), yn = parseInt(y, 10);
+        var check = new Date(yn, mn - 1, dn);
+        if (check.getFullYear() !== yn || check.getMonth() !== mn - 1 || check.getDate() !== dn)
+            return t;
+        return y + "-" + ("0" + mn).slice(-2) + "-" + ("0" + dn).slice(-2);
+    }
+
+    function isoFromDisplay(text) { return parseDate(text); }
+
+    // Met en forme la saisie en JJ/MM/AAAA quand elle est valide.
+    function normalizeBirth() {
+        var iso = parseDate(birth.text);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(iso))
+            birth.text = displayFromIso(iso);
     }
 
     function displayFromIso(iso) {
@@ -127,6 +160,11 @@ Item {
         onClicked: root.closeRequested()
     }
 
+    DatePicker {
+        id: datePicker
+        onPicked: (iso) => birth.text = root.displayFromIso(iso)
+    }
+
     ActionSheet {
         id: moreSheet
         title: "Joueur"
@@ -197,6 +235,12 @@ Item {
                     placeholder: "JJ/MM/AAAA"
                     maxLength: 10
                     inputHints: Qt.ImhPreferNumbers
+                    actionIcon: "calendar"
+                    actionName: "Choisir la date de naissance"
+                    onActionClicked: {
+                        datePicker.openAt(root.parseDate(birth.text), root.suggestedYear);
+                    }
+                    onEditingFinished: root.normalizeBirth()
                 }
             }
             ChipRow { id: position; width: parent.width; label: "Poste"; options: root.positions }

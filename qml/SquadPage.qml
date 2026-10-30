@@ -381,6 +381,7 @@ Item {
 
     PlayerForm {
         id: form
+        category: page.team ? page.team.category : ""
         x: page.split ? page.listWidth : 0
         width: page.width - x
         height: page.height
