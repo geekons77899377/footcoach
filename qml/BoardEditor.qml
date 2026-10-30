@@ -78,6 +78,12 @@ Item {
             toast.show("Enregistrement impossible : " + backend.lastError);
     }
 
+    // Les données de l'appareil ont été remplacées : abandonne l'enregistrement en attente du schéma ouvert.
+    function discard() {
+        saveTimer.stop();
+        boardId = -1;
+    }
+
     function flush() {
         if (saveTimer.running)
             save();

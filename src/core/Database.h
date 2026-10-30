@@ -8,7 +8,8 @@
 class Database
 {
 public:
-    Database() = default;
+    // Le nom de connexion doit être unique par instance ouverte en même temps (tests qui ouvrent deux bases).
+    explicit Database(const QString &connectionName = QStringLiteral("footcoach")) : m_connection(connectionName) {}
     ~Database();
 
     Database(const Database &) = delete;
@@ -28,5 +29,5 @@ private:
     bool applyScript(const QString &resourcePath, QString *error);
 
     QString m_path;
-    const QString m_connection = QStringLiteral("footcoach");
+    const QString m_connection;
 };

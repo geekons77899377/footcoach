@@ -96,6 +96,14 @@ Item {
         refreshData();
     }
     onScopeChanged: refreshData()
+    Connections {
+        target: backend
+        function onDataReplaced() {
+            page.mode = "browse";
+            page.refresh();
+        }
+    }
+
     Component.onCompleted: refresh()
     onVisibleChanged: if (visible) refresh()
 

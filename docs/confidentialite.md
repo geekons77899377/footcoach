@@ -19,9 +19,16 @@ l'application ne reçoit, ne collecte et ne consulte aucune de ces données.
 - Aucune publicité, aucun outil de mesure d'audience, aucun service tiers.
 - Aucune permission Android n'est demandée.
 
+## Export et import volontaires
+La page « Données » permet de créer un fichier contenant toutes vos données, que vous envoyez vous-même (par exemple
+par WhatsApp ou e-mail) à un autre de vos appareils. Ce transfert est initié par vous, passe par l'application de votre
+choix et n'implique aucun serveur de l'éditeur de FootCoach. L'application elle-même n'envoie rien. Le fichier contient
+les noms, dates de naissance et coordonnées saisis : traitez-le comme vos données d'origine.
+
 ## Durée de conservation et suppression
 Les données restent sur l'appareil jusqu'à leur suppression dans l'application ou jusqu'à la désinstallation
-de l'application, qui efface toutes les données.
+de l'application, qui efface toutes les données. Avant un import, l'application garde dans son dossier privé les trois
+dernières copies de vos données (elles disparaissent aussi avec l'application).
 
 ## Responsabilité de l'utilisateur
 Si vous saisissez des données concernant des joueurs, notamment des mineurs, vous êtes responsable de leur

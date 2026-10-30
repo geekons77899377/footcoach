@@ -88,6 +88,14 @@ Item {
         return team.name + " · " + count;
     }
 
+    Connections {
+        target: backend
+        function onDataReplaced() {
+            page.closeForm();
+            page.refreshTeams();
+        }
+    }
+
     onShowInactiveChanged: refreshPlayers()
     Component.onCompleted: refreshTeams()
     onVisibleChanged: if (visible) refreshTeams()

@@ -43,6 +43,15 @@ Item {
         refresh();
     }
 
+    Connections {
+        target: backend
+        function onDataReplaced() {
+            editor.discard();
+            page.currentId = -1;
+            page.refresh();
+        }
+    }
+
     Component.onCompleted: refresh()
     // La liste peut avoir changé depuis une autre page (accueil, import…) : on la relit à chaque affichage.
     onVisibleChanged: if (visible) refresh()

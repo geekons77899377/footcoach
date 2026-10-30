@@ -37,10 +37,11 @@ ApplicationWindow {
         { id: "attendance", text: "Présences", short: "Suivi", icon: "check" },
         { id: "exercises", text: "Exercices", icon: "dumbbell" },
         { id: "sessions", text: "Séances", icon: "clipboard" },
-        { id: "tactics", text: "Tactique", icon: "board" }
+        { id: "tactics", text: "Tactique", icon: "board" },
+        { id: "data", text: "Données", icon: "copy" }
     ]
     readonly property var primaryIds: ["home", "squad", "calendar", "attendance"]
-    readonly property var moreIds: ["exercises", "sessions", "tactics"]
+    readonly property var moreIds: ["exercises", "sessions", "tactics", "data"]
 
     function indexOf(id) {
         for (var i = 0; i < sections.length; ++i) {
@@ -69,7 +70,8 @@ ApplicationWindow {
         model: [
             { id: "exercises", text: "Exercices", icon: "dumbbell", checked: win.section === "exercises" },
             { id: "sessions", text: "Séances", icon: "clipboard", checked: win.section === "sessions" },
-            { id: "tactics", text: "Tactique", icon: "board", checked: win.section === "tactics" }
+            { id: "tactics", text: "Tactique", icon: "board", checked: win.section === "tactics" },
+            { id: "data", text: "Données", icon: "copy", checked: win.section === "data" }
         ]
         onChosen: (id) => win.go(id, -1)
     }
@@ -215,6 +217,7 @@ ApplicationWindow {
             ExercisesPage { }
             SessionsPage { }
             TacticsPage { id: tactics }
+            DataPage { onImported: win.go("home", -1) }
         }
 
         // --- Barre du bas (téléphone en portrait) ------------------------------------------------

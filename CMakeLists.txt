@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.7.0 LANGUAGES CXX)
+project(FootCoach VERSION 0.8.0 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -145,6 +145,7 @@ if(FOOTCOACH_HAVE_QML)
         src/app/Backend.cpp
         src/app/BackendSessions.cpp
         src/app/BackendPlan.cpp
+        src/app/BackendData.cpp
     )
     qt_add_resources(FootCoach "sql"
         PREFIX "/sql"
@@ -157,7 +158,7 @@ if(FOOTCOACH_HAVE_QML)
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml TacticsPage.qml Theme.qml
         CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml
-        ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml Toast.qml
+        ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml Toast.qml DataPage.qml
         BoardGeometry.js Icons.js
     )
     set(QML_FILES_PATHS)
@@ -186,7 +187,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 13
+            QT_ANDROID_VERSION_CODE 14
             # Google Play exige API 36 pour les nouvelles applications depuis le 31/08/2026.
             QT_ANDROID_MIN_SDK_VERSION 23
             QT_ANDROID_TARGET_SDK_VERSION 36
@@ -201,7 +202,7 @@ if(FOOTCOACH_BUILD_TESTS)
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
     foreach(test_name repositories sessions attendance plan board backend)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendPlan.cpp)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"

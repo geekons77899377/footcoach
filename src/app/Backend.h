@@ -8,6 +8,7 @@
 #include "core/SessionRepository.h"
 #include "core/TeamRepository.h"
 
+#include <QJsonObject>
 #include <QObject>
 #include <QSqlDatabase>
 #include <QString>
@@ -118,10 +119,26 @@ public:
     Q_INVOKABLE QVariantMap removePlanItem(int itemId);
     Q_INVOKABLE QVariantMap movePlanItem(int itemId, int delta);       // -1 : monte, +1 : descend
 
+    // --- Transfert de données entre appareils (téléphone ↔ tablette) ---------------------------------------
+    // Fichier « .footcoach » : tout le contenu de la base en JSON versionné. url : chemin local, file:/// ou
+    // content:// (sélecteur de fichiers Android).
+    Q_INVOKABLE QString suggestedExportName() const;
+    Q_INVOKABLE QVariantMap exportDataFile(const QString &url);
+    // Lit un fichier sans rien modifier : {ok, error, exportedAt, appVersion, counts: {teams, players, sessions,
+    // exercises, boards}, current: {…mêmes clés pour la base actuelle}}.
+    Q_INVOKABLE QVariantMap inspectDataFile(const QString &url);
+    // REMPLACE toutes les données de l'appareil par celles du fichier, en une seule transaction (tout ou rien).
+    // Une sauvegarde de l'état actuel est écrite avant : {ok, error, backupName}.
+    Q_INVOKABLE QVariantMap importDataFile(const QString &url);
+
 signals:
     void lastErrorChanged();
+    void dataReplaced();               // les données ont été remplacées par un import : relire les listes
 
 private:
+    QByteArray buildExport(int *schema = nullptr);
+    bool parseDataFile(const QString &url, QJsonObject *root, QString *error) const;
+    QVariantMap countsOfDatabase();
     bool find(int id, BoardRecord *out);
     void setError(const QString &message);
 

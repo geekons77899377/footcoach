@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.8.0 — 2026-10-30
+- Nouvelle page « Données » (menu Plus, ou barre latérale) : « Créer le fichier » enregistre toutes les données dans un fichier `.footcoach` (équipes, joueurs, séances, plans, exercices, présences, blessures, schémas) ; « Choisir un fichier » l'importe sur un autre appareil (téléphone ↔ tablette). Le fichier peut être envoyé par WhatsApp, e-mail ou Drive.
+- L'import REMPLACE les données de l'appareil, après un récapitulatif (contenu du fichier et contenu actuel). Il est fait en une seule transaction : en cas de problème, rien n'est modifié. Les trois dernières copies de l'état précédent sont gardées dans le dossier privé de l'application (`sauvegardes`).
+- Fichiers refusés : format inconnu, fichier trop gros (64 Mo), version plus récente que l'application, colonnes ou lignes inconnues ou mal formées, contenu incohérent.
+- Après un import, les pages ouvertes (effectif, calendrier, séances, exercices, tactique) referment leurs fiches et se rechargent.
+- Tests : aller-retour complet entre deux bases, fichiers abîmés, import incohérent annulé (12 tests dans le backend). Une classe `Database` accepte un nom de connexion, pour ouvrir deux bases à la fois.
+- Non vérifié ici : les sélecteurs de fichier sur Android (enregistrement et ouverture, y compris les fichiers reçus par WhatsApp), et la compilation Qt Quick.
+
 ## 0.7.0 — 2026-10-30
 - Exercices en QML : bibliothèque (recherche, filtre par catégorie, archivés), fiche d'un exercice (titre, catégorie, objectif, durée, joueurs, matériel, description), archivage, suppression refusée si l'exercice est dans un plan.
 - Séances en QML : séances de l'équipe (à venir / passées) avec résumé du plan, plan de la séance : ajout d'un exercice de la bibliothèque, ordre (monter / descendre), durée et notes de la séance, horaires calculés, total comparé à la durée de la séance (avertissement s'il dépasse), matériel à prévoir sans doublon.

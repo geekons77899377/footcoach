@@ -54,6 +54,14 @@ Item {
         currentId = -1;
     }
 
+    Connections {
+        target: backend
+        function onDataReplaced() {
+            page.closeEditor();
+            page.refresh();
+        }
+    }
+
     onScopeChanged: { closeEditor(); refreshRows(); }
     Component.onCompleted: refresh()
     onVisibleChanged: if (visible) refresh()

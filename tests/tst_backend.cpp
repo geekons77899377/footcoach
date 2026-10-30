@@ -2,6 +2,7 @@
 #include "core/Database.h"
 #include "core/TacticalBoard.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
@@ -275,6 +276,94 @@ private slots:
         QVERIFY(b.setSessionStatus(sess, "cancelled", false).value("ok").toBool());
         QVERIFY(!b.addToPlan(sess, ex2, 10).value("ok").toBool());
         QVERIFY(!b.plan(9999).value("ok").toBool());
+    }
+
+    void exportImportRoundTrip()
+    {
+        // Appareil A : une équipe, des joueurs, une séance avec plan et appel, un schéma.
+        Backend a(m_db.handle());
+        const int team = a.saveTeam({{"name", "U15"}, {"category", "U15"}}).value("id").toInt();
+        const int p1 = a.savePlayer({{"teamId", team}, {"firstName", "Ali"}, {"lastName", "Alpha"},
+                                     {"jerseyNumber", 9}, {"birthDate", "2011-03-04"}}).value("id").toInt();
+        a.savePlayer({{"teamId", team}, {"firstName", "Bob"}, {"lastName", "Bravo"}, {"jerseyNumber", 4}});
+        const int sess = a.saveSession({{"teamId", team}, {"date", "2026-11-03"}, {"time", "18:30"},
+                                        {"durationMin", 90}, {"theme", "Finition"}}, false).value("id").toInt();
+        const int ex = a.saveExercise({{"title", "Mon exercice"}, {"category", "game"}, {"durationMin", 25},
+                                       {"equipment", "Ballons"}}).value("id").toInt();
+        QVERIFY(a.addToPlan(sess, ex, 0).value("ok").toBool());
+        QVERIFY(a.saveAttendance(sess, {QVariantMap{{"playerId", p1}, {"status", "present"}, {"note", "ok"}}}, true)
+                    .value("ok").toBool());
+        const int board = a.createBoard("Pressing");
+        QVERIFY(board > 0);
+        const int nExercises = a.exercises(true).size();
+
+        const QString file = m_dir.filePath(QStringLiteral("export.footcoach"));
+        QVERIFY(a.exportDataFile(file).value("ok").toBool());
+        QVERIFY(a.suggestedExportName().endsWith(QStringLiteral(".footcoach")));
+
+        // Appareil B : base neuve avec ses propres données (qui seront remplacées).
+        Database other(QStringLiteral("footcoach-b"));
+        QString error;
+        QVERIFY2(other.open(m_dir.filePath(QStringLiteral("b.db")), &error), qPrintable(error));
+        auto cleanupOther = qScopeGuard([&] { other.close(); });      // exécuté après la destruction de b
+        Backend b(other.handle());
+        b.saveTeam({{"name", "Autre équipe"}});
+        b.createBoard("À remplacer");
+        QSignalSpy replaced(&b, &Backend::dataReplaced);
+
+        const QVariantMap info = b.inspectDataFile(file);
+        QVERIFY2(info.value("ok").toBool(), qPrintable(info.value("error").toString()));
+        QCOMPARE(info.value("counts").toMap().value("players").toInt(), 2);
+        QCOMPARE(info.value("counts").toMap().value("sessions").toInt(), 1);
+        QCOMPARE(info.value("current").toMap().value("teams").toInt(), 1);
+        QCOMPARE(b.teams().size(), 1);                    // inspecter ne modifie rien
+
+        const QVariantMap r = b.importDataFile(QUrl::fromLocalFile(file).toString());
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(replaced.count(), 1);
+        QVERIFY(!r.value("backupName").toString().isEmpty());
+
+        const QVariantList teams = b.teams();
+        QCOMPARE(teams.size(), 1);
+        QCOMPARE(teams.at(0).toMap().value("name").toString(), QStringLiteral("U15"));
+        const QVariantList players = b.players(team, true);
+        QCOMPARE(players.size(), 2);
+        QCOMPARE(b.boards().size(), 1);
+        QCOMPARE(b.boards().at(0).toMap().value("title").toString(), QStringLiteral("Pressing"));
+        QCOMPARE(b.exercises(true).size(), nExercises);
+        const QVariantMap plan = b.plan(sess);
+        QVERIFY(plan.value("ok").toBool());
+        QCOMPARE(plan.value("entries").toList().size(), 1);
+        const QVariantMap sheet = b.attendanceSheet(sess);
+        QVERIFY2(sheet.value("ok").toBool(), qPrintable(sheet.value("error").toString()));
+
+        // Fichier abîmé, mauvais format, version plus récente : refusés, données intactes.
+        const QString bad = m_dir.filePath(QStringLiteral("bad.footcoach"));
+        auto write = [&](const QByteArray &bytes) { QFile f(bad); QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate)); f.write(bytes); };
+        write("pas du json");
+        QVERIFY(!b.importDataFile(bad).value("ok").toBool());
+        write("{\"format\":\"autre\"}");
+        QVERIFY(!b.importDataFile(bad).value("ok").toBool());
+        write("{\"format\":\"footcoach-data\",\"version\":1,\"schema\":999,\"tables\":{}}");
+        QVERIFY(!b.importDataFile(bad).value("ok").toBool());
+        // Contenu incohérent (joueur d'une équipe inexistante) : la transaction est annulée.
+        QFile src(file);
+        QVERIFY(src.open(QIODevice::ReadOnly));
+        QJsonObject root = QJsonDocument::fromJson(src.readAll()).object();
+        QJsonObject tables = root.value("tables").toObject();
+        QJsonObject pl = tables.value("player").toObject();
+        QJsonArray rows = pl.value("rows").toArray();
+        QJsonArray row0 = rows.at(0).toArray();
+        row0[1] = 424242;                                  // team_id
+        rows[0] = row0;
+        pl["rows"] = rows;
+        tables["player"] = pl;
+        root["tables"] = tables;
+        write(QJsonDocument(root).toJson(QJsonDocument::Compact));
+        const QVariantMap refused = b.importDataFile(bad);
+        QVERIFY(!refused.value("ok").toBool());
+        QCOMPARE(b.players(team, true).size(), 2);         // rien n'a changé
+        QCOMPARE(b.teams().size(), 1);
     }
 
     void sessionsAttendanceAndStats()

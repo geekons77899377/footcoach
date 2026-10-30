@@ -62,6 +62,14 @@ Item {
         return "";
     }
 
+    Connections {
+        target: backend
+        function onDataReplaced() {
+            page.closeForm();
+            page.refresh();
+        }
+    }
+
     onShowArchivedChanged: refresh()
     Component.onCompleted: refresh()
     onVisibleChanged: if (visible) refresh()
