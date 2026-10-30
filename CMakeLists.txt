@@ -143,6 +143,7 @@ if(FOOTCOACH_HAVE_QML)
         ${CORE_SOURCES}
         src/app/Backend.h
         src/app/Backend.cpp
+        src/app/BackendSessions.cpp
     )
     qt_add_resources(FootCoach "sql"
         PREFIX "/sql"
@@ -193,7 +194,7 @@ if(FOOTCOACH_BUILD_TESTS)
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
     foreach(test_name repositories sessions attendance plan board backend)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"

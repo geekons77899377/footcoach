@@ -209,6 +209,83 @@ private slots:
         QVERIFY(b.deleteTeam(team).value("ok").toBool());
         QVERIFY(b.teams().isEmpty());
     }
+
+    void sessionsAttendanceAndStats()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        auto player = [&](const QString &last, int jersey) {
+            return b.savePlayer({{"teamId", team}, {"firstName", "X"}, {"lastName", last}, {"jerseyNumber", jersey}})
+                .value("id").toInt();
+        };
+        const int p1 = player("Alpha", 1), p2 = player("Bravo", 2);
+
+        QVariantMap s{{"teamId", team}, {"date", "2026-11-03"}, {"time", "18:30"}, {"durationMin", 90}, {"theme", "Finition"}};
+        const QVariantMap a = b.saveSession(s, false);
+        QVERIFY2(a.value("ok").toBool(), qPrintable(a.value("error").toString()));
+        const int sid = a.value("id").toInt();
+
+        // Chevauchement : confirmation demandée, puis possible avec force.
+        QVariantMap clash = s;
+        clash["time"] = "19:00";
+        const QVariantMap c = b.saveSession(clash, false);
+        QVERIFY(!c.value("ok").toBool());
+        QVERIFY(c.value("needsConfirm").toBool());
+        QCOMPARE(b.sessions(team, "2026-11-01", "2026-11-30").size(), 1);
+        QVERIFY(b.saveSession(clash, true).value("ok").toBool());
+        QCOMPARE(b.sessions(team, "2026-11-01", "2026-11-30").size(), 2);
+        QCOMPARE(b.sessionDates(team, "2026-11-01", "2026-11-30"), QStringList{"2026-11-03"});
+
+        // Validations.
+        QVariantMap bad = s;
+        bad["time"] = "25:00";
+        QVERIFY(!b.saveSession(bad, true).value("ok").toBool());
+        bad = s;
+        bad["durationMin"] = 5;
+        QVERIFY(!b.saveSession(bad, true).value("ok").toBool());
+
+        // Appel : par défaut absents ; enregistrement + passage à « réalisée ».
+        const QVariantMap sheet = b.attendanceSheet(sid);
+        QVERIFY(sheet.value("ok").toBool());
+        QCOMPARE(sheet.value("players").toList().size(), 2);
+        QCOMPARE(sheet.value("players").toList().first().toMap().value("status").toString(), QStringLiteral("absent"));
+        const QVariantList entries{QVariantMap{{"playerId", p1}, {"status", "present"}},
+                                   QVariantMap{{"playerId", p2}, {"status", "excused"}, {"note", "malade"}}};
+        QVERIFY(b.saveAttendance(sid, entries, true).value("ok").toBool());
+        QVERIFY(!b.saveAttendance(sid, {QVariantMap{{"playerId", p1}, {"status", "???"}}}, false).value("ok").toBool());
+        const QVariantMap first = b.sessions(team, "2026-11-03", "2026-11-03").first().toMap();
+        QCOMPARE(first.value("status").toString(), QStringLiteral("done"));
+        QCOMPARE(first.value("present").toInt(), 1);
+        QCOMPARE(first.value("total").toInt(), 2);
+
+        // Statistiques : p1 présent (100 %), p2 excusé (hors taux).
+        const QVariantMap st = b.attendanceStats(team, "2026-01-01", "2026-12-31");
+        QCOMPARE(st.value("sessions").toList().size(), 1);
+        const QVariantList rows = st.value("players").toList();
+        QCOMPARE(rows.first().toMap().value("id").toInt(), p1);
+        QCOMPARE(rows.first().toMap().value("rate").toDouble(), 1.0);
+        QCOMPARE(rows.at(1).toMap().value("excused").toInt(), 1);
+        QCOMPARE(rows.at(1).toMap().value("rate").toDouble(), -1.0);
+
+        // Séance annulée : pas d'appel, et son statut ne bloque pas.
+        QVERIFY(b.setSessionStatus(sid, "cancelled", false).value("ok").toBool());
+        QVERIFY(!b.attendanceSheet(sid).value("ok").toBool());
+
+        // Récurrence : lundi et jeudi pendant deux semaines.
+        QVariantMap rule{{"teamId", team}, {"from", "2026-12-01"}, {"to", "2026-12-14"}, {"weekdays", QVariantList{1, 4}},
+                         {"time", "18:00"}, {"durationMin", 90}};
+        const QVariantMap pre = b.previewRecurrence(rule);
+        QVERIFY(pre.value("ok").toBool());
+        QCOMPARE(pre.value("count").toInt(), 4);        // jeu 3, lun 7, jeu 10, lun 14
+        QCOMPARE(b.createRecurring(rule, false).value("count").toInt(), 4);
+        QVERIFY(b.createRecurring(rule, false).value("needsConfirm").toBool());   // même créneaux : conflits
+        QCOMPARE(b.sessions(team, "2026-12-01", "2026-12-31").size(), 4);
+        rule["weekdays"] = QVariantList();
+        QVERIFY(!b.previewRecurrence(rule).value("ok").toBool());
+
+        QVERIFY(b.deleteSession(sid).value("ok").toBool());
+        QCOMPARE(b.sessions(team, "2026-11-01", "2026-11-30").size(), 1);
+    }
 };
 
 QTEST_GUILESS_MAIN(BackendTest)

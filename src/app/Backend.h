@@ -1,7 +1,9 @@
 #pragma once
 
 #include "core/BoardRepository.h"
+#include "core/AttendanceRepository.h"
 #include "core/PlayerRepository.h"
+#include "core/SessionRepository.h"
 #include "core/TeamRepository.h"
 
 #include <QObject>
@@ -62,6 +64,37 @@ public:
     Q_INVOKABLE QVariantMap setPlayerActive(int id, bool active);   // la réactivation vérifie le numéro
     Q_INVOKABLE QVariantMap deletePlayer(int id);                   // définitif (présences et blessures aussi)
 
+    // --- Séances (calendrier) ---------------------------------------------------------------------
+    // Séances de l'équipe dont le jour est entre from et to (AAAA-MM-JJ, inclus), par date :
+    // [{id, teamId, date, time, endTime, durationMin, location, theme, notes, status, present, total}]
+    // (present et total valent -1 tant qu'aucun appel n'est enregistré). status : planned, done, cancelled.
+    Q_INVOKABLE QVariantList sessions(int teamId, const QString &from, const QString &to);
+    // Jours (AAAA-MM-JJ) ayant au moins une séance.
+    Q_INVOKABLE QStringList sessionDates(int teamId, const QString &from, const QString &to);
+    // Crée (id absent ou <= 0) ou modifie une séance : {id, teamId, date, time (HH:mm), durationMin (15..300),
+    // location, theme, notes, status}. Si elle chevauche une autre séance de l'équipe et que force est faux,
+    // rien n'est écrit et le résultat est {ok:false, needsConfirm:true, error: description du conflit}.
+    Q_INVOKABLE QVariantMap saveSession(const QVariantMap &session, bool force);
+    Q_INVOKABLE QVariantMap setSessionStatus(int id, const QString &status, bool force);
+    Q_INVOKABLE QVariantMap deleteSession(int id);       // supprime aussi appel et plan d'exercices
+    // Séances hebdomadaires : {teamId, from, to, weekdays [1 = lundi … 7], time, durationMin, location, theme}.
+    // Aperçu : {ok, count, clashes, error}. Création : même résultat, avec needsConfirm si des séances en
+    // chevauchent d'autres et que force est faux.
+    Q_INVOKABLE QVariantMap previewRecurrence(const QVariantMap &rule);
+    Q_INVOKABLE QVariantMap createRecurring(const QVariantMap &rule, bool force);
+
+    // --- Appel et statistiques de présence ----------------------------------------------------------
+    // Feuille d'appel : {ok, error, session: {...}, players: [{playerId, name, jerseyNumber, active, status, note}]}
+    // (joueurs actifs + inactifs déjà dans l'appel). Impossible pour une séance annulée.
+    Q_INVOKABLE QVariantMap attendanceSheet(int sessionId);
+    // entries : [{playerId, status (present, absent, excused, injured), note}] ; markDone passe la séance prévue
+    // à « réalisée ».
+    Q_INVOKABLE QVariantMap saveAttendance(int sessionId, const QVariantList &entries, bool markDone);
+    // Synthèse des séances réalisées entre from et to : {sessions: [{id, date}], players: [{id, name,
+    // jerseyNumber, active, present, absent, excused, injured, counted, rate (-1 si inconnu), cells [statut par
+    // séance, "" si non concerné]}]}, classés par taux décroissant.
+    Q_INVOKABLE QVariantMap attendanceStats(int teamId, const QString &from, const QString &to);
+
 signals:
     void lastErrorChanged();
 
@@ -73,5 +106,7 @@ private:
     BoardRepository m_repo;
     TeamRepository m_teams;
     PlayerRepository m_players;
+    SessionRepository m_sessions;
+    AttendanceRepository m_attendance;
     QString m_lastError;
 };

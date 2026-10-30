@@ -11,6 +11,9 @@ class SessionRepository
 public:
     explicit SessionRepository(const QSqlDatabase &db) : m_db(db) {}
 
+    // Une séance par son id ; id < 0 dans le résultat si elle n'existe pas.
+    Session get(int id, QString *error = nullptr) const;
+
     // Séances dont le jour de début est compris entre `from` et `to` (inclus), triées par date.
     QList<Session> listBetween(int teamId, const QDate &from, const QDate &to, QString *error = nullptr) const;
     // Jours (entre `from` et `to` inclus) ayant au moins une séance, tous statuts confondus.

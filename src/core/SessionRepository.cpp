@@ -39,6 +39,18 @@ Session readSession(const QSqlQuery &q)
 
 } // namespace
 
+Session SessionRepository::get(int id, QString *error) const
+{
+    QSqlQuery q(m_db);
+    q.prepare(kSelect + QStringLiteral(" WHERE id = ?"));
+    q.addBindValue(id);
+    if (!q.exec()) {
+        setError(error, q.lastError().text());
+        return Session();
+    }
+    return q.next() ? readSession(q) : Session();
+}
+
 QList<Session> SessionRepository::listBetween(int teamId, const QDate &from, const QDate &to, QString *error) const
 {
     QList<Session> sessions;
