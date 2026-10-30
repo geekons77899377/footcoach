@@ -56,11 +56,16 @@ ApplicationWindow {
             tactics.openBoard(boardId);
     }
 
+    // Les feuilles du bas s'ouvrent au-dessus de la barre de navigation et de la zone sûre.
+    Binding {
+        target: AppState
+        property: "bottomInset"
+        value: (bottomBar.visible ? bottomBar.height : 0) + win.SafeArea.margins.bottom
+    }
+
     ActionSheet {
         id: moreSheet
         title: "Plus"
-        // Au-dessus de la barre du bas (et de la zone sûre en bas de l'écran).
-        navInset: bottomBar.visible ? bottomBar.height + win.SafeArea.margins.bottom : 0
         model: [
             { id: "exercises", text: "Exercices", icon: "dumbbell", checked: win.section === "exercises" },
             { id: "sessions", text: "Séances", icon: "clipboard", checked: win.section === "sessions" },

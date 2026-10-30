@@ -8,7 +8,8 @@ Popup {
 
     property string title: ""
     property var model: []
-    property real navInset: 0          // espace à laisser en bas (barre de navigation)
+    // Espace laissé en bas : barre de navigation et zone sûre (renseigné par Main pour toutes les feuilles).
+    property real navInset: AppState.bottomInset
     signal chosen(string id)
 
     parent: Overlay.overlay
@@ -18,6 +19,8 @@ Popup {
     width: Math.min(parent ? parent.width - 24 : 360, 440)
     x: parent ? (parent.width - width) / 2 : 0
     y: parent ? parent.height - height - 12 - navInset : 0
+    // Hauteur limitée à l'écran : une longue liste (beaucoup d'équipes) défile.
+    height: Math.min(implicitHeight, parent ? parent.height - navInset - 24 : implicitHeight)
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     Overlay.modal: Rectangle { color: "#99000000" }
@@ -29,7 +32,18 @@ Popup {
         border.color: Theme.border
     }
 
-    contentItem: Column {
+    contentItem: Flickable {
+        id: scroller
+        implicitHeight: sheetColumn.implicitHeight
+        contentWidth: width
+        contentHeight: sheetColumn.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+
+      Column {
+        id: sheetColumn
+        width: scroller.width
         spacing: 2
 
         Text {
@@ -93,5 +107,6 @@ Popup {
                 }
             }
         }
+      }
     }
 }

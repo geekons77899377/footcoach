@@ -1,5 +1,8 @@
 # Journal des modifications
 
+## 0.5.1 — 2026-10-30
+- Les feuilles du bas (équipe, actions d'une séance, « Plus »…) s'ouvrent toutes au-dessus de la barre de navigation et de la zone sûre, et défilent s'il y a beaucoup de choix (avant : la liste des équipes passait sous la barre du bas).
+
 ## 0.5.0 — 2026-10-30
 - Calendrier en QML : mois avec points sur les jours de séance, liste Jour / Semaine / Mois, création et modification d'une séance (sélecteurs de date et d'heure, durée, lieu, thème, statut, notes), alerte en cas de chevauchement, changement de statut, suppression, séances récurrentes avec aperçu du nombre de séances.
 - Appel : un statut par joueur (présent, absent, excusé, blessé), « Tous présents / absents », note par joueur, option « marquer la séance comme réalisée ».

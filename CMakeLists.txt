@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.5.0 LANGUAGES CXX)
+project(FootCoach VERSION 0.5.1 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -184,7 +184,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 8
+            QT_ANDROID_VERSION_CODE 9
         )
     endif()
 endif()
