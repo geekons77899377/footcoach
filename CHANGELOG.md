@@ -1,5 +1,8 @@
 # Journal des modifications
 
+## 0.5.2 — 2026-10-30
+- Calendrier : mois et séances côte à côte dès 640 px de large (tablette 10 pouces en portrait), au lieu de 760 px.
+
 ## 0.5.1 — 2026-10-30
 - Les feuilles du bas (équipe, actions d'une séance, « Plus »…) s'ouvrent toutes au-dessus de la barre de navigation et de la zone sûre, et défilent s'il y a beaucoup de choix (avant : la liste des équipes passait sous la barre du bas).
 

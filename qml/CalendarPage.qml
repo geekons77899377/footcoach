@@ -14,8 +14,9 @@ Item {
     property var sessions: []
     property var marks: []
     property string mode: "browse"               // browse, session, recurrence, attendance
-    readonly property bool split: width >= 760
+    readonly property bool split: width >= 640
     readonly property int teamId: AppState.teamId
+    readonly property int leftWidth: width >= 900 ? 380 : 330     // colonne du mois en mode deux colonnes
 
     readonly property var scopes: [{ id: "day", text: "Jour" }, { id: "week", text: "Semaine" }, { id: "month", text: "Mois" }]
 
@@ -369,7 +370,7 @@ Item {
             anchors.right: parent.right
             Flickable {
                 id: leftPane
-                width: 380
+                width: page.leftWidth
                 height: parent.height
                 contentWidth: width
                 contentHeight: leftCol.height + 32
@@ -397,18 +398,19 @@ Item {
                     }
                 }
             }
-            Rectangle { x: 380; width: 1; height: parent.height; color: Theme.border }
+            Rectangle { x: page.leftWidth; width: 1; height: parent.height; color: Theme.border }
             Flickable {
-                x: 381
-                width: parent.width - 381
+                x: page.leftWidth + 1
+                width: parent.width - page.leftWidth - 1
                 height: parent.height
                 contentWidth: width
-                contentHeight: rightCol.height + 32
+                contentHeight: rightCol.height + 40
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 SessionList {
                     id: rightCol
                     x: Theme.gutter
+                    y: 8
                     width: Math.min(parent.width - 2 * Theme.gutter, 640)
                 }
             }
