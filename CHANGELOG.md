@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.8.7 — 2026-10-31
+- Navigation latérale : quand la fenêtre est trop basse (téléphone en paysage : 390 px de haut pour 8 entrées), la colonne d'icônes défile maintenant. Avant, Séances, Tactique et Données étaient hors de l'écran et inatteignables, ce qui correspond très probablement au « on ne peut pas scroller en paysage » signalé.
+- Vérifié ici hors écran sur 7 formats (téléphone 412×892, petit téléphone 360×640, téléphone paysage 844×390, tablette 800×1280 et 1280×800, PC 1280×800 et 1000×600), toutes sections plus l'éditeur tactique ; mode de navigation attendu pour chaque format (bas, colonne d'icônes, menu latéral). Chemin d'ouverture Android simulé : fenêtre 412×892 inchangée. Non vérifié : appareils réels.
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.6 — 2026-10-31
 - Version PC : la fenêtre s'ouvrait à la taille d'un téléphone (412 × 892), donc avec la mise en page « téléphone » (barre de navigation en bas). Sur PC, la fenêtre s'ouvre maintenant en 1280 × 820 au plus, réduite si l'écran est plus petit, ce qui donne le menu latéral et la liste à côté de l'éditeur. Android et iOS ne changent pas.
 - Cause de mon côté : mes essais précédents simulaient seulement des tailles de téléphone et fixaient la taille de la fenêtre, donc ils ne passaient jamais par la taille d'ouverture réelle d'une fenêtre de PC.

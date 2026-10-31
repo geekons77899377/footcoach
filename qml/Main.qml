@@ -142,13 +142,23 @@ ApplicationWindow {
                 }
             }
 
-            Column {
+            // Les entrées défilent quand la fenêtre est trop basse (téléphone en paysage : 8 entrées ne tiennent pas).
+            Flickable {
+                id: navScroll
                 anchors.top: brand.bottom
                 anchors.topMargin: 24
+                anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: win.navMode === "sidebar" ? 12 : 8
                 anchors.rightMargin: win.navMode === "sidebar" ? 12 : 8
+                contentWidth: width
+                contentHeight: navColumn.implicitHeight + 8
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+            Column {
+                id: navColumn
+                width: navScroll.width
                 spacing: 6
                 Repeater {
                     model: win.sections
@@ -207,6 +217,7 @@ ApplicationWindow {
                         }
                     }
                 }
+            }
             }
         }
 
