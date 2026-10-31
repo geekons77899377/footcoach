@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.9.7 — 2026-10-31 (branche v1)
+- **Essai pour le clavier du premier appui.** Journal adb de la 0.9.5 : le clavier est demandé et Gboard dit l'afficher, mais l'animation d'apparition pilotée par l'application (trace ImeTracker) ne se termine jamais (elle n'est annulée que 9 s plus tard, à la fermeture), et aucun « onShown » n'apparaît. Hypothèse, **non démontrée** : elle attend une image dessinée par la vue Android de l'activité, alors que Qt Quick dessine ailleurs. Essai : à l'ouverture du clavier, l'application demande un redessin de cette vue (`View.invalidate()`, par JNI) à 100 ms puis 400 ms (`Backend::nudgeKeyboardAnimation`).
+- **Non vérifié** : que cela règle le défaut ; le code Android n'est pas compilé ici (à voir à la compilation dans Qt Creator).
+
 ## 0.9.6 — 2026-10-31 (branche v1)
 - Le numéro de version est affiché sous le titre de la page Données (« version 0.9.6 »), pour savoir sans ambiguïté quelle version est installée sur l'appareil. Constaté : l'essai du clavier de la 0.9.5 a été fait sur une 0.9.4 non mise à jour ; les essais du premier appui dans un champ restent donc à refaire sur une version dont le numéro est affiché.
 

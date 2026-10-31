@@ -47,6 +47,10 @@ ApplicationWindow {
         target: AppState
         function onKeyboardModeChanged() { kbdPrefs.mode = AppState.keyboardMode; }
     }
+    // Essai 0.9.7 : au premier affichage du clavier, son animation Android ne se terminait pas (journal adb, 0.9.5).
+    Timer { id: nudge1; interval: 100; onTriggered: if (backend && backend.nudgeKeyboardAnimation) backend.nudgeKeyboardAnimation() }
+    Timer { id: nudge2; interval: 400; onTriggered: if (backend && backend.nudgeKeyboardAnimation) backend.nudgeKeyboardAnimation() }
+    onKeyboardUpChanged: if (keyboardUp) { nudge1.restart(); nudge2.restart(); }
     onKeyboardModeChanged: applyKeyboardMode()
     Component.onCompleted: {
         if (kbdPrefs.mode === "resize" || kbdPrefs.mode === "fixed")
