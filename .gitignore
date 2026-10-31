@@ -12,3 +12,7 @@ CMakeLists.txt.user*
 *.p12
 keystore.properties
 local.properties
+
+# Banc d'essai QML (fichiers de travail)
+tests/qml/.work/
+tests/qml/__pycache__/

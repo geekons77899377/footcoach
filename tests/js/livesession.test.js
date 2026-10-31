@@ -1,0 +1,18 @@
+const fs=require('fs');eval(fs.readFileSync(require('path').join(__dirname,'..','..','qml','LiveSession.js'),'utf8').replace('.pragma library',''));
+const assert=require('assert');
+const S=(id,date,time,dur,st)=>({id,date,time,durationMin:dur,status:st||'planned'});
+const day='2026-10-31';
+const at=(h,m)=>new Date(2026,9,31,h,m,0).getTime();
+const ss=[S(1,day,'10:00',90),S(2,day,'18:00',90),S(3,day,'19:00',60),S(4,day,'20:30',60,'cancelled')];
+assert.equal(pickAuto(ss,at(9,0)).session.id,1);assert.equal(pickAuto(ss,at(9,0)).mode,'next');
+assert.equal(pickAuto(ss,at(10,30)).session.id,1);assert.equal(pickAuto(ss,at(10,30)).mode,'now');
+assert.equal(pickAuto(ss,at(12,0)).session.id,2);assert.equal(pickAuto(ss,at(12,0)).mode,'next');
+let r=pickAuto(ss,at(19,15));assert.equal(r.session.id,3);assert.equal(r.overlaps,2);
+assert.equal(pickAuto(ss,at(21,0)).mode,'none');assert.equal(pickAuto(ss,at(20,45)).mode,'none');
+assert.equal(pickAuto([],at(9,0)).mode,'none');
+assert.equal(clock(15*60000),'15:00');assert.equal(clock(12*60000+45000),'12:45');assert.equal(clock(-30000),'+00:30');
+assert.equal(clock(0),'00:00');assert.equal(clock(61*60000),'1:01:00');assert.equal(clock(3725000),'1:02:05');
+assert.equal(remaining(15,60000),14*60000);
+assert.equal(elapsed(5000,1000,true,4000),8000);assert.equal(elapsed(5000,1000,false,99999),5000);assert.equal(elapsed(0,5000,true,1000),0);
+assert.equal(actual(20000),'1\'');assert.equal(actual(12.4*60000),'12\'');
+console.log('LiveSession.js : tous les tests passent');

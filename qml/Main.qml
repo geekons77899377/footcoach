@@ -25,6 +25,9 @@ ApplicationWindow {
     Material.accent: Theme.accent
     Material.background: Theme.bg
 
+    // Clavier à l'écran ouvert (Android : la fenêtre est alors réduite). Propriété simple pour pouvoir la simuler en test.
+    property bool keyboardUp: Qt.inputMethod.visible
+
     readonly property string navMode: width < 600 ? "bottom" : (width >= 840 && height >= 520 ? "sidebar" : "rail")
     property string section: "home"
 
@@ -269,7 +272,7 @@ ApplicationWindow {
         Rectangle {
             id: bottomBar
             // Masquée pendant la saisie : le clavier réduit déjà la fenêtre, la barre ne doit pas lui prendre la place.
-            visible: win.navMode === "bottom" && !win.immersive && !Qt.inputMethod.visible
+            visible: win.navMode === "bottom" && !win.immersive && !win.keyboardUp
             anchors.bottom: parent.bottom
             width: parent.width
             height: 72

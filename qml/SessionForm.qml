@@ -125,6 +125,8 @@ Item {
         onClicked: root.closeRequested()
     }
 
+    EnsureVisible { flick: scroll }
+
     Flickable {
         id: scroll
         anchors.top: header.bottom

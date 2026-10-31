@@ -155,6 +155,8 @@ Item {
         onChosen: (id) => id === "toggle" ? root.toggleRequested() : root.deleteRequested()
     }
 
+    EnsureVisible { flick: scroll }
+
     Flickable {
         id: scroll
         anchors.top: header.bottom

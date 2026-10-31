@@ -118,6 +118,8 @@ Item {
         onChosen: (id) => id === "archive" ? root.archiveRequested() : root.deleteRequested()
     }
 
+    EnsureVisible { flick: scroll }
+
     Flickable {
         id: scroll
         anchors.top: header.bottom

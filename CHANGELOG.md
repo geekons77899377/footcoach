@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## 0.9.4 — 2026-10-31 (branche v1)
+- **Champs de saisie et clavier** : un champ placé en bas d'un formulaire (Notes de la séance, de la récurrence et du joueur, Description de l'exercice, E-mail du joueur) restait caché derrière le clavier, car une liste défilante ne se déplace pas toute seule vers le champ touché. Nouveau composant `EnsureVisible` : le champ qui prend le focus est ramené à l'écran, y compris quand la fenêtre est réduite par le clavier. Appliqué aux fiches Exercice, Joueur, Séance et Récurrence.
+- La barre du bas est masquée pendant la saisie via la propriété `keyboardUp` de la fenêtre (liée à `Qt.inputMethod.visible`).
+- **Tests** : nouveau banc de tests QML hors écran dans le dépôt (`tests/qml/`, `python3 tests/qml/run_all.py`) : séance du jour (choix selon l'heure, chronomètre, reprise après relance), bouton retour (13 cas), et **chaque champ de saisie de l'application** avec clavier simulé (33 champs, dont fiches, fenêtres de dialogue, recherches ; le test échoue si on ajoute un champ sans l'ajouter au test). Tests de la logique JavaScript de la séance du jour ajoutés à `ctest` (`livesession_js`, avec Node.js). Avant le correctif, ces tests donnaient 5 échecs (champs du bas cachés) ; après, 0.
+- **Non vérifié sur téléphone** : le clavier simulé est une fenêtre réduite ; le vrai clavier Android, ses animations et le comportement de Qt sur votre téléphone restent à confirmer.
+
 ## 0.9.3 — 2026-10-31 (branche v1)
 - La barre de navigation du bas est masquée tant que le clavier est ouvert (téléphone en portrait), pour laisser sa place au formulaire ; elle revient à la fermeture du clavier. Constaté sur appareil en 0.9.2 : le réglage `adjustResize` fonctionne (l'en-tête reste en place), mais la barre restait au-dessus du clavier.
 - Non vérifié sur téléphone (le banc d'essai ne simule pas le clavier) : le masquage et le retour de la barre, et l'absence de saut d'affichage à la fermeture du clavier.
