@@ -5,6 +5,9 @@ import QtQuick
 // Prise passive : boutons, listes et champs situés dessous reçoivent le toucher normalement.
 TapHandler {
     id: root
+    // Écran tactile et stylet seulement : la souris n'ouvre pas de clavier virtuel, et une prise de ce handler
+    // au-dessus des pages empêchait les clics souris d'atteindre les boutons (version PC).
+    acceptedDevices: PointerDevice.TouchScreen | PointerDevice.Stylus
 
     onTapped: (point) => {
         const win = root.parent.Window.window;

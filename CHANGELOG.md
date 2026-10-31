@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## 0.8.8 — 2026-10-31
+- **Correction PC : la souris ne fonctionnait plus.** Depuis la 0.8.3, la couche transparente qui ferme le clavier (`KeyboardDismiss`) interceptait les clics de souris avant les boutons : menu, boutons, cartes ne répondaient plus à la souris. Cette couche ne réagit maintenant qu'à l'écran tactile et au stylet (la souris n'ouvre pas de clavier virtuel). Sur téléphone et tablette, le comportement du clavier reste celui de la 0.8.3/0.8.5.
+- Vérifié ici hors écran : avant correction, clic souris sur les entrées du menu latéral → aucune réaction ; après correction → la section change à chaque clic. Clic souris sur le bouton plein écran de l'éditeur : fonctionne. Fermeture du clavier au toucher (champ Notes, dialogue d'équipe, zone assombrie) : inchangée. Non vérifié : sous Windows réel.
+- Mon banc d'essai voyait déjà un clic souris sans effet lors de l'essai du plein écran (0.8.4) ; je l'ai pris pour une limite de l'outil au lieu d'y voir ce défaut. Les essais de souris sont maintenant faits systématiquement.
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.7 — 2026-10-31
 - Navigation latérale : quand la fenêtre est trop basse (téléphone en paysage : 390 px de haut pour 8 entrées), la colonne d'icônes défile maintenant. Avant, Séances, Tactique et Données étaient hors de l'écran et inatteignables, ce qui correspond très probablement au « on ne peut pas scroller en paysage » signalé.
 - Vérifié ici hors écran sur 7 formats (téléphone 412×892, petit téléphone 360×640, téléphone paysage 844×390, tablette 800×1280 et 1280×800, PC 1280×800 et 1000×600), toutes sections plus l'éditeur tactique ; mode de navigation attendu pour chaque format (bas, colonne d'icônes, menu latéral). Chemin d'ouverture Android simulé : fenêtre 412×892 inchangée. Non vérifié : appareils réels.
