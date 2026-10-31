@@ -76,7 +76,7 @@ Item {
         id: header
         width: parent.width
         title: "Données"
-        subtitle: "Téléphone ↔ tablette"
+        subtitle: "Téléphone ↔ tablette  ·  version " + Qt.application.version
     }
 
     Flickable {

@@ -1,5 +1,8 @@
 # Journal des modifications
 
+## 0.9.6 — 2026-10-31 (branche v1)
+- Le numéro de version est affiché sous le titre de la page Données (« version 0.9.6 »), pour savoir sans ambiguïté quelle version est installée sur l'appareil. Constaté : l'essai du clavier de la 0.9.5 a été fait sur une 0.9.4 non mise à jour ; les essais du premier appui dans un champ restent donc à refaire sur une version dont le numéro est affiché.
+
 ## 0.9.5 — 2026-10-31 (branche v1)
 - **Clavier, premier appui dans un champ** : constaté sur appareil en 0.9.4 : au premier appui, le clavier s'ouvre sans touches visibles et l'en-tête disparaît ; au deuxième champ, tout est correct. **Hypothèse, non confirmée** : avec `adjustResize`, Android réduit la fenêtre et Qt recrée sa surface d'affichage à ce moment (clignotement/écran noir signalé dans le forum Qt, QTBUG-41170, sur des versions plus anciennes de Qt) ; cela se produirait surtout à la première ouverture.
 - Nouveau mode par défaut **« Fixe »** : le manifeste déclare `adjustNothing` (la fenêtre Android ne bouge plus) et l'application remonte elle-même son contenu de la hauteur du clavier (`Qt.inputMethod.keyboardRectangle`, normalisée par `qml/Keyboard.js` : conversion si le rectangle est en pixels d'appareil, hauteur de repli de 42 % si le clavier est ouvert mais son rectangle vide, plafond à 70 %).
