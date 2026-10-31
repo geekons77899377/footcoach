@@ -285,7 +285,9 @@ Item {
                     font.pixelSize: 14
                     color: Theme.textMuted
                 }
-                Row {
+                // Les boutons passent à la ligne quand l'écran est étroit (ils débordaient sur téléphone).
+                Flow {
+                    width: parent.width
                     spacing: 10
                     AppButton {
                         visible: root.teamId > 0

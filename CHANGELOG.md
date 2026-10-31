@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.9.1 — 2026-10-31 (branche v1)
+- Accueil, carte « Aucune séance aujourd'hui » : les boutons « Planifier une séance » et « Changer de séance » passent à la ligne quand l'écran est étroit ; sur téléphone, le second dépassait de l'écran (constaté sur appareil). Vérifié hors appareil sur 412, 360 et 320 de large.
+- Non corrigé : défilement vers le haut de la fenêtre quand on touche un champ de notes sur Android (cause à confirmer sur appareil, voir les échanges).
+
 ## 0.9.0 — 2026-10-31 (branche v1)
 - **Accueil : « Séance du jour »** avec chronomètre par exercice.
   - La séance affichée est choisie d'office selon l'heure du téléphone (celle dont la plage horaire contient l'heure actuelle) ; sinon la prochaine séance du jour. « Changer de séance » permet de choisir à la main (hier, aujourd'hui, demain) et de revenir à l'automatique. Si deux séances se chevauchent, un avertissement s'affiche.
