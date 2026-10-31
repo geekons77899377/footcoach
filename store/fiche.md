@@ -1,8 +1,8 @@
 # Fiche Play Store — FootCoach (brouillon)
 
 **Nom** (30 caractères max) : FootCoach
-**Description courte** (80 max) : Organisez vos entraînements de foot : schémas tactiques, effectif, séances et présences.
-**Catégorie** : Sports · **Prix** : gratuit · **Contact** : poubelle75111@hotmail.fr
+**Description courte** (80 max) : Organisez vos entraînements de foot : tactique, effectif, séances, présences.
+**Catégorie** : Sports · **Prix** : gratuit · **Contact** : footcoach.app@gmail.com
 
 ## Description complète
 FootCoach aide les entraîneurs de football à 11 à préparer et suivre leurs entraînements, sur téléphone comme sur tablette.

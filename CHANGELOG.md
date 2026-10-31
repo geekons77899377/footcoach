@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## 0.8.11 — 2026-10-31
+- Préparation Google Play (aucun changement de code ni de schéma) :
+  - Contact public : `footcoach.app@gmail.com` (fiche et politique de confidentialité).
+  - Description courte de la fiche ramenée à 77 caractères (limite 80).
+  - Politique de confidentialité : le téléphone et l'adresse e-mail des joueurs sont maintenant listés parmi les données traitées (ils étaient saisis par l'application mais seulement évoqués dans la section Export).
+  - `minSdk` laissé à 23 pour l'instant, en attente de décision (Qt 6.9 ne prend officiellement en charge qu'Android 9, API 28, et au-delà).
+
 ## 0.8.10 — 2026-10-31
 - Android : ajout de `android/AndroidManifest.xml` (remplace le modèle généré par Qt).
   - **Icône :** `android:icon` et `android:roundIcon` pointent maintenant vers l'icône de l'application. Avant, le manifeste généré n'en déclarait aucune, d'où l'icône Android par défaut (constaté dans le manifeste généré par la 0.8.9).
