@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.9.3 — 2026-10-31 (branche v1)
+- La barre de navigation du bas est masquée tant que le clavier est ouvert (téléphone en portrait), pour laisser sa place au formulaire ; elle revient à la fermeture du clavier. Constaté sur appareil en 0.9.2 : le réglage `adjustResize` fonctionne (l'en-tête reste en place), mais la barre restait au-dessus du clavier.
+- Non vérifié sur téléphone (le banc d'essai ne simule pas le clavier) : le masquage et le retour de la barre, et l'absence de saut d'affichage à la fermeture du clavier.
+
 ## 0.9.2 — 2026-10-31 (branche v1)
 - **Bouton retour d'Android** : il ferme d'abord ce qui est ouvert (fiche d'exercice ou de joueur, plan de séance, formulaire du calendrier, fiche dépliée du suivi, plein écran puis schéma du terrain), puis ramène à l'accueil ; l'application ne se ferme que depuis l'accueil. Une fenêtre ouverte (feuille de choix, dialogue, chronomètre en plein écran) se ferme d'abord, par le comportement de Qt.
 - **Clavier** : le manifeste Android déclare maintenant `windowSoftInputMode="adjustResize"` : la fenêtre se réduit au lieu d'être poussée vers le haut quand le clavier s'ouvre dans un champ de notes (constaté sur appareil : l'en-tête passait sous la barre d'état).

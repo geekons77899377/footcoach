@@ -268,7 +268,8 @@ ApplicationWindow {
 
         Rectangle {
             id: bottomBar
-            visible: win.navMode === "bottom" && !win.immersive
+            // Masquée pendant la saisie : le clavier réduit déjà la fenêtre, la barre ne doit pas lui prendre la place.
+            visible: win.navMode === "bottom" && !win.immersive && !Qt.inputMethod.visible
             anchors.bottom: parent.bottom
             width: parent.width
             height: 72
