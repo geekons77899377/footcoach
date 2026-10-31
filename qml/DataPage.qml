@@ -162,6 +162,39 @@ Item {
                     }
                 }
             }
+
+            Card {
+                width: parent.width
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    Icon { name: "tick"; color: Theme.accent; size: 28 }
+                    Text {
+                        width: parent.width
+                        text: "Clavier (essai)"
+                        font.pixelSize: 18
+                        font.weight: Font.Bold
+                        color: Theme.text
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        font.pixelSize: 14
+                        color: Theme.textMuted
+                        text: "Si l'écran devient noir ou si le clavier s'affiche mal au premier appui dans un champ, "
+                              + "essayez l'autre mode. « Fixe » : la fenêtre ne bouge pas et l'application se relève "
+                              + "d'elle-même. « Android » : c'est Android qui réduit la fenêtre."
+                    }
+                    ChipRow {
+                        objectName: "keyboardMode"
+                        width: parent.width
+                        allowClear: false
+                        options: [ { id: "fixed", text: "Fixe" }, { id: "resize", text: "Android" } ]
+                        value: AppState.keyboardMode
+                        onPicked: (id) => AppState.keyboardMode = id
+                    }
+                }
+            }
         }
     }
 

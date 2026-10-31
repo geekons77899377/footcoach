@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtCore
+import "Keyboard.js" as Kbd
 
 // Fenêtre principale. Trois dispositions de navigation selon la place disponible :
 //  - « bottom » (téléphone en portrait) : barre en bas, comme dans la maquette ;
@@ -25,8 +27,36 @@ ApplicationWindow {
     Material.accent: Theme.accent
     Material.background: Theme.bg
 
-    // Clavier à l'écran ouvert (Android : la fenêtre est alors réduite). Propriété simple pour pouvoir la simuler en test.
+    // Clavier à l'écran. Deux façons de lui laisser la place, au choix dans Données > Clavier (essai) :
+    //  - "fixed" (défaut) : la fenêtre Android ne bouge pas (adjustNothing) et l'application remonte elle-même son contenu
+    //    de la hauteur du clavier. Évite le clignotement noir d'Android, qui recrée sa surface quand la fenêtre change
+    //    de taille (observé : premier appui dans un champ = écran noir, deuxième appui = correct) ;
+    //  - "resize" : Android réduit la fenêtre (adjustResize).
+    // Propriétés simples (sans liaison forcée) pour pouvoir les simuler dans les tests.
     property bool keyboardUp: Qt.inputMethod.visible
+    property string keyboardMode: AppState.keyboardMode
+    property real keyboardHeight: keyboardMode === "fixed"
+                                  ? Kbd.height(Qt.inputMethod.keyboardRectangle, win.height, Screen.devicePixelRatio, keyboardUp)
+                                  : 0
+    Settings {
+        id: kbdPrefs
+        category: "keyboard"
+        property string mode: "fixed"
+    }
+    Connections {
+        target: AppState
+        function onKeyboardModeChanged() { kbdPrefs.mode = AppState.keyboardMode; }
+    }
+    onKeyboardModeChanged: applyKeyboardMode()
+    Component.onCompleted: {
+        if (kbdPrefs.mode === "resize" || kbdPrefs.mode === "fixed")
+            AppState.keyboardMode = kbdPrefs.mode;
+        applyKeyboardMode();
+    }
+    function applyKeyboardMode() {
+        if (backend && backend.setSoftInputResize)
+            backend.setSoftInputResize(keyboardMode === "resize");
+    }
 
     readonly property string navMode: width < 600 ? "bottom" : (width >= 840 && height >= 520 ? "sidebar" : "rail")
     property string section: "home"
@@ -89,7 +119,8 @@ ApplicationWindow {
     Binding {
         target: AppState
         property: "bottomInset"
-        value: (bottomBar.visible ? bottomBar.height : 0) + win.SafeArea.margins.bottom
+        value: win.keyboardHeight > 0 ? win.keyboardHeight
+               : (bottomBar.visible ? bottomBar.height : 0) + win.SafeArea.margins.bottom
     }
 
     ActionSheet {
@@ -117,7 +148,7 @@ ApplicationWindow {
         id: shell
         anchors.fill: parent
         anchors.topMargin: parent.SafeArea.margins.top
-        anchors.bottomMargin: parent.SafeArea.margins.bottom
+        anchors.bottomMargin: win.keyboardHeight > 0 ? win.keyboardHeight : parent.SafeArea.margins.bottom
         anchors.leftMargin: parent.SafeArea.margins.left
         anchors.rightMargin: parent.SafeArea.margins.right
 

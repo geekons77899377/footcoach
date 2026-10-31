@@ -8,13 +8,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py"]
 env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
 bad = []
-for t in TESTS:
-    r = subprocess.run([sys.executable, t], cwd=HERE, env=env, capture_output=True, text=True)
+RUNS = [(t, {}) for t in TESTS] + [("t_fields.py", {"KBMODE": "fixed"})]   # champs : clavier qui réduit la fenêtre, puis fenêtre fixe
+for t, extra in RUNS:
+    r = subprocess.run([sys.executable, t], cwd=HERE, env=dict(env, **extra), capture_output=True, text=True)
     lines = r.stdout.splitlines()
     ok = [l for l in lines if l.strip().startswith("OK ")]
     ko = [l for l in lines if l.startswith("KO ") or "ECHECS" in l or l.startswith("   KO ")]
     status = "OK " if r.returncode == 0 and not ko else "KO "
-    print(f"{status}{t:14s} {len(ok)} vérifications OK, {len(ko)} échec(s)")
+    print(f"{status}{t:14s}{extra.get('KBMODE', ''):6s} {len(ok)} vérifications OK, {len(ko)} échec(s)")
     for l in ko:
         print("     ", l.strip())
     if status == "KO ":

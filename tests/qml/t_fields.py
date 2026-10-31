@@ -13,8 +13,15 @@ def objs():
         except Exception: pass
     return out
 def sec(s): QMetaObject.invokeMethod(h.win,"go",Q_ARG("QVariant",s),Q_ARG("QVariant",-1)); h.spin(400)
+import os
+MODE=os.environ.get("KBMODE","resize")   # resize = Android réduit la fenêtre ; fixed = fenêtre immobile + marge de l'application
 def kb(on):
-    h.win.setProperty("keyboardUp",on); h.resize(W,H-KB if on else H); h.spin(250)
+    h.win.setProperty("keyboardUp",on)
+    if MODE=="fixed":
+        h.win.setProperty("keyboardHeight",float(KB) if on else 0.0)   # remplace la liaison : hauteur simulée
+        h.spin(250)
+    else:
+        h.resize(W,H-KB if on else H); h.spin(250)
 def inputs():
     out=[]
     for o in objs():

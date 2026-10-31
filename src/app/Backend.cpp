@@ -404,3 +404,20 @@ void Backend::setKeepScreenOn(bool on)
     Q_UNUSED(on);
 #endif
 }
+
+void Backend::setSoftInputResize(bool resize)
+{
+#ifdef Q_OS_ANDROID
+    // WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE = 0x10, SOFT_INPUT_ADJUST_NOTHING = 0x30.
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([resize]() {
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        if (!activity.isValid())
+            return;
+        QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
+        if (window.isValid())
+            window.callMethod<void>("setSoftInputMode", "(I)V", resize ? jint(0x10) : jint(0x30));
+    });
+#else
+    Q_UNUSED(resize);
+#endif
+}

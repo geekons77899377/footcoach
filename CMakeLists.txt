@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.9.4 LANGUAGES CXX)
+project(FootCoach VERSION 0.9.5 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -165,7 +165,7 @@ if(FOOTCOACH_HAVE_QML)
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml TacticsPage.qml Theme.qml
         CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml Toast.qml DataPage.qml
-        BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
+        BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml Keyboard.js
     )
     set(QML_FILES_PATHS)
     foreach(f ${QML_FILES})
@@ -193,7 +193,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 31
+            QT_ANDROID_VERSION_CODE 32
             # Google Play exige API 36 pour les nouvelles applications depuis le 31/08/2026.
             QT_ANDROID_MIN_SDK_VERSION 28
             QT_ANDROID_TARGET_SDK_VERSION 36
@@ -224,6 +224,7 @@ if(FOOTCOACH_BUILD_TESTS)
     find_program(NODE_EXECUTABLE node)
     if(NODE_EXECUTABLE)
         add_test(NAME livesession_js COMMAND ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/js/livesession.test.js)
+        add_test(NAME keyboard_js COMMAND ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/js/keyboard.test.js)
     endif()
     # Tests QML hors écran (PySide6) : voir tests/qml/README.md, à lancer avec python3 tests/qml/run_all.py.
 endif()
