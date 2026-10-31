@@ -1,5 +1,14 @@
 # Journal des modifications
 
+## 0.8.5 — 2026-10-31
+- Éditeur tactique, sélection multiple : deux nouveaux boutons dans la barre d'actions (visibles quand plusieurs éléments sont sélectionnés).
+  - **Aligner** : à gauche, centré horizontalement, à droite, en haut, centré verticalement, en bas, et répartir horizontalement ou verticalement (3 éléments minimum, espacement régulier entre les deux extrêmes, ordre conservé). « Gauche », « haut », etc. sont ceux de l'écran, quelle que soit l'orientation du terrain. Les flèches sélectionnées ne bougent pas avec l'alignement.
+  - **Faire tourner le groupe** : 90° à droite ou à gauche, 45° à droite ou à gauche, demi-tour, autour du centre de la sélection. Les positions des éléments et les extrémités des flèches sélectionnées tournent ; les buts, plots et notes tournent aussi sur eux-mêmes. Les calculs tiennent compte des proportions du terrain (105 × 68 m). Si un élément sortirait du terrain, rien n'est modifié et un message l'indique.
+  - Les boutons « Pivoter » existants continuent de faire tourner chaque élément sur lui-même. Annuler et rétablir fonctionnent pour les deux actions.
+- Clavier : dans les boîtes de dialogue (notes d'un exercice du plan, texte d'un schéma, équipe, choix d'un exercice), toucher la zone assombrie autour de la boîte ferme maintenant le clavier (limite signalée en 0.8.3). Dans les fiches joueur et séance, le champ Notes se comportait déjà correctement dans mes essais.
+- Vérifié ici hors écran (Qt 6.12 via PySide6, orientations paysage et portrait) : chaque alignement, la répartition, la rotation (4 × 90° ramène exactement au départ, résultat identique dans les deux orientations), annuler, et le clavier dans la boîte d'équipe. Non vérifié : appareil réel et clavier virtuel Android.
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.4 — 2026-10-31
 - Éditeur tactique : nouveau bouton « Terrain en plein écran » (colonne de boutons à droite du terrain, sous le zoom). Il masque l'en-tête et la barre d'outils pour donner tout l'écran au terrain, surtout utile sur téléphone en paysage. Le même bouton (« Quitter le plein écran ») revient à l'affichage normal ; le plein écran est aussi quitté en ouvrant un autre schéma.
 - En plein écran, trois boutons flottants en haut à gauche gardent l'essentiel à portée : l'outil actif (ouvre la liste des outils, qui défile), annuler et rétablir. Les aides de la sélection multiple et des outils se décalent pour ne pas les recouvrir.

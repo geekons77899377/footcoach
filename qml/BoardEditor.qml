@@ -148,6 +148,45 @@ Item {
         onChosen: (id) => editor.tool = id
     }
 
+    // Alignement de la sélection multiple (par rapport à l'écran, quelle que soit l'orientation du terrain).
+    ActionSheet {
+        id: alignSheet
+        title: "Aligner la sélection"
+        model: [
+            { id: "left", text: "À gauche", icon: "alignleft" },
+            { id: "hcenter", text: "Centrer horizontalement", icon: "alignhcenter" },
+            { id: "right", text: "À droite", icon: "alignright" },
+            { id: "top", text: "En haut", icon: "aligntop" },
+            { id: "vcenter", text: "Centrer verticalement", icon: "alignvcenter" },
+            { id: "bottom", text: "En bas", icon: "alignbottom" },
+            { id: "hdist", text: "Répartir horizontalement (3 minimum)", icon: "alignhdist" },
+            { id: "vdist", text: "Répartir verticalement (3 minimum)", icon: "alignvdist" }
+        ]
+        onChosen: (id) => {
+            if ((id === "hdist" || id === "vdist") && board.selItems < 3)
+                toast.show("Il faut au moins 3 éléments pour les répartir.");
+            else
+                board.alignSelected(id, view.vertical);
+        }
+    }
+
+    // Rotation du groupe autour de son centre.
+    ActionSheet {
+        id: groupRotateSheet
+        title: "Faire tourner le groupe"
+        model: [
+            { id: "90", text: "Quart de tour à droite (90°)", icon: "rotatecw" },
+            { id: "-90", text: "Quart de tour à gauche (90°)", icon: "rotateccw" },
+            { id: "45", text: "45° à droite", icon: "rotatecw" },
+            { id: "-45", text: "45° à gauche", icon: "rotateccw" },
+            { id: "180", text: "Demi-tour (180°)", icon: "rotatecw" }
+        ]
+        onChosen: (id) => {
+            if (!board.rotateGroup(parseInt(id, 10), view.vertical))
+                toast.show("Rotation impossible : des éléments sortiraient du terrain.");
+        }
+    }
+
     ActionSheet {
         id: moreSheet
         title: "Schéma"
@@ -500,6 +539,18 @@ Item {
                         iconName: "edit"
                         accessibleName: "Modifier le texte"
                         onClicked: editor.editLabel(board.selLabelIndex)
+                    }
+                    IconButton {
+                        visible: board.selItems > 1
+                        iconName: "align"
+                        accessibleName: "Aligner la sélection"
+                        onClicked: alignSheet.open()
+                    }
+                    IconButton {
+                        visible: board.selCount > 1
+                        iconName: "grouprotate"
+                        accessibleName: "Faire tourner le groupe"
+                        onClicked: groupRotateSheet.open()
                     }
                     IconButton {
                         visible: board.selTransformable > 0

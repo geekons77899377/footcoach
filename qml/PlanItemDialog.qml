@@ -34,7 +34,7 @@ Popup {
         color: Theme.surface
         border.width: 1
         border.color: Theme.border
-        KeyboardDismiss {}
+        KeyboardDismissAll { popup: root }   // y compris la zone assombrie autour
     }
     onOpened: durationField.focusField()
 

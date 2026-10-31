@@ -76,6 +76,78 @@ function nextFreePlayerNumber(items) {
     return 0;
 }
 
+
+// --- Alignement et rotation d'un groupe ------------------------------------------------------
+// Les calculs se font en mètres dans le repère AFFICHÉ (x vers la droite, y vers le bas), pour que « à gauche »
+// veuille dire à gauche à l'écran quelle que soit l'orientation du terrain, et que les rotations gardent les
+// proportions du terrain (105 × 68 m).
+
+function displaySize(pitch, vertical) {
+    var depth = pitch === "half" ? HALF_L : FIELD_L;
+    return vertical ? { w: FIELD_W, h: depth } : { w: depth, h: FIELD_W };
+}
+
+function toMetres(nx, ny, pitch, vertical) {
+    var uv = toUV(nx, ny, vertical), d = displaySize(pitch, vertical);
+    return { x: uv.u * d.w, y: uv.v * d.h };
+}
+
+function fromMetres(x, y, pitch, vertical) {
+    var d = displaySize(pitch, vertical);
+    return fromUV(x / d.w, y / d.h, vertical);          // { x: nx, y: ny }
+}
+
+// Alignement de points { x, y } : left, hcenter, right, top, vcenter, bottom ; hdist, vdist = répartition
+// régulière entre les deux extrêmes (l'ordre des points est conservé). Renvoie de nouveaux points, dans le même ordre.
+function alignPoints(pts, mode) {
+    var n = pts.length, out = [], i;
+    if (n === 0)
+        return out;
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (i = 0; i < n; ++i) {
+        minX = Math.min(minX, pts[i].x); maxX = Math.max(maxX, pts[i].x);
+        minY = Math.min(minY, pts[i].y); maxY = Math.max(maxY, pts[i].y);
+    }
+    for (i = 0; i < n; ++i)
+        out.push({ x: pts[i].x, y: pts[i].y });
+    if (mode === "left") { for (i = 0; i < n; ++i) out[i].x = minX; }
+    else if (mode === "right") { for (i = 0; i < n; ++i) out[i].x = maxX; }
+    else if (mode === "hcenter") { for (i = 0; i < n; ++i) out[i].x = (minX + maxX) / 2; }
+    else if (mode === "top") { for (i = 0; i < n; ++i) out[i].y = minY; }
+    else if (mode === "bottom") { for (i = 0; i < n; ++i) out[i].y = maxY; }
+    else if (mode === "vcenter") { for (i = 0; i < n; ++i) out[i].y = (minY + maxY) / 2; }
+    else if (mode === "hdist" || mode === "vdist") {
+        var key = mode === "hdist" ? "x" : "y";
+        var order = [];
+        for (i = 0; i < n; ++i) order.push(i);
+        order.sort(function (a, b) { return pts[a][key] - pts[b][key] || a - b; });
+        var lo = mode === "hdist" ? minX : minY, hi = mode === "hdist" ? maxX : maxY;
+        for (i = 0; i < n; ++i)
+            out[order[i]][key] = n > 1 ? lo + (hi - lo) * i / (n - 1) : lo;
+    }
+    return out;
+}
+
+// Rotation de points autour de (cx, cy), degrés, sens horaire à l'écran (y vers le bas).
+function rotatePoints(pts, cx, cy, degrees) {
+    var a = degrees * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), out = [];
+    for (var i = 0; i < pts.length; ++i) {
+        var dx = pts[i].x - cx, dy = pts[i].y - cy;
+        out.push({ x: cx + dx * c - dy * s, y: cy + dx * s + dy * c });
+    }
+    return out;
+}
+
+// Vrai si tous les points (mètres affichés) tiennent dans le terrain, à une tolérance près.
+function insidePitch(pts, pitch, vertical) {
+    var d = displaySize(pitch, vertical), eps = 1e-6;
+    for (var i = 0; i < pts.length; ++i) {
+        if (pts[i].x < -eps || pts[i].x > d.w + eps || pts[i].y < -eps || pts[i].y > d.h + eps)
+            return false;
+    }
+    return true;
+}
+
 // --- Flèches ----------------------------------------------------------------------------------
 
 // Tracé d'une flèche en pixels d'écran. style : run, pass, dribble, cross ; curve : courbure des centres.

@@ -16,6 +16,7 @@ QtObject {
 
     // Résumé de la sélection (pour afficher les bonnes actions).
     property int selCount: 0
+    property int selItems: 0                      // éléments (hors flèches) sélectionnés
     property int selTransformable: 0              // buts, plots, notes
     property int selColorable: 0
     property int selCrosses: 0
@@ -194,12 +195,13 @@ QtObject {
     // --- Sélection ------------------------------------------------------------------------------
 
     function _selectionChanged() {
-        var n = 0, tr = 0, co = 0, cr = 0, lab = -1, labCount = 0;
+        var n = 0, ni = 0, tr = 0, co = 0, cr = 0, lab = -1, labCount = 0;
         for (var i = 0; i < items.count; ++i) {
             var it = items.get(i);
             if (!it.sel)
                 continue;
             n++;
+            ni++;
             if (isRotatable(it.kind)) tr++;
             if (isColorable(it.kind)) co++;
             if (hasLabel(it.kind)) { lab = i; labCount++; }
@@ -212,6 +214,7 @@ QtObject {
                 cr++;
         }
         selCount = n;
+        selItems = ni;
         selTransformable = tr;
         selColorable = co;
         selCrosses = cr;
@@ -339,6 +342,85 @@ QtObject {
                 items.setProperty(i, "rot", (((it.rot + degrees) % 360) + 360) % 360);
         }
         commit();
+    }
+
+    // --- Alignement et rotation d'un groupe -----------------------------------------------------
+    // `vertical` : orientation d'affichage du terrain (BoardView.vertical), pour que « gauche », « haut »
+    // et le sens de rotation soient ceux de l'écran. Les flèches sélectionnées ne suivent pas l'alignement.
+
+    function _selectedItemIndexes() {
+        var idx = [];
+        for (var i = 0; i < items.count; ++i)
+            if (items.get(i).sel)
+                idx.push(i);
+        return idx;
+    }
+
+    // mode : left, hcenter, right, top, vcenter, bottom, hdist, vdist. Renvoie vrai si quelque chose a changé.
+    function alignSelected(mode, vertical) {
+        var idx = _selectedItemIndexes();
+        if (idx.length < 2 || ((mode === "hdist" || mode === "vdist") && idx.length < 3))
+            return false;
+        var pts = idx.map(function (i) { return Geo.toMetres(items.get(i).nx, items.get(i).ny, pitch, vertical); });
+        var out = Geo.alignPoints(pts, mode), changed = false;
+        for (var k = 0; k < idx.length; ++k) {
+            var n = Geo.fromMetres(out[k].x, out[k].y, pitch, vertical);
+            var nx = Geo.clamp(n.x, 0, 1), ny = Geo.clamp(n.y, 0, 1);
+            if (Math.abs(nx - items.get(idx[k]).nx) > 1e-9 || Math.abs(ny - items.get(idx[k]).ny) > 1e-9)
+                changed = true;
+            items.setProperty(idx[k], "nx", nx);
+            items.setProperty(idx[k], "ny", ny);
+        }
+        if (changed)
+            commit();
+        return changed;
+    }
+
+    // Fait tourner tout le groupe sélectionné autour de son centre : positions des éléments et extrémités
+    // des flèches sélectionnées ; les buts, plots et notes tournent aussi sur eux-mêmes. Renvoie faux (sans
+    // rien changer) si un élément sortirait du terrain.
+    function rotateGroup(degrees, vertical) {
+        var idx = _selectedItemIndexes(), arrowIdx = [], pts = [], i, j;
+        for (j = 0; j < arrows.length; ++j)
+            if (arrows[j].sel)
+                arrowIdx.push(j);
+        for (i = 0; i < idx.length; ++i)
+            pts.push(Geo.toMetres(items.get(idx[i]).nx, items.get(idx[i]).ny, pitch, vertical));
+        for (j = 0; j < arrowIdx.length; ++j) {
+            var a = arrows[arrowIdx[j]];
+            pts.push(Geo.toMetres(a.x1, a.y1, pitch, vertical));
+            pts.push(Geo.toMetres(a.x2, a.y2, pitch, vertical));
+        }
+        if (pts.length < 2)
+            return false;
+        var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (i = 0; i < pts.length; ++i) {
+            minX = Math.min(minX, pts[i].x); maxX = Math.max(maxX, pts[i].x);
+            minY = Math.min(minY, pts[i].y); maxY = Math.max(maxY, pts[i].y);
+        }
+        var out = Geo.rotatePoints(pts, (minX + maxX) / 2, (minY + maxY) / 2, degrees);
+        if (!Geo.insidePitch(out, pitch, vertical))
+            return false;
+        var k = 0;
+        for (i = 0; i < idx.length; ++i, ++k) {
+            var n = Geo.fromMetres(out[k].x, out[k].y, pitch, vertical);
+            items.setProperty(idx[i], "nx", Geo.clamp(n.x, 0, 1));
+            items.setProperty(idx[i], "ny", Geo.clamp(n.y, 0, 1));
+            var it = items.get(idx[i]);
+            if (isRotatable(it.kind))
+                items.setProperty(idx[i], "rot", (((it.rot + degrees) % 360) + 360) % 360);
+        }
+        var list = arrows.slice();
+        for (j = 0; j < arrowIdx.length; ++j, k += 2) {
+            var p1 = Geo.fromMetres(out[k].x, out[k].y, pitch, vertical);
+            var p2 = Geo.fromMetres(out[k + 1].x, out[k + 1].y, pitch, vertical);
+            var ar = list[arrowIdx[j]];
+            ar.x1 = Geo.clamp(p1.x, 0, 1); ar.y1 = Geo.clamp(p1.y, 0, 1);
+            ar.x2 = Geo.clamp(p2.x, 0, 1); ar.y2 = Geo.clamp(p2.y, 0, 1);
+        }
+        arrows = list;
+        commit();
+        return true;
     }
 
     function scaleSelected(factor) {
