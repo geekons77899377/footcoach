@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.8.4 — 2026-10-31
+- Éditeur tactique : nouveau bouton « Terrain en plein écran » (colonne de boutons à droite du terrain, sous le zoom). Il masque l'en-tête et la barre d'outils pour donner tout l'écran au terrain, surtout utile sur téléphone en paysage. Le même bouton (« Quitter le plein écran ») revient à l'affichage normal ; le plein écran est aussi quitté en ouvrant un autre schéma.
+- En plein écran, trois boutons flottants en haut à gauche gardent l'essentiel à portée : l'outil actif (ouvre la liste des outils, qui défile), annuler et rétablir. Les aides de la sélection multiple et des outils se décalent pour ne pas les recouvrir.
+- Plein écran = l'application occupe tout l'espace de l'éditeur ; la barre d'état et de navigation du système ne sont pas masquées (non fait volontairement, non vérifiable ici).
+- Vérifié ici hors écran (Qt 6.12 via PySide6) en 844×390 (paysage) et 412×892 (portrait) : bascule, retour, redimensionnement du terrain, ouverture de la liste des outils. Les interactions de l'éditeur (placement, déplacement, flèches, zoom, pincement) donnent les mêmes résultats qu'avant. Non vérifié : rendu sur appareil.
+- Non traité : le bouton Retour d'Android ne quitte pas encore le plein écran (aucune gestion du bouton Retour n'existe encore dans l'application).
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.3 — 2026-10-31
 - Clavier : toucher en dehors d'un champ de saisie retire maintenant le focus au champ et ferme le clavier (signalé sur le Redmi : le clavier restait ouvert). Une couche transparente au-dessus des pages (`KeyboardDismiss.qml`) le fait pour les pages, formulaires et listes défilantes ; les boîtes de dialogue qui ont un champ (équipe, saisie de texte, durée d'un exercice, choix d'un exercice) ont la leur.
 - Toucher un bouton, un autre champ ou le champ déjà actif se comporte comme avant (le clavier reste ouvert pour un champ).

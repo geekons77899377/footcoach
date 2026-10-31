@@ -14,12 +14,15 @@ Item {
     property string loadError: ""
     property string tool: "select"
     property bool showBack: true
+    // Plein écran du terrain : l'en-tête et la barre d'outils se masquent ; les outils restent accessibles par un bouton.
+    property bool fullscreen: false
     readonly property bool landscape: width > height
     readonly property bool shortLandscape: landscape && height < 500       // téléphone couché : outils plus serrés
     // Toutes les tailles suivent la plus petite dimension de l'écran (1 ≈ téléphone de 400 dp de large).
     readonly property real u: Math.max(0.8, Math.min(1.3, Math.min(width, height) / 400))
     readonly property int toolSize: Math.round((shortLandscape ? 52 : 58) * u)    // côté d'un outil
     readonly property int stripSize: toolSize + Math.round(16 * u)               // épaisseur de la barre d'outils
+    readonly property int stripUsed: fullscreen ? 0 : stripSize                  // place prise par la barre d'outils
     readonly property int zoomButton: Math.round(40 * u)
 
     signal closeRequested()
@@ -60,6 +63,7 @@ Item {
         flush();
         boardId = id;
         tool = "select";
+        fullscreen = false;
         var b = backend.board(id);
         title = b.title || "";
         editable = b.readable === true;
@@ -123,6 +127,27 @@ Item {
             prompt.ask("Étiquette (3 caractères maximum)", it.label, false, 3);
     }
 
+    function currentToolIcon() {
+        for (var i = 0; i < tools.length; ++i)
+            if (tools[i].id === tool)
+                return tools[i].icon;
+        return "t-select";
+    }
+    function currentToolText() {
+        for (var i = 0; i < tools.length; ++i)
+            if (tools[i].id === tool)
+                return tools[i].text;
+        return "";
+    }
+
+    // Choix de l'outil quand la barre d'outils est masquée (plein écran).
+    ActionSheet {
+        id: toolSheet
+        title: "Outil"
+        model: editor.tools.map(function (t) { return { id: t.id, text: t.text, icon: t.icon, checked: editor.tool === t.id }; })
+        onChosen: (id) => editor.tool = id
+    }
+
     ActionSheet {
         id: moreSheet
         title: "Schéma"
@@ -179,6 +204,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 64
+        visible: !editor.fullscreen
 
         Row {
             anchors.left: parent.left
@@ -249,7 +275,7 @@ Item {
 
     Item {
         id: body
-        anchors.top: header.bottom
+        anchors.top: editor.fullscreen ? parent.top : header.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -257,10 +283,10 @@ Item {
         BoardView {
             id: view
             objectName: "boardView"
-            x: editor.landscape ? editor.stripSize : 0
+            x: editor.landscape ? editor.stripUsed : 0
             y: 0
-            width: body.width - (editor.landscape ? editor.stripSize : 0)
-            height: body.height - (editor.landscape ? 0 : editor.stripSize)
+            width: body.width - (editor.landscape ? editor.stripUsed : 0)
+            height: body.height - (editor.landscape ? 0 : editor.stripUsed)
             board: board
             tool: editor.tool
             enabled: editor.editable
@@ -303,10 +329,10 @@ Item {
             visible: editor.editable && !prefs.hintSeen && board.items.count === 0 && board.arrows.length === 0
             MouseArea { anchors.fill: parent; onClicked: prefs.hintSeen = true }
             anchors.left: view.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: editor.fullscreen ? editor.zoomButton + 24 : 12
             anchors.top: view.top
             anchors.topMargin: 12
-            width: Math.min(view.width - editor.zoomButton - 36, 360)
+            width: Math.min(view.width - editor.zoomButton - 36 - (editor.fullscreen ? editor.zoomButton + 12 : 0), 360)
             height: hint.implicitHeight + 24
             radius: 16
             color: "#d90f172a"
@@ -360,16 +386,61 @@ Item {
                 enabled: view.zoom > 1.01
                 onClicked: view.fit()
             }
+            IconButton {
+                diameter: editor.zoomButton
+                iconName: editor.fullscreen ? "collapse" : "expand"
+                accessibleName: editor.fullscreen ? "Quitter le plein écran" : "Terrain en plein écran"
+                fillColor: "#d90f172a"
+                borderColor: Theme.border
+                onClicked: editor.fullscreen = !editor.fullscreen
+            }
+        }
+
+        // En plein écran : outils, annuler et rétablir restent à portée, en haut à gauche.
+        Column {
+            visible: editor.editable && editor.fullscreen
+            anchors.left: view.left
+            anchors.leftMargin: 12
+            anchors.top: view.top
+            anchors.topMargin: 12
+            spacing: 8
+            IconButton {
+                diameter: editor.zoomButton
+                iconName: editor.currentToolIcon()
+                iconColor: Theme.accent
+                accessibleName: "Outil : " + editor.currentToolText()
+                fillColor: "#d90f172a"
+                borderColor: Theme.accent
+                onClicked: toolSheet.open()
+            }
+            IconButton {
+                diameter: editor.zoomButton
+                iconName: "undo"
+                accessibleName: "Annuler"
+                fillColor: "#d90f172a"
+                borderColor: Theme.border
+                enabled: board.canUndo
+                onClicked: board.undo()
+            }
+            IconButton {
+                diameter: editor.zoomButton
+                iconName: "redo"
+                accessibleName: "Rétablir"
+                fillColor: "#d90f172a"
+                borderColor: Theme.border
+                enabled: board.canRedo
+                onClicked: board.redo()
+            }
         }
 
         // Aide de la sélection multiple.
         Rectangle {
             visible: editor.editable && editor.tool === "multi"
             anchors.left: view.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: editor.fullscreen ? editor.zoomButton + 24 : 12
             anchors.top: view.top
             anchors.topMargin: 12
-            width: Math.min(view.width - editor.zoomButton - 36, 360)
+            width: Math.min(view.width - editor.zoomButton - 36 - (editor.fullscreen ? editor.zoomButton + 12 : 0), 360)
             height: multiHint.implicitHeight + 20
             radius: 16
             color: "#d90f172a"
@@ -484,7 +555,7 @@ Item {
             width: editor.landscape ? editor.stripSize : body.width
             height: editor.landscape ? body.height : editor.stripSize
             color: Theme.bgDeep
-            visible: editor.editable
+            visible: editor.editable && !editor.fullscreen
 
             Rectangle {
                 width: editor.landscape ? 1 : parent.width
@@ -589,7 +660,7 @@ Item {
         visible: opacity > 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: editor.landscape ? 20 : editor.stripSize + 20
+        anchors.bottomMargin: editor.landscape ? 20 : editor.stripUsed + 20
         width: Math.min(parent.width - 32, toastText.implicitWidth + 36)
         height: toastText.implicitHeight + 24
         radius: 16
