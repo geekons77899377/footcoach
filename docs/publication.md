@@ -10,7 +10,7 @@ Sources : [niveau d'API cible](https://developer.android.com/google/play/require
 |---|---|---|
 | Identifiant | `org.footcoach.app` | Ne plus changer après la première publication. |
 | `minSdk` / `targetSdk` | 23 / **36** | API 36 exigée pour les nouvelles applications depuis le 31/08/2026. |
-| `versionCode` | 14 | À augmenter à chaque envoi sur Google Play. |
+| `versionCode` | voir `QT_ANDROID_VERSION_CODE` dans `CMakeLists.txt` | À augmenter à chaque envoi sur Google Play. |
 | Version | `project(FootCoach VERSION …)` | Source unique : `versionName` en découle. |
 | ABI | arm64-v8a seule | Google Play exige le 64 bits ; le 32 bits est facultatif ([règle](https://developer.android.com/google/play/requirements/64-bit)). |
 | Qt | 6.9.3 minimum | Première version 6.9 compatible avec les pages de 16 Ko. |
@@ -19,7 +19,9 @@ Sources : [niveau d'API cible](https://developer.android.com/google/play/require
 ```
 aapt2 dump badging app.apk | findstr "package sdkVersion targetSdkVersion uses-permission"
 ```
-Attendu : `targetSdkVersion:'36'` et **aucune** `uses-permission`.
+Attendu : `targetSdkVersion:'36'` et **aucune** `uses-permission`. Le manifeste est `android/AndroidManifest.xml` (le marqueur
+`INSERT_PERMISSIONS` y est volontairement absent : sans lui, Qt n'ajoute pas INTERNET, ACCESS_NETWORK_STATE ni
+WRITE_EXTERNAL_STORAGE). Vérifier aussi `android:icon` et `allowBackup="false"` dans le manifeste généré.
 
 ## 2. Clé d'upload (une seule fois, hors dépôt)
 ```

@@ -1,5 +1,14 @@
 # Journal des modifications
 
+## 0.8.10 — 2026-10-31
+- Android : ajout de `android/AndroidManifest.xml` (remplace le modèle généré par Qt).
+  - **Icône :** `android:icon` et `android:roundIcon` pointent maintenant vers l'icône de l'application. Avant, le manifeste généré n'en déclarait aucune, d'où l'icône Android par défaut (constaté dans le manifeste généré par la 0.8.9).
+  - **Permissions :** plus aucune. Qt ajoutait `INTERNET`, `ACCESS_NETWORK_STATE` et `WRITE_EXTERNAL_STORAGE` (relevées dans le manifeste généré), alors que l'application n'utilise ni le réseau ni le stockage partagé (l'export et l'import passent par le sélecteur de fichiers du système). Ceci met le manifeste en accord avec la politique de confidentialité.
+  - **Sauvegarde automatique Android désactivée** (`allowBackup="false"`) : les données des joueurs restent sur l'appareil. Le transfert d'un appareil à l'autre passe par l'export / import de fichier.
+- Non vérifié ici (pas d'Android ni de Qt Quick) : la compilation et l'installation. À contrôler sur l'appareil : icône dans le lanceur, application qui démarre, export / import de fichier, et dans le manifeste généré : `android:icon` présent, aucune `uses-permission`. Si un champ `%%INSERT_...%%` était mal orthographié, la compilation échouerait avec une erreur visible.
+- `docs/publication.md` : valeurs mises à jour (versionCode, permissions, manifeste).
+- Aucun changement d'identifiant (`org.footcoach.app`), de schéma (4) ni de format de fichier (1).
+
 ## 0.8.9 — 2026-10-31
 - Nouvelle icône : un joueur qui frappe le ballon vers un but, sur fond vert (concept « vue de côté », redessiné en vectoriel, source unique `store/icon.svg`). Elle remplace le ballon vert sur fond bleu nuit.
 - Android : icône adaptative en deux couches (fond pelouse + premier plan joueur, but et ballon cadré dans la zone sûre de 66 dp) et icône classique en carré arrondi. Google Play : `store/icon-512.png` (512 × 512, opaque).
