@@ -421,20 +421,3 @@ void Backend::setSoftInputResize(bool resize)
     Q_UNUSED(resize);
 #endif
 }
-
-void Backend::nudgeKeyboardAnimation()
-{
-#ifdef Q_OS_ANDROID
-    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
-        QJniObject activity = QNativeInterface::QAndroidApplication::context();
-        if (!activity.isValid())
-            return;
-        QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
-        if (!window.isValid())
-            return;
-        QJniObject decor = window.callObjectMethod("getDecorView", "()Landroid/view/View;");
-        if (decor.isValid())
-            decor.callMethod<void>("invalidate", "()V");
-    });
-#endif
-}

@@ -125,8 +125,6 @@ public:
     Q_INVOKABLE void setKeepScreenOn(bool on);
     // Android : true = la fenêtre est réduite par le clavier (adjustResize), false = elle ne bouge pas (adjustNothing).
     Q_INVOKABLE void setSoftInputResize(bool resize);
-    // Android : demande un redessin de la vue de l'activité (essai : débloquer l'animation d'apparition du clavier).
-    Q_INVOKABLE void nudgeKeyboardAnimation();
 
     // --- Transfert de données entre appareils (téléphone ↔ tablette) ---------------------------------------
     // Fichier « .footcoach » : tout le contenu de la base en JSON versionné. url : chemin local, file:/// ou
