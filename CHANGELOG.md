@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.8.9 — 2026-10-31
+- Nouvelle icône : un joueur qui frappe le ballon vers un but, sur fond vert (concept « vue de côté », redessiné en vectoriel, source unique `store/icon.svg`). Elle remplace le ballon vert sur fond bleu nuit.
+- Android : icône adaptative en deux couches (fond pelouse + premier plan joueur, but et ballon cadré dans la zone sûre de 66 dp) et icône classique en carré arrondi. Google Play : `store/icon-512.png` (512 × 512, opaque).
+- Windows : nouvelle icône d'exécutable (`windows/footcoach.ico`, 16 à 256 px, via `windows/footcoach.rc`). Première fois que l'exécutable Windows a une icône propre.
+- `tools/make_icons.py` régénère tout depuis `store/icon.svg`.
+- Vérifié ici : génération des fichiers, tailles et transparence, superposition fond + premier plan avec masque rond et zone sûre, lisibilité à 48 px. Non vérifié : affichage sur le Redmi et la tablette, compilation de la ressource Windows (MSVC), fiche Play (rien n'est envoyé à Google Play).
+- Aucun changement d'identifiant (`org.footcoach.app`), de schéma (4) ni de format de fichier (1).
+
 ## 0.8.8 — 2026-10-31
 - **Correction PC : la souris ne fonctionnait plus.** Depuis la 0.8.3, la couche transparente qui ferme le clavier (`KeyboardDismiss`) interceptait les clics de souris avant les boutons : menu, boutons, cartes ne répondaient plus à la souris. Cette couche ne réagit maintenant qu'à l'écran tactile et au stylet (la souris n'ouvre pas de clavier virtuel). Sur téléphone et tablette, le comportement du clavier reste celui de la 0.8.3/0.8.5.
 - Vérifié ici hors écran : avant correction, clic souris sur les entrées du menu latéral → aucune réaction ; après correction → la section change à chaque clic. Clic souris sur le bouton plein écran de l'éditeur : fonctionne. Fermeture du clavier au toucher (champ Notes, dialogue d'équipe, zone assombrie) : inchangée. Non vérifié : sous Windows réel.

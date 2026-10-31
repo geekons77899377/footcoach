@@ -1,0 +1,2 @@
+// Icône de l'exécutable Windows (générée par tools/make_icons.py).
+IDI_ICON1 ICON "footcoach.ico"

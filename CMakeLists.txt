@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.8.8 LANGUAGES CXX)
+project(FootCoach VERSION 0.8.9 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -138,6 +138,9 @@ endif()
 
 if(FOOTCOACH_HAVE_QML)
     qt_policy(SET QTP0001 NEW)   # préfixe de ressources /qt/qml/
+    if(WIN32)
+        enable_language(RC)   # icône de l'exécutable (windows/footcoach.rc)
+    endif()
     qt_add_executable(FootCoach WIN32
         src/main_qml.cpp
         ${CORE_SOURCES}
@@ -147,6 +150,9 @@ if(FOOTCOACH_HAVE_QML)
         src/app/BackendPlan.cpp
         src/app/BackendData.cpp
     )
+    if(WIN32)
+        target_sources(FootCoach PRIVATE windows/footcoach.rc)
+    endif()
     qt_add_resources(FootCoach "sql"
         PREFIX "/sql"
         BASE "sql"
@@ -187,7 +193,7 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 22
+            QT_ANDROID_VERSION_CODE 23
             # Google Play exige API 36 pour les nouvelles applications depuis le 31/08/2026.
             QT_ANDROID_MIN_SDK_VERSION 23
             QT_ANDROID_TARGET_SDK_VERSION 36
