@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FootCoach VERSION 0.8.11 LANGUAGES CXX)
+project(FootCoach VERSION 0.8.12 LANGUAGES CXX)
 
 # L'application cible Windows et Android. L'option ci-dessous est réservée aux vérifications de compilation
 # sur d'autres systèmes (CI, Linux).
@@ -193,9 +193,9 @@ if(FOOTCOACH_HAVE_QML)
         set_target_properties(FootCoach PROPERTIES
             QT_ANDROID_PACKAGE_NAME "org.footcoach.app"
             QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
-            QT_ANDROID_VERSION_CODE 25
+            QT_ANDROID_VERSION_CODE 26
             # Google Play exige API 36 pour les nouvelles applications depuis le 31/08/2026.
-            QT_ANDROID_MIN_SDK_VERSION 23
+            QT_ANDROID_MIN_SDK_VERSION 28
             QT_ANDROID_TARGET_SDK_VERSION 36
             # Icône de l'application (adaptative + repli) : voir tools/make_icons.py.
             QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"

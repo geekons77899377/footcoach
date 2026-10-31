@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## 0.8.12 — 2026-10-31
+- Android : `minSdk` passé de 23 à 28 (Android 9). Qt 6.9 ne prend en charge qu'Android 9 et au-delà ; l'application n'est plus proposée sur Android 6 à 8, où elle n'était pas garantie. Aucun changement de code, de schéma (4) ni de format de fichier (1).
+- À vérifier au prochain build : `aapt2 dump badging app.apk` doit afficher `sdkVersion:'28'`.
+
 ## 0.8.11 — 2026-10-31
 - Préparation Google Play (aucun changement de code ni de schéma) :
   - Contact public : `footcoach.app@gmail.com` (fiche et politique de confidentialité).

@@ -9,7 +9,7 @@ Sources : [niveau d'API cible](https://developer.android.com/google/play/require
 | Point | Valeur | Remarque |
 |---|---|---|
 | Identifiant | `org.footcoach.app` | Ne plus changer après la première publication. |
-| `minSdk` / `targetSdk` | 23 / **36** | API 36 exigée pour les nouvelles applications depuis le 31/08/2026. |
+| `minSdk` / `targetSdk` | 28 / **36** | API 36 exigée pour les nouvelles applications depuis le 31/08/2026. |
 | `versionCode` | voir `QT_ANDROID_VERSION_CODE` dans `CMakeLists.txt` | À augmenter à chaque envoi sur Google Play. |
 | Version | `project(FootCoach VERSION …)` | Source unique : `versionName` en découle. |
 | ABI | arm64-v8a seule | Google Play exige le 64 bits ; le 32 bits est facultatif ([règle](https://developer.android.com/google/play/requirements/64-bit)). |
