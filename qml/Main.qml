@@ -54,6 +54,26 @@ ApplicationWindow {
         return 0;
     }
 
+    // Bouton retour du téléphone : d'abord la fiche ou le plein écran de la page courante, puis retour à l'accueil.
+    // Retourne true si le geste a été utilisé ; sinon (accueil, rien à fermer) l'application peut se fermer.
+    function handleBack() {
+        var page = ({ squad: squadPage, calendar: calendarPage, attendance: attendancePage,
+                      exercises: exercisesPage, sessions: sessionsPage, tactics: tactics })[section];
+        if (page && page.goBack())
+            return true;
+        if (section !== "home") {
+            go("home", -1);
+            return true;
+        }
+        return false;
+    }
+
+    // Android : le bouton retour demande la fermeture de la fenêtre ; on la refuse tant qu'il y a quelque chose à fermer.
+    onClosing: (close) => {
+        if (Qt.platform.os === "android" && handleBack())
+            close.accepted = false;
+    }
+
     function go(id, boardId) {
         section = id;
         if (id === "tactics" && boardId > 0)
@@ -235,11 +255,11 @@ ApplicationWindow {
             HomePage {
                 onNavigate: (section, boardId) => win.go(section, boardId)
             }
-            SquadPage { }
-            CalendarPage { }
-            AttendancePage { }
+            SquadPage { id: squadPage }
+            CalendarPage { id: calendarPage }
+            AttendancePage { id: attendancePage }
             ExercisesPage { id: exercisesPage }
-            SessionsPage { }
+            SessionsPage { id: sessionsPage }
             TacticsPage { id: tactics }
             DataPage { onImported: win.go("home", -1) }
         }

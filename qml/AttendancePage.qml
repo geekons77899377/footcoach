@@ -11,6 +11,14 @@ Item {
     property string period: "all"
     property var stats: ({ sessions: [], players: [] })
     property int openIndex: -1
+
+    // Bouton retour du téléphone : replie la fiche ouverte. Retourne true si la page a utilisé le geste.
+    function goBack() {
+        if (openIndex < 0)
+            return false;
+        openIndex = -1;
+        return true;
+    }
     readonly property int teamId: AppState.teamId
     readonly property var periods: [{ id: "all", text: "Tout" }, { id: "30", text: "30 jours" },
                                     { id: "90", text: "3 mois" }, { id: "365", text: "12 mois" }]

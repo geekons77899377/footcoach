@@ -80,6 +80,14 @@ Item {
         currentId = -1;
     }
 
+    // Bouton retour du téléphone : ferme la fiche ouverte. Retourne true si la page a utilisé le geste.
+    function goBack() {
+        if (!editing)
+            return false;
+        closeForm();
+        return true;
+    }
+
     function subtitleText() {
         if (!team)
             return "Aucune équipe";

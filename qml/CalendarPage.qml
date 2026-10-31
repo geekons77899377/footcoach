@@ -61,6 +61,14 @@ Item {
         refresh();
     }
 
+    // Bouton retour du téléphone : ferme le formulaire ouvert (séance, récurrence, appel).
+    function goBack() {
+        if (mode === "browse")
+            return false;
+        mode = "browse";
+        return true;
+    }
+
     function newSession() {
         sessionForm.openNew(teamId, selected);
         mode = "session";

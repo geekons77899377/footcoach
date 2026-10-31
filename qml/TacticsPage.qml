@@ -43,6 +43,17 @@ Item {
         refresh();
     }
 
+    // Bouton retour du téléphone : quitte le plein écran du terrain, puis ferme le schéma ouvert.
+    function goBack() {
+        if (currentId < 0)
+            return false;
+        if (editor.fullscreen)
+            editor.fullscreen = false;
+        else
+            closeEditor();
+        return true;
+    }
+
     Connections {
         target: backend
         function onDataReplaced() {

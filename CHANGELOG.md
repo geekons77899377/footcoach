@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## 0.9.2 — 2026-10-31 (branche v1)
+- **Bouton retour d'Android** : il ferme d'abord ce qui est ouvert (fiche d'exercice ou de joueur, plan de séance, formulaire du calendrier, fiche dépliée du suivi, plein écran puis schéma du terrain), puis ramène à l'accueil ; l'application ne se ferme que depuis l'accueil. Une fenêtre ouverte (feuille de choix, dialogue, chronomètre en plein écran) se ferme d'abord, par le comportement de Qt.
+- **Clavier** : le manifeste Android déclare maintenant `windowSoftInputMode="adjustResize"` : la fenêtre se réduit au lieu d'être poussée vers le haut quand le clavier s'ouvre dans un champ de notes (constaté sur appareil : l'en-tête passait sous la barre d'état).
+- Manifeste : `android:enableOnBackInvokedCallback="false"` sur `<application>`, pour que le retour passe par la fenêtre de Qt (cet attribut a été signalé comme nécessaire sur Android 13 et plus dans un fil du forum Qt ; Android 16 pourrait l'ignorer pour une cible API 36).
+- Vérifié hors appareil : l'enchaînement des retours sur les 7 pages (13 cas). **Non vérifié sur téléphone** : le bouton retour lui-même, le geste de retour par balayage, et surtout le clavier (le banc d'essai ne simule pas le clavier Android).
+
 ## 0.9.1 — 2026-10-31 (branche v1)
 - Accueil, carte « Aucune séance aujourd'hui » : les boutons « Planifier une séance » et « Changer de séance » passent à la ligne quand l'écran est étroit ; sur téléphone, le second dépassait de l'écran (constaté sur appareil). Vérifié hors appareil sur 412, 360 et 320 de large.
 - Non corrigé : défilement vers le haut de la fenêtre quand on touche un champ de notes sur Android (cause à confirmer sur appareil, voir les échanges).
