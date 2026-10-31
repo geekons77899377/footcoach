@@ -3,7 +3,6 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtCore
-import "Keyboard.js" as Kbd
 
 // Fenêtre principale. Trois dispositions de navigation selon la place disponible :
 //  - « bottom » (téléphone en portrait) : barre en bas, comme dans la maquette ;
@@ -27,35 +26,41 @@ ApplicationWindow {
     Material.accent: Theme.accent
     Material.background: Theme.bg
 
-    // Clavier à l'écran. Deux façons de lui laisser la place, au choix dans Données > Clavier (essai) :
-    //  - "fixed" (défaut) : la fenêtre Android ne bouge pas (adjustNothing) et l'application remonte elle-même son contenu
-    //    de la hauteur du clavier. Évite le clignotement noir d'Android, qui recrée sa surface quand la fenêtre change
-    //    de taille (observé : premier appui dans un champ = écran noir, deuxième appui = correct) ;
-    //  - "resize" : Android réduit la fenêtre (adjustResize).
-    // Propriétés simples (sans liaison forcée) pour pouvoir les simuler dans les tests.
+    // Clavier à l'écran ouvert (Android : la fenêtre est alors réduite). Propriété simple pour pouvoir la simuler en test.
     property bool keyboardUp: Qt.inputMethod.visible
-    property string keyboardMode: AppState.keyboardMode
-    property real keyboardHeight: keyboardMode === "fixed"
-                                  ? Kbd.height(Qt.inputMethod.keyboardRectangle, win.height, Screen.devicePixelRatio, keyboardUp)
-                                  : 0
+
+    // Contournement (0.9.8), Android seulement : au premier affichage du clavier après le lancement, ses touches ne
+    // s'affichent pas (le deuxième champ touché est correct). Cause non trouvée ; on ouvre donc puis on referme le
+    // clavier une fois, sur un champ invisible, peu après le lancement. Désactivable dans Données > Clavier (essai).
     Settings {
         id: kbdPrefs
         category: "keyboard"
-        property string mode: "fixed"
+        property bool warmup: true
     }
-    Connections {
-        target: AppState
-        function onKeyboardModeChanged() { kbdPrefs.mode = AppState.keyboardMode; }
+    function warmUpKeyboard() {
+        warmField.forceActiveFocus();
+        Qt.inputMethod.show();
+        warmEnd.restart();
     }
-    onKeyboardModeChanged: applyKeyboardMode()
-    Component.onCompleted: {
-        if (kbdPrefs.mode === "resize" || kbdPrefs.mode === "fixed")
-            AppState.keyboardMode = kbdPrefs.mode;
-        applyKeyboardMode();
+    TextInput {
+        id: warmField
+        objectName: "warmField"
+        width: 2; height: 2; opacity: 0
+        z: -1
     }
-    function applyKeyboardMode() {
-        if (backend && backend.setSoftInputResize)
-            backend.setSoftInputResize(keyboardMode === "resize");
+    Timer {
+        id: warmStart
+        interval: 1500
+        running: Qt.platform.os === "android" && kbdPrefs.warmup
+        onTriggered: win.warmUpKeyboard()
+    }
+    Timer {
+        id: warmEnd
+        interval: 700
+        onTriggered: {
+            Qt.inputMethod.hide();
+            warmField.focus = false;
+        }
     }
 
     readonly property string navMode: width < 600 ? "bottom" : (width >= 840 && height >= 520 ? "sidebar" : "rail")
@@ -119,8 +124,7 @@ ApplicationWindow {
     Binding {
         target: AppState
         property: "bottomInset"
-        value: win.keyboardHeight > 0 ? win.keyboardHeight
-               : (bottomBar.visible ? bottomBar.height : 0) + win.SafeArea.margins.bottom
+        value: (bottomBar.visible ? bottomBar.height : 0) + win.SafeArea.margins.bottom
     }
 
     ActionSheet {
@@ -148,7 +152,7 @@ ApplicationWindow {
         id: shell
         anchors.fill: parent
         anchors.topMargin: parent.SafeArea.margins.top
-        anchors.bottomMargin: win.keyboardHeight > 0 ? win.keyboardHeight : parent.SafeArea.margins.bottom
+        anchors.bottomMargin: parent.SafeArea.margins.bottom
         anchors.leftMargin: parent.SafeArea.margins.left
         anchors.rightMargin: parent.SafeArea.margins.right
 

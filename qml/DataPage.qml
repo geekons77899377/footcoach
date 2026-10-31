@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import QtQuick.Controls
 import QtQuick.Dialogs
 
@@ -181,21 +182,28 @@ Item {
                         wrapMode: Text.Wrap
                         font.pixelSize: 14
                         color: Theme.textMuted
-                        text: "Si l'écran devient noir ou si le clavier s'affiche mal au premier appui dans un champ, "
-                              + "essayez l'autre mode. « Fixe » : la fenêtre ne bouge pas et l'application se relève "
-                              + "d'elle-même. « Android » : c'est Android qui réduit la fenêtre."
+                        text: "Au premier appui dans un champ après le lancement, le clavier peut s'ouvrir sans ses "
+                              + "touches. Contournement : l'application ouvre puis referme le clavier une fois, "
+                              + "tout de suite après son lancement (un bref clignotement est possible). "
+                              + "Prend effet au prochain lancement."
                     }
                     ChipRow {
-                        objectName: "keyboardMode"
+                        objectName: "warmupChoice"
                         width: parent.width
                         allowClear: false
-                        options: [ { id: "fixed", text: "Fixe" }, { id: "resize", text: "Android" } ]
-                        value: AppState.keyboardMode
-                        onPicked: (id) => AppState.keyboardMode = id
+                        options: [ { id: "on", text: "Activé" }, { id: "off", text: "Désactivé" } ]
+                        value: warmSettings.warmup ? "on" : "off"
+                        onPicked: (id) => warmSettings.warmup = (id === "on")
                     }
                 }
             }
         }
+    }
+
+    Settings {
+        id: warmSettings
+        category: "keyboard"
+        property bool warmup: true
     }
 
     Toast { id: toast }

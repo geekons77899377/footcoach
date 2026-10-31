@@ -123,8 +123,6 @@ public:
     // Garde l'écran allumé tant que la séance du jour est affichée (Android : drapeau FLAG_KEEP_SCREEN_ON de la
     // fenêtre, sans permission ; il s'efface seul quand l'application quitte l'avant-plan). Sans effet ailleurs.
     Q_INVOKABLE void setKeepScreenOn(bool on);
-    // Android : true = la fenêtre est réduite par le clavier (adjustResize), false = elle ne bouge pas (adjustNothing).
-    Q_INVOKABLE void setSoftInputResize(bool resize);
 
     // --- Transfert de données entre appareils (téléphone ↔ tablette) ---------------------------------------
     // Fichier « .footcoach » : tout le contenu de la base en JSON versionné. url : chemin local, file:/// ou

@@ -1,14 +1,12 @@
 # Journal des modifications
 
+## 0.9.8 — 2026-10-31 (branche v1)
+- **Retour en arrière sur le clavier** : les essais des versions 0.9.5 (mode « Fixe » `adjustNothing` avec marge gérée par l'application, interrupteur Données > Clavier) et 0.9.7 (redessin de la vue Android) sont annulés par `git revert` : ils n'ont pas supprimé le défaut du premier appui dans un champ (constaté sur appareil, journaux adb de la 0.9.5 et de la 0.9.7). Le manifeste redevient `adjustResize`, comme en 0.9.4.
+- **Contournement, non vérifié** : au lancement (Android seulement), l'application ouvre puis referme une fois le clavier sur un champ invisible, puisque le deuxième champ s'affiche correctement. Cause du défaut non trouvée : le journal montre que l'animation d'apparition du clavier ne se termine pas au premier affichage. Un bref clignotement du clavier au démarrage est possible. Désactivable dans Données > Clavier (essai) si ça gêne.
+- Le numéro de version reste affiché sous le titre de la page Données.
+
 ## 0.9.6 — 2026-10-31 (branche v1)
 - Le numéro de version est affiché sous le titre de la page Données (« version 0.9.6 »), pour savoir sans ambiguïté quelle version est installée sur l'appareil. Constaté : l'essai du clavier de la 0.9.5 a été fait sur une 0.9.4 non mise à jour ; les essais du premier appui dans un champ restent donc à refaire sur une version dont le numéro est affiché.
-
-## 0.9.5 — 2026-10-31 (branche v1)
-- **Clavier, premier appui dans un champ** : constaté sur appareil en 0.9.4 : au premier appui, le clavier s'ouvre sans touches visibles et l'en-tête disparaît ; au deuxième champ, tout est correct. **Hypothèse, non confirmée** : avec `adjustResize`, Android réduit la fenêtre et Qt recrée sa surface d'affichage à ce moment (clignotement/écran noir signalé dans le forum Qt, QTBUG-41170, sur des versions plus anciennes de Qt) ; cela se produirait surtout à la première ouverture.
-- Nouveau mode par défaut **« Fixe »** : le manifeste déclare `adjustNothing` (la fenêtre Android ne bouge plus) et l'application remonte elle-même son contenu de la hauteur du clavier (`Qt.inputMethod.keyboardRectangle`, normalisée par `qml/Keyboard.js` : conversion si le rectangle est en pixels d'appareil, hauteur de repli de 42 % si le clavier est ouvert mais son rectangle vide, plafond à 70 %).
-- Interrupteur d'essai **Données > Clavier (essai)** : « Fixe » ou « Android » (ancien comportement `adjustResize`, appliqué par `Window.setSoftInputMode`), mémorisé. Permet de comparer sur le téléphone sans nouvelle version.
-- **Tests** : `keyboard_js` ajouté à `ctest` (9/9) ; les 34 vérifications de champs tournent dans les deux modes (fenêtre réduite, puis fenêtre fixe avec hauteur de clavier simulée de 380).
-- **Non vérifié sur téléphone** : que « Fixe » supprime le défaut du premier appui, la valeur réelle de `keyboardRectangle` sur votre téléphone, l'appel JNI `setSoftInputMode` (non compilé pour Android ici). Limites connues : feuilles ancrées en bas et téléphone en paysage non traités.
 
 ## 0.9.4 — 2026-10-31 (branche v1)
 - **Champs de saisie et clavier** : un champ placé en bas d'un formulaire (Notes de la séance, de la récurrence et du joueur, Description de l'exercice, E-mail du joueur) restait caché derrière le clavier, car une liste défilante ne se déplace pas toute seule vers le champ touché. Nouveau composant `EnsureVisible` : le champ qui prend le focus est ramené à l'écran, y compris quand la fenêtre est réduite par le clavier. Appliqué aux fiches Exercice, Joueur, Séance et Récurrence.
