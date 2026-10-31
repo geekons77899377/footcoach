@@ -58,6 +58,8 @@ ApplicationWindow {
         section = id;
         if (id === "tactics" && boardId > 0)
             tactics.openBoard(boardId);
+        else if (id === "exercises" && boardId > 0)
+            exercisesPage.openById(boardId);
     }
 
     // Les feuilles du bas s'ouvrent au-dessus de la barre de navigation et de la zone sûre.
@@ -236,7 +238,7 @@ ApplicationWindow {
             SquadPage { }
             CalendarPage { }
             AttendancePage { }
-            ExercisesPage { }
+            ExercisesPage { id: exercisesPage }
             SessionsPage { }
             TacticsPage { id: tactics }
             DataPage { onImported: win.go("home", -1) }

@@ -41,6 +41,26 @@ Item {
         editing = true;
     }
 
+    // Ouvre la fiche d'un exercice de la bibliothèque (depuis la séance du jour).
+    function openById(id) {
+        refresh();
+        for (var i = 0; i < exercises.length; ++i) {
+            if (exercises[i].id === id) {
+                openExercise(exercises[i]);
+                return;
+            }
+        }
+        showArchived = true;                  // exercice archivé : il reste dans d'anciens plans
+        refresh();
+        for (var j = 0; j < exercises.length; ++j) {
+            if (exercises[j].id === id) {
+                openExercise(exercises[j]);
+                break;
+            }
+        }
+        showArchived = false;
+    }
+
     function newExercise() {
         currentId = -1;
         form.openNew();

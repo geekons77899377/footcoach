@@ -1,5 +1,16 @@
 # Journal des modifications
 
+## 0.9.0 — 2026-10-31 (branche v1)
+- **Accueil : « Séance du jour »** avec chronomètre par exercice.
+  - La séance affichée est choisie d'office selon l'heure du téléphone (celle dont la plage horaire contient l'heure actuelle) ; sinon la prochaine séance du jour. « Changer de séance » permet de choisir à la main (hier, aujourd'hui, demain) et de revenir à l'automatique. Si deux séances se chevauchent, un avertissement s'affiche.
+  - Grand chronomètre en **décompte** (durée prévue de l'exercice), boutons Commencer / Pause / Reprendre et Exercice suivant / Terminer la séance. Au-delà de la durée prévue, il continue en orange (+mm:ss).
+  - Déroulé de la séance : exercices à venir, en cours (mis en avant avec son chronomètre), terminés (durée réelle et durée prévue). Appuyer sur un exercice ouvre sa fiche dans Exercices pour le redéfinir.
+  - Plein écran du chronomètre (lisible de loin), et deux colonnes en paysage et sur tablette.
+  - Le temps se recalcule toujours à partir de l'heure de départ : un écran verrouillé ou une application en arrière-plan ne fausse pas le chronomètre. L'état est conservé si l'application est relancée le même jour (réglages de l'application, aucun changement de schéma).
+  - L'écran reste allumé tant que le chronomètre tourne (Android : drapeau de fenêtre, sans permission).
+- Schéma de données : inchangé (4). Format `.footcoach` : inchangé (1). Identifiant : inchangé.
+- Vérifié hors appareil : choix de la séance selon l'heure, décompte, pause, reprise, dépassement, fin de séance, reprise après relance, ouverture de l'exercice, 7 formats d'écran. **Non vérifié sur téléphone** : écran maintenu allumé (appel Android via JNI), comportement écran verrouillé, lisibilité en plein soleil. Il n'y a pas d'alerte sonore ni de notification quand l'application est en arrière-plan.
+
 ## 0.8.12 — 2026-10-31
 - Android : `minSdk` passé de 23 à 28 (Android 9). Qt 6.9 ne prend en charge qu'Android 9 et au-delà ; l'application n'est plus proposée sur Android 6 à 8, où elle n'était pas garantie. Aucun changement de code, de schéma (4) ni de format de fichier (1).
 - À vérifier au prochain build : `aapt2 dump badging app.apk` doit afficher `sdkVersion:'28'`.

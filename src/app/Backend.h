@@ -119,6 +119,11 @@ public:
     Q_INVOKABLE QVariantMap removePlanItem(int itemId);
     Q_INVOKABLE QVariantMap movePlanItem(int itemId, int delta);       // -1 : monte, +1 : descend
 
+    // --- Écran ------------------------------------------------------------------------------------------
+    // Garde l'écran allumé tant que la séance du jour est affichée (Android : drapeau FLAG_KEEP_SCREEN_ON de la
+    // fenêtre, sans permission ; il s'efface seul quand l'application quitte l'avant-plan). Sans effet ailleurs.
+    Q_INVOKABLE void setKeepScreenOn(bool on);
+
     // --- Transfert de données entre appareils (téléphone ↔ tablette) ---------------------------------------
     // Fichier « .footcoach » : tout le contenu de la base en JSON versionné. url : chemin local, file:/// ou
     // content:// (sélecteur de fichiers Android).

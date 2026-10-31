@@ -8,6 +8,7 @@ Item {
     signal navigate(string section, int boardId)
 
     function refresh() {
+        switcher.load();
         boards = backend.boards();
     }
 
@@ -19,6 +20,10 @@ Item {
         width: parent.width
         title: "Tableau de bord"
         subtitle: "Bonne séance, coach"
+        TeamSwitcher {
+            id: switcher
+            onChanged: live.reload()
+        }
     }
 
     Flickable {
@@ -37,6 +42,16 @@ Item {
             y: 16
             width: Math.min(parent.width - 2 * Theme.gutter, 720)
             spacing: 18
+
+            // Séance du jour : chronomètre et déroulé.
+            LiveSessionCard {
+                id: live
+                objectName: "live"
+                width: parent.width
+                teamName: switcher.current === null ? "" : switcher.current.name
+                onOpenExercise: (exerciseId) => root.navigate("exercises", exerciseId)
+                onPlanSession: root.navigate("calendar", -1)
+            }
 
             // Boîte à outils.
             Text {

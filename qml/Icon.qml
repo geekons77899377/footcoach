@@ -59,6 +59,11 @@ Item {
         "pitch": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M3 10h3v4H3M21 10h-3v4h3"/>',
         // Outils du terrain : pictogrammes en couleur (indépendants de la couleur demandée).
         "t-select": '<path d="M6 3l13 7-6 2.2L10.5 19z" fill="C"/>',
+        "play": '<path d="M8 5.5v13l11-6.5z"/>',
+        "pause": '<path d="M8.5 5v14M15.5 5v14"/>',
+        "skip": '<path d="M6 5.5v13l9-6.5z"/><path d="M18.5 5v14"/>',
+        "tick": '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+        "stopwatch": '<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V9.5M10 3h4M18.5 6.5l1.2-1.2"/>',
         "clock": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
         "repeat": '<path d="M4 11V9a3 3 0 0 1 3-3h11M15 3l3 3-3 3M20 13v2a3 3 0 0 1-3 3H6M9 21l-3-3 3-3"/>',
         "t-multi": '<rect x="3.5" y="3.5" width="11" height="11" rx="2" stroke-dasharray="2.6 2.2"/><rect x="9.5" y="9.5" width="11" height="11" rx="2"/>',

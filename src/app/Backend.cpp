@@ -3,6 +3,10 @@
 #include "core/TacticalBoard.h"
 
 #include <QDate>
+#ifdef Q_OS_ANDROID
+#include <QCoreApplication>
+#include <QJniObject>
+#endif
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -376,4 +380,27 @@ QVariantMap Backend::deletePlayer(int id)
     const bool ok = m_players.remove(id, &error);
     setError(error);
     return result(ok, id, error);
+}
+
+void Backend::setKeepScreenOn(bool on)
+{
+#ifdef Q_OS_ANDROID
+    // android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON = 0x80. À appeler depuis le fil de l'interface
+    // Android ; l'activité est celle de Qt.
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([on]() {
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        if (!activity.isValid())
+            return;
+        QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
+        if (!window.isValid())
+            return;
+        const jint flag = 0x80;
+        if (on)
+            window.callMethod<void>("addFlags", "(I)V", flag);
+        else
+            window.callMethod<void>("clearFlags", "(I)V", flag);
+    });
+#else
+    Q_UNUSED(on);
+#endif
 }
