@@ -11,8 +11,11 @@ ApplicationWindow {
     id: win
 
     visible: true
-    width: 412
-    height: 892
+    // Téléphone/tablette : la fenêtre est imposée par le système. PC : fenêtre de bureau, bornée par l'écran
+    // disponible (sinon on obtenait la mise en page « téléphone » sur Windows).
+    readonly property bool desktop: Qt.platform.os !== "android" && Qt.platform.os !== "ios"
+    width: desktop ? Math.min(1280, Math.max(minimumWidth, Screen.desktopAvailableWidth - 80)) : 412
+    height: desktop ? Math.min(820, Math.max(minimumHeight, Screen.desktopAvailableHeight - 80)) : 892
     minimumWidth: 320
     minimumHeight: 300
     title: "FootCoach"

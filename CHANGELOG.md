@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## 0.8.6 — 2026-10-31
+- Version PC : la fenêtre s'ouvrait à la taille d'un téléphone (412 × 892), donc avec la mise en page « téléphone » (barre de navigation en bas). Sur PC, la fenêtre s'ouvre maintenant en 1280 × 820 au plus, réduite si l'écran est plus petit, ce qui donne le menu latéral et la liste à côté de l'éditeur. Android et iOS ne changent pas.
+- Cause de mon côté : mes essais précédents simulaient seulement des tailles de téléphone et fixaient la taille de la fenêtre, donc ils ne passaient jamais par la taille d'ouverture réelle d'une fenêtre de PC.
+- Vérifié ici hors écran à 1280 × 800 : toutes les sections et l'éditeur tactique en mode « menu latéral ». Non vérifié : la fenêtre réelle sous Windows (taille d'ouverture réellement obtenue, écrans à forte mise à l'échelle).
+- Aucun changement de schéma (4) ni de format de fichier (1).
+
 ## 0.8.5 — 2026-10-31
 - Éditeur tactique, sélection multiple : deux nouveaux boutons dans la barre d'actions (visibles quand plusieurs éléments sont sélectionnés).
   - **Aligner** : à gauche, centré horizontalement, à droite, en haut, centré verticalement, en bas, et répartir horizontalement ou verticalement (3 éléments minimum, espacement régulier entre les deux extrêmes, ordre conservé). « Gauche », « haut », etc. sont ceux de l'écran, quelle que soit l'orientation du terrain. Les flèches sélectionnées ne bougent pas avec l'alignement.
