@@ -74,7 +74,7 @@ private slots:
 
     void seedExercisesPresent()
     {
-        QCOMPARE(m_db->schemaVersion(), 4);
+        QCOMPARE(m_db->schemaVersion(), 5);
         const QList<Exercise> all = m_ex->list(false);
         QVERIFY2(all.size() >= 15, "une quinzaine d'exercices de départ attendus");
         QSet<QString> categories;

@@ -2,6 +2,7 @@
 #include "Backend.h"
 
 #include "core/PlanSchedule.h"
+#include "core/TacticalBoard.h"
 
 #include <QRegularExpression>
 #include <QSet>
@@ -158,6 +159,20 @@ QVariantMap Backend::plan(int sessionId)
         durations.append(e.durationMin);
     const auto times = PlanSchedule::schedule(s.startAt, durations);
 
+    // Terrains des blocs, en une seule requête : { id du bloc -> terrain }.
+    QMap<int, BoardRecord> blockBoards;
+    {
+        QString boardError;
+        const QList<BoardRecord> boards = m_repo.forBlocksOfSession(sessionId, &boardError);
+        if (!boardError.isEmpty()) {
+            setError(boardError);
+            return done(false, -1, boardError);
+        }
+        for (const BoardRecord &b : boards)
+            if (!blockBoards.contains(b.sessionExerciseId))
+                blockBoards.insert(b.sessionExerciseId, b);
+    }
+
     QVariantList rows;
     QStringList equipment;
     QSet<QString> seen;
@@ -170,6 +185,20 @@ QVariantMap Backend::plan(int sessionId)
         m.insert(QStringLiteral("durationMin"), e.durationMin);      // durée de CE plan (écrase celle de l'exercice)
         m.insert(QStringLiteral("suggestedMin"), e.exercise.durationMin);
         m.insert(QStringLiteral("notes"), e.notes);
+        // Terrain propre au bloc : boardId (-1 s'il n'en a pas), boardReadable et boardJson (JSON normalisé, vide si
+        // le contenu enregistré est illisible : l'interface ne doit alors rien en faire).
+        const auto board = blockBoards.constFind(e.itemId);
+        m.insert(QStringLiteral("boardId"), board == blockBoards.constEnd() ? -1 : board->id);
+        bool boardReadable = false;
+        QString boardJson;
+        if (board != blockBoards.constEnd()) {
+            Tactics::Board parsed;
+            boardReadable = Tactics::fromJson(board->sceneJson, &parsed);
+            if (boardReadable)
+                boardJson = Tactics::toJson(parsed);
+        }
+        m.insert(QStringLiteral("boardReadable"), boardReadable);
+        m.insert(QStringLiteral("boardJson"), boardJson);
         m.insert(QStringLiteral("start"), e.durationMin > 0 ? times.at(i).start.time().toString(QStringLiteral("HH:mm")) : QString());
         m.insert(QStringLiteral("end"), e.durationMin > 0 ? times.at(i).end.time().toString(QStringLiteral("HH:mm")) : QString());
         rows.append(m);
@@ -212,6 +241,59 @@ QVariantMap Backend::addToPlan(int sessionId, int exerciseId, int durationMin)
     const int id = m_plan.add(sessionId, exerciseId, minutes, QString(), &error);
     setError(id > 0 ? QString() : error);
     return done(id > 0, id, error);
+}
+
+QVariantMap Backend::createBlockBoard(int itemId)
+{
+    QString error;
+    const int sessionId = m_plan.sessionOf(itemId, &error);
+    if (sessionId < 0) {
+        const QString msg = error.isEmpty() ? tr("Ce bloc n'existe plus.") : error;
+        setError(msg);
+        return done(false, itemId, msg);
+    }
+    const Session s = m_sessions.get(sessionId, &error);
+    if (s.id < 0) {
+        const QString msg = error.isEmpty() ? tr("Séance introuvable.") : error;
+        setError(msg);
+        return done(false, itemId, msg);
+    }
+    if (s.status == QLatin1String("cancelled")) {
+        const QString msg = tr("Cette séance est annulée.");
+        setError(msg);
+        return done(false, itemId, msg);
+    }
+
+    BoardRecord existing;
+    if (m_repo.forBlock(itemId, &existing, &error)) {
+        setError(QString());
+        QVariantMap m = done(true, itemId);
+        m.insert(QStringLiteral("boardId"), existing.id);
+        m.insert(QStringLiteral("created"), false);
+        return m;
+    }
+    if (!error.isEmpty()) {
+        setError(error);
+        return done(false, itemId, error);
+    }
+
+    QString title = tr("Terrain");
+    for (const PlanEntry &e : m_plan.entries(sessionId, nullptr))
+        if (e.itemId == itemId && !e.exercise.title.trimmed().isEmpty())
+            title = e.exercise.title.trimmed();
+
+    BoardRecord record;
+    record.title = title;
+    record.sessionExerciseId = itemId;
+    if (!m_repo.insert(record, &error)) {
+        setError(error);
+        return done(false, itemId, error);
+    }
+    setError(QString());
+    QVariantMap m = done(true, itemId);
+    m.insert(QStringLiteral("boardId"), record.id);
+    m.insert(QStringLiteral("created"), true);
+    return m;
 }
 
 QVariantMap Backend::updatePlanItem(int itemId, int durationMin, const QString &notes)

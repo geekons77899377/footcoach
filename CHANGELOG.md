@@ -1,5 +1,21 @@
 # Journal des modifications
 
+## 0.10.0 — 2026-11-03 (branche v1, non publiée) — schéma 5 : un terrain par bloc de séance
+**Étape 2 : le terrain dans le plan de séance**
+- Chaque bloc du plan affiche la miniature de son terrain, ou un état vide « Pas encore de terrain pour cet atelier » avec le bouton **Ajouter un terrain**. « Ouvrir le terrain » ouvre l'éditeur tactique existant par-dessus le plan ; le retour (bouton de l'en-tête ou retour d'Android) enregistre, remet à jour la miniature et **conserve la position de défilement**. Le terrain n'est créé que sur demande (terrain vide, au nom de l'exercice).
+- Dans ce contexte, l'éditeur n'offre plus « Renommer » ni « Dupliquer » ; « Supprimer le schéma » devient « Retirer le terrain de ce bloc ». Séance annulée : miniature visible, ni ajout ni ouverture. Terrain au contenu illisible : ouvert en lecture seule, jamais écrasé, retirable.
+- Nouvelle fonction `Backend::createBlockBoard(itemId)` (idempotente) : seule évolution du backend, nécessaire parce qu'aucune fonction ne créait un terrain lié à un bloc. `PlanRepository::sessionOf`. Aucun changement de la structure de base.
+- `BoardThumb.qml` : traits et pastilles proportionnels à la largeur (inchangé à 72 px, lisible en grand).
+- Tests : `tst_backend::blockBoardThroughTheBackend`, `importReferenceFiles` étendu (fichiers 1 à 5), `tests/qml/t_blockboard.py` (Backend **simulé**, 5 formats d'écran). **Non vérifié sur téléphone ou tablette.**
+
+**Étape 1 : socle (schéma 5)**
+- **Schéma de données 5** (`sql/005_block_board.sql`) : `tactical_board.session_exercise_id` (clé étrangère vers `session_exercise`, `ON DELETE CASCADE`) et son index. Colonne facultative : les données existantes ne changent pas. Le format d'échange `.footcoach` reste en version 1 ; fichier de référence `schema5.footcoach` ajouté (les 1 à 4 sont inchangés).
+- Cœur C++ : `BoardRecord.sessionExerciseId`, `BoardRepository::get / forBlock / forBlocksOfSession / referenceForExercise`, `PlanEntry.boardId`, `Backend::plan()` renvoie `boardId`, `boardReadable`, `boardJson` pour chaque bloc.
+- Règles appliquées dans le dépôt : un terrain de bloc n'est ni un schéma de référence ni lié à une séance ; un seul terrain par bloc ; un seul schéma de référence par exercice (contrôlés à l'ajout ou au changement de lien seulement, pour ne pas bloquer d'éventuels doublons existants).
+- `BoardRepository::forSession` inclut les terrains des blocs, sans doublon. `Backend::boards()` (bibliothèque) n'affiche pas les terrains de bloc. Dupliquer un schéma produit un schéma libre.
+- `BoardRepository::update` renvoie désormais une erreur si le schéma n'existe pas (avant : succès silencieux).
+- **Non vérifié** : l'application complète sur appareil ; la cascade a été testée par les tests C++ sur SQLite 3.45.1 de l'environnement de développement, pas sur le SQLite d'Android. Les écrans Widgets (`src/ui`) n'ont pas été adaptés.
+
 ## 0.9.8 — 2026-10-31 (branche v1)
 - **Retour en arrière sur le clavier** : les essais des versions 0.9.5 (mode « Fixe » `adjustNothing` avec marge gérée par l'application, interrupteur Données > Clavier) et 0.9.7 (redessin de la vue Android) sont annulés par `git revert` : ils n'ont pas supprimé le défaut du premier appui dans un champ (constaté sur appareil, journaux adb de la 0.9.5 et de la 0.9.7). Le manifeste redevient `adjustResize`, comme en 0.9.4.
 - **Contournement, non vérifié** : au lancement (Android seulement), l'application ouvre puis referme une fois le clavier sur un champ invisible, puisque le deuxième champ s'affiche correctement. Cause du défaut non trouvée : le journal montre que l'animation d'apparition du clavier ne se termine pas au premier affichage. Un bref clignotement du clavier au démarrage est possible. Désactivable dans Données > Clavier (essai) si ça gêne.

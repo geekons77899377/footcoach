@@ -335,6 +335,214 @@ private slots:
         QVERIFY(m_repo->forSession(9999).isEmpty());
     }
 
+    // --- Terrain propre à un bloc (schéma 5) ---------------------------------------------------
+
+    void blockBoardIsCreatedAndRead()
+    {
+        const int block = addBlock(m_session.id);
+        QString error;
+        BoardRecord none;
+        QVERIFY(!m_repo->forBlock(block, &none, &error));
+        QVERIFY(error.isEmpty());
+
+        const int id = addBlockBoard(block, QStringLiteral("Atelier 1"));
+        BoardRecord back;
+        QVERIFY2(m_repo->forBlock(block, &back, &error), qPrintable(error));
+        QCOMPARE(back.id, id);
+        QCOMPARE(back.sessionExerciseId, block);
+        QCOMPARE(back.exerciseId, -1);
+        QCOMPARE(back.sessionId, -1);
+        QCOMPARE(back.title, QStringLiteral("Atelier 1"));
+        BoardRecord byId;
+        QVERIFY(m_repo->get(id, &byId, &error));
+        QCOMPARE(byId.sessionExerciseId, block);
+        QVERIFY(!m_repo->get(424242, &byId, &error));
+        QVERIFY(!error.isEmpty());
+
+        // mise à jour du contenu : le lien au bloc est conservé
+        back.title = QStringLiteral("Atelier 1 bis");
+        QVERIFY2(m_repo->update(back, &error), qPrintable(error));
+        QVERIFY(m_repo->forBlock(block, &byId, &error));
+        QCOMPARE(byId.title, QStringLiteral("Atelier 1 bis"));
+        QCOMPARE(byId.sessionExerciseId, block);
+
+        // lu par la séance
+        QCOMPARE(m_repo->forBlocksOfSession(m_session.id).size(), 1);
+        QVERIFY(m_repo->forBlocksOfSession(9999).isEmpty());
+    }
+
+    void planEntryExposesTheBlockBoardId()
+    {
+        const int a = addBlock(m_session.id);
+        const int b = addBlock(m_session.id);
+        const int id = addBlockBoard(b, QStringLiteral("B"));
+        const QList<PlanEntry> entries = m_plan->entries(m_session.id);
+        QCOMPARE(entries.size(), 2);
+        QCOMPARE(entries.at(0).itemId, a);
+        QCOMPARE(entries.at(0).boardId, -1);
+        QCOMPARE(entries.at(1).itemId, b);
+        QCOMPARE(entries.at(1).boardId, id);
+    }
+
+    void blockBoardRulesAreEnforced()
+    {
+        Exercise e;
+        e.title = QStringLiteral("Réf");
+        QVERIFY(m_ex->insert(e));
+        const int block = addBlock(m_session.id);
+        QString error;
+
+        // un terrain de bloc n'est ni un schéma de référence ni lié à une séance
+        BoardRecord b;
+        b.title = QStringLiteral("X");
+        b.sessionExerciseId = block;
+        b.exerciseId = e.id;
+        QVERIFY(!m_repo->insert(b, &error));
+        QVERIFY(!error.isEmpty());
+        b.exerciseId = -1;
+        b.sessionId = m_session.id;
+        QVERIFY(!m_repo->insert(b, &error));
+        b.sessionId = -1;
+        QVERIFY2(m_repo->insert(b, &error), qPrintable(error));
+
+        // un seul terrain par bloc
+        BoardRecord second;
+        second.title = QStringLiteral("Y");
+        second.sessionExerciseId = block;
+        QVERIFY(!m_repo->insert(second, &error));
+        QVERIFY(error.contains(QStringLiteral("déjà")));
+        QCOMPARE(m_repo->list().size(), 1);
+
+        // bloc inexistant : refusé par la clé étrangère
+        BoardRecord orphan;
+        orphan.title = QStringLiteral("Z");
+        orphan.sessionExerciseId = 424242;
+        QVERIFY(!m_repo->insert(orphan, &error));
+
+        // un seul schéma de référence par exercice
+        BoardRecord ref1, ref2;
+        ref1.title = ref2.title = QStringLiteral("Réf");
+        ref1.exerciseId = ref2.exerciseId = e.id;
+        QVERIFY(m_repo->insert(ref1, &error));
+        QVERIFY(!m_repo->insert(ref2, &error));
+        QVERIFY(error.contains(QStringLiteral("référence")));
+
+        // modifier le contenu d'un schéma existant n'est pas bloqué par la règle
+        ref1.title = QStringLiteral("Réf 2");
+        QVERIFY2(m_repo->update(ref1, &error), qPrintable(error));
+        // mais en faire un terrain de bloc déjà pourvu l'est
+        BoardRecord moved = ref1;
+        moved.exerciseId = -1;
+        moved.sessionExerciseId = block;
+        QVERIFY(!m_repo->update(moved, &error));
+        // et mettre à jour un schéma inconnu échoue
+        BoardRecord ghost;
+        ghost.id = 424242;
+        QVERIFY(!m_repo->update(ghost, &error));
+    }
+
+    void deletingABlockDeletesItsBoardOnly()
+    {
+        const int exA = firstExerciseId();
+        const int blockA = addBlock(m_session.id, exA);
+        const int blockB = addBlock(m_session.id, m_ex->list(false).at(1).id);
+        const int boardA = addBlockBoard(blockA, QStringLiteral("A"));
+        const int boardB = addBlockBoard(blockB, QStringLiteral("B"));
+        const int ref = addBoard(QStringLiteral("référence"), exA, -1);
+
+        QVERIFY(m_plan->remove(blockA));
+        BoardRecord r;
+        QVERIFY(!m_repo->get(boardA, &r));                // supprimé en cascade
+        QVERIFY(m_repo->get(boardB, &r));                 // l'autre bloc est intact
+        QVERIFY(m_repo->get(ref, &r));                    // la référence de l'exercice aussi
+        QCOMPARE(r.exerciseId, exA);
+    }
+
+    void deletingASessionDeletesBlocksAndBlockBoardsButKeepsReferences()
+    {
+        const int exA = firstExerciseId();
+        const int exB = m_ex->list(false).at(1).id;
+        const int blockA = addBlock(m_session.id, exA);
+        const int blockB = addBlock(m_session.id, exB);
+        addBlockBoard(blockA, QStringLiteral("A"));
+        addBlockBoard(blockB, QStringLiteral("B"));
+        const int refA = addBoard(QStringLiteral("réf A"), exA, -1);
+        const int free = addBoard(QStringLiteral("libre"), -1, -1);
+        const int linked = addBoard(QStringLiteral("lié à la séance"), -1, m_session.id);
+
+        QVERIFY(m_sessions->remove(m_session.id));
+        QSqlQuery q(m_db->handle());
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM session_exercise")) && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NOT NULL")) && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+
+        QList<int> left;
+        for (const BoardRecord &r : m_repo->list())
+            left << r.id;
+        QCOMPARE(left, (QList<int>{free, linked, refA}));  // tri par titre : « libre », « lié… », « réf A »
+        // la bibliothèque d'exercices n'est pas touchée
+        BoardRecord r;
+        QVERIFY(m_repo->referenceForExercise(exA, &r));
+        QCOMPARE(r.id, refA);
+    }
+
+    void usedExerciseCannotBeDeletedAndItsBlockBoardSurvives()
+    {
+        // session_exercise.exercise_id est en ON DELETE RESTRICT : l'exercice utilisé par un bloc ne se supprime pas.
+        Exercise e;
+        e.title = QStringLiteral("Temporaire");
+        QVERIFY(m_ex->insert(e));
+        const int block = addBlock(m_session.id, e.id);
+        const int board = addBlockBoard(block, QStringLiteral("Bloc"));
+        QString error;
+        QVERIFY(!m_ex->remove(e.id, &error));
+        BoardRecord r;
+        QVERIFY(m_repo->get(board, &r));
+        QCOMPARE(r.sessionExerciseId, block);
+    }
+
+    void forSessionHasNoDuplicatesWithBlockBoards()
+    {
+        const int exA = firstExerciseId();
+        const int exB = m_ex->list(false).at(1).id;
+        const int blockA = addBlock(m_session.id, exA);
+        const int blockB = addBlock(m_session.id, exB);
+        const Session other = makeSession(QDate(2026, 11, 3));
+        const int otherBlock = addBlock(other.id, exA);
+
+        const int refA = addBoard(QStringLiteral("réf A"), exA, -1);         // via l'exercice : une seule fois
+        const int direct = addBoard(QStringLiteral("direct"), -1, m_session.id);
+        const int boardA = addBlockBoard(blockA, QStringLiteral("bloc A"));
+        const int boardB = addBlockBoard(blockB, QStringLiteral("bloc B"));
+        addBlockBoard(otherBlock, QStringLiteral("autre séance"));
+
+        QList<int> ids;
+        for (const BoardRecord &r : m_repo->forSession(m_session.id))
+            ids << r.id;
+        QCOMPARE(ids, (QList<int>{refA, direct, boardA, boardB}));
+        QCOMPARE(QSet<int>(ids.begin(), ids.end()).size(), ids.size());
+
+        // bibliothèque : sans les terrains de bloc par défaut
+        QCOMPARE(m_repo->list(nullptr, false).size(), 2);
+        QCOMPARE(m_repo->list().size(), 5);
+    }
+
+    void unreadableBlockBoardIsKeptAndNeverOverwritten()
+    {
+        const int block = addBlock(m_session.id);
+        const int id = addBlockBoard(block, QStringLiteral("Illisible"));
+        QSqlQuery q(m_db->handle());
+        QVERIFY(q.exec(QStringLiteral("UPDATE tactical_board SET scene_json = '{pas du json' WHERE id = %1").arg(id)));
+
+        BoardRecord r;
+        QVERIFY(m_repo->get(id, &r));
+        QCOMPARE(r.sceneJson, QStringLiteral("{pas du json"));       // le contenu stocké est rendu tel quel
+        Board parsed;
+        QVERIFY(!fromJson(r.sceneJson, &parsed));                    // et reste détectable comme illisible
+        QCOMPARE(m_repo->forBlocksOfSession(m_session.id).size(), 1);
+    }
+
     // --- Fiche PDF ----------------------------------------------------------------------------
 
     void sheetListsBoardsAfterThePlan()
@@ -399,6 +607,27 @@ private:
         if (!m_sessions->insert(s))
             QTest::qFail("insertion de séance", __FILE__, __LINE__);
         return s;
+    }
+
+    // Ajoute un bloc à la séance (exercice quelconque si non précisé) et renvoie son identifiant.
+    int addBlock(int sessionId, int exerciseId = -1)
+    {
+        const int ex = exerciseId > 0 ? exerciseId : m_ex->list(false).last().id;
+        const int id = m_plan->add(sessionId, ex, 15);
+        if (id <= 0)
+            QTest::qFail("ajout d'un bloc", __FILE__, __LINE__);
+        return id;
+    }
+
+    int addBlockBoard(int sessionExerciseId, const QString &title)
+    {
+        BoardRecord b;
+        b.title = title;
+        b.sessionExerciseId = sessionExerciseId;
+        QString error;
+        if (!m_repo->insert(b, &error))
+            QTest::qFail(qPrintable(error), __FILE__, __LINE__);
+        return b.id;
     }
 
     int firstExerciseId() const { return m_ex->list(false).first().id; }

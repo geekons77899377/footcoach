@@ -278,6 +278,103 @@ private slots:
         QVERIFY(!b.plan(9999).value("ok").toBool());
     }
 
+    // Étape 2 : terrain propre à un bloc, créé à la demande et relu par plan() (contrat utilisé par PlanEditor.qml).
+    void blockBoardThroughTheBackend()
+    {
+        const QString dbFile = m_dir.filePath(QStringLiteral("t.db"));     // celle ouverte par init()
+        int team = 0, sess = 0, i1 = 0, i2 = 0, boardId = 0;
+        const QString json = QStringLiteral(
+            "{\"version\":1,\"pitch\":\"half\",\"items\":["
+            "{\"kind\":\"player\",\"x\":0.25,\"y\":0.5,\"label\":\"9\"}],\"arrows\":[]}");
+        {
+            Database &db = m_db;
+            Backend b(db.handle());
+            team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+            sess = b.saveSession({{"teamId", team}, {"date", "2026-11-03"}, {"time", "18:30"},
+                                  {"durationMin", 60}}, false).value("id").toInt();
+            const int ex1 = b.saveExercise({{"title", "Rondo 5 contre 2"}, {"category", "technical"}}).value("id").toInt();
+            const int ex2 = b.saveExercise({{"title", "Jeu réduit"}, {"category", "game"}}).value("id").toInt();
+            i1 = b.addToPlan(sess, ex1, 20).value("id").toInt();
+            i2 = b.addToPlan(sess, ex2, 20).value("id").toInt();
+
+            // Bloc sans terrain : rien n'est créé tout seul (règle B).
+            QVariantList rows = b.plan(sess).value("entries").toList();
+            QCOMPARE(rows.at(0).toMap().value("boardId").toInt(), -1);
+            QVERIFY(!rows.at(0).toMap().value("boardReadable").toBool());
+            QVERIFY(rows.at(0).toMap().value("boardJson").toString().isEmpty());
+            QVERIFY(b.boards().isEmpty());
+
+            // Création à la demande : terrain vide au nom de l'exercice, idempotente.
+            const QVariantMap made = b.createBlockBoard(i1);
+            QVERIFY2(made.value("ok").toBool(), qPrintable(made.value("error").toString()));
+            QVERIFY(made.value("created").toBool());
+            boardId = made.value("boardId").toInt();
+            QVERIFY(boardId > 0);
+            const QVariantMap again = b.createBlockBoard(i1);
+            QVERIFY(again.value("ok").toBool());
+            QVERIFY(!again.value("created").toBool());
+            QCOMPARE(again.value("boardId").toInt(), boardId);
+            QCOMPARE(b.board(boardId).value("title").toString(), QStringLiteral("Rondo 5 contre 2"));
+            QVERIFY(b.board(boardId).value("readable").toBool());
+            QVERIFY(b.boards().isEmpty());                          // le terrain d'un bloc n'est pas dans la bibliothèque
+
+            rows = b.plan(sess).value("entries").toList();
+            QCOMPARE(rows.at(0).toMap().value("boardId").toInt(), boardId);
+            QVERIFY(rows.at(0).toMap().value("boardReadable").toBool());
+            QCOMPARE(rows.at(1).toMap().value("boardId").toInt(), -1);   // l'autre bloc n'a rien
+
+            // Modification puis relecture par plan().
+            QVERIFY2(b.saveBoard(boardId, json), qPrintable(b.lastError()));
+            Tactics::Board back;
+            QVERIFY(Tactics::fromJson(b.plan(sess).value("entries").toList().at(0).toMap().value("boardJson").toString(), &back));
+            QCOMPARE(back.pitch, Tactics::Pitch::Half);
+            QCOMPARE(back.items.size(), 1);
+
+            // Blocs inconnus ou séance annulée : refusé, sans rien créer.
+            QVERIFY(!b.createBlockBoard(424242).value("ok").toBool());
+            QVERIFY(!b.lastError().isEmpty());
+        }
+        {
+            // Réouverture de la base : le terrain est retrouvé tel quel.
+            Database &db = m_db;
+            db.close();
+            QString error;
+            QVERIFY2(db.open(dbFile, &error), qPrintable(error));
+            Backend b(db.handle());
+            const QVariantMap row = b.plan(sess).value("entries").toList().at(0).toMap();
+            QCOMPARE(row.value("boardId").toInt(), boardId);
+            Tactics::Board back;
+            QVERIFY(Tactics::fromJson(row.value("boardJson").toString(), &back));
+            QCOMPARE(back.items.size(), 1);
+            QCOMPARE(back.items.first().label, QStringLiteral("9"));
+
+            // Contenu illisible : signalé, jamais réécrit.
+            QSqlQuery q(db.handle());
+            QVERIFY(q.exec(QStringLiteral("UPDATE tactical_board SET scene_json = '{pas du json' WHERE id = %1").arg(boardId)));
+            const QVariantMap broken = b.plan(sess).value("entries").toList().at(0).toMap();
+            QCOMPARE(broken.value("boardId").toInt(), boardId);
+            QVERIFY(!broken.value("boardReadable").toBool());
+            QVERIFY(broken.value("boardJson").toString().isEmpty());
+            QVERIFY(!b.saveBoard(boardId, json));
+            QVERIFY(q.exec(QStringLiteral("SELECT scene_json FROM tactical_board WHERE id = %1").arg(boardId)) && q.next());
+            QCOMPARE(q.value(0).toString(), QStringLiteral("{pas du json"));
+
+            // Retrait du terrain : le bloc reste, sans terrain ; supprimer le bloc supprime son terrain.
+            QVERIFY(b.deleteBoard(boardId));
+            QCOMPARE(b.plan(sess).value("entries").toList().size(), 2);
+            QCOMPARE(b.plan(sess).value("entries").toList().at(0).toMap().value("boardId").toInt(), -1);
+            const int second = b.createBlockBoard(i2).value("boardId").toInt();
+            QVERIFY(second > 0);
+            QVERIFY(b.removePlanItem(i2).value("ok").toBool());
+            QVERIFY(b.board(second).isEmpty());
+
+            // Séance annulée : pas de création.
+            QVERIFY(b.setSessionStatus(sess, "cancelled", false).value("ok").toBool());
+            QVERIFY(!b.createBlockBoard(i1).value("ok").toBool());
+            QVERIFY(b.plan(sess).value("entries").toList().at(0).toMap().value("boardId").toInt() == -1);
+        }
+    }
+
     void exportImportRoundTrip()
     {
         // Appareil A : une équipe, des joueurs, une séance avec plan et appel, un schéma.

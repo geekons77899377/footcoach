@@ -11,10 +11,13 @@ class PlanRepository
 public:
     explicit PlanRepository(const QSqlDatabase &db) : m_db(db) {}
 
-    // Lignes du plan, par position croissante, avec les champs de l'exercice (y compris archivé).
+    // Lignes du plan, par position croissante, avec les champs de l'exercice (y compris archivé) et l'id du terrain
+    // du bloc (boardId, -1 s'il n'en a pas).
     QList<PlanEntry> entries(int sessionId, QString *error = nullptr) const;
     // Ajoute l'exercice en fin de plan. Renvoie l'id de la ligne, ou -1 en cas d'erreur.
     int add(int sessionId, int exerciseId, int durationMin, const QString &notes = QString(), QString *error = nullptr);
+    // Séance d'une ligne du plan, ou -1 si la ligne n'existe pas (error reste vide dans ce cas).
+    int sessionOf(int itemId, QString *error = nullptr) const;
     bool updateItem(int itemId, int durationMin, const QString &notes, QString *error = nullptr);
     // Retire la ligne et recompacte les positions (1, 2, 3…).
     bool remove(int itemId, QString *error = nullptr);

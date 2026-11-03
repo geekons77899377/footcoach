@@ -92,6 +92,43 @@ const QStringList kSampleData = {
     "INSERT INTO injury(player_id,start_date,end_date,description) VALUES(2,'2026-10-20',NULL,'Entorse')",
 };
 
+// Ajouts propres au schéma 5 : un terrain rattaché au bloc de la séance 1 (le schéma de référence ci-dessus reste lié à l'exercice).
+const QStringList kSampleDataSchema5 = {
+    "INSERT INTO tactical_board(id,title,formation,scene_json,exercise_id,session_id,session_exercise_id) "
+    "VALUES(2,'Atelier 1 : jeu à thème',NULL,'{\"items\":[{\"t\":\"player\",\"x\":0.25}]}',NULL,NULL,"
+    "(SELECT id FROM session_exercise WHERE session_id=1 AND position=1))",
+};
+
+// Prépare un fichier de base au schéma « schema » (migrations 001 à 00N, user_version, données d'exemple), sans passer par Database.
+bool buildDatabaseAtSchema(const QString &dbFile, const QString &conn, int schema, QString *error)
+{
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
+    db.setDatabaseName(dbFile);
+    if (!db.open()) {
+        *error = db.lastError().text();
+        return false;
+    }
+    QSqlQuery q(db);
+    bool ok = q.exec(QStringLiteral("PRAGMA foreign_keys = ON"));
+    const QDir sql(QStringLiteral(":/sql"));
+    const QStringList files = sql.entryList({QStringLiteral("*.sql")}, QDir::Files, QDir::Name);
+    for (int n = 0; ok && n < schema; ++n)
+        for (const QString &st : statementsOf(sql.filePath(files.at(n))))
+            if (!(ok = q.exec(st))) {
+                *error = q.lastError().text() + " / " + st;
+                break;
+            }
+    ok = ok && q.exec(QStringLiteral("PRAGMA user_version = %1").arg(schema));
+    for (const QString &st : kSampleData)
+        if (ok && !(ok = q.exec(st)))
+            *error = q.lastError().text() + " / " + st;
+    if (ok && schema >= 5)
+        for (const QString &st : kSampleDataSchema5)
+            if (ok && !(ok = q.exec(st)))
+                *error = q.lastError().text() + " / " + st;
+    return ok;
+}
+
 } // namespace
 
 class DataFormatTest : public QObject
@@ -161,26 +198,16 @@ private slots:
         if (out.isEmpty())
             QSKIP("Définir FOOTCOACH_WRITE_FIXTURES=<dossier> pour recréer les fichiers de référence");
         QVERIFY(QDir().mkpath(out));
-        for (int schema = 1; schema <= 4; ++schema) {
+        for (int schema = 1; schema <= 5; ++schema) {
             const QString conn = QStringLiteral("fixture-%1").arg(schema);
             const QString dbFile = m_dir.filePath(QStringLiteral("fx%1.db").arg(schema));
             {
-                QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
-                db.setDatabaseName(dbFile);
-                QVERIFY(db.open());
-                QSqlQuery q(db);
-                QVERIFY(q.exec(QStringLiteral("PRAGMA foreign_keys = ON")));
-                const QDir sql(QStringLiteral(":/sql"));
-                const QStringList files = sql.entryList({QStringLiteral("*.sql")}, QDir::Files, QDir::Name);
-                for (int n = 0; n < schema; ++n)
-                    for (const QString &s : statementsOf(sql.filePath(files.at(n))))
-                        QVERIFY2(q.exec(s), qPrintable(q.lastError().text() + " / " + s));
-                QVERIFY(q.exec(QStringLiteral("PRAGMA user_version = %1").arg(schema)));
-                for (const QString &s : kSampleData) {
-                    QVERIFY2(q.exec(s), qPrintable(q.lastError().text() + " / " + s));
-                }
+                QString error;
+                QVERIFY2(buildDatabaseAtSchema(dbFile, conn, schema, &error), qPrintable(error));
+                QSqlDatabase db = QSqlDatabase::database(conn);
                 QCoreApplication::setApplicationVersion(schema == 4 ? QStringLiteral("0.8.0")
-                                                                    : QStringLiteral("reconstitue-schema-%1").arg(schema));
+                                                        : schema == 5 ? QStringLiteral("0.10.0")
+                                                                      : QStringLiteral("reconstitue-schema-%1").arg(schema));
                 Backend b(db);
                 QVERIFY(b.exportDataFile(QDir(out).filePath(QStringLiteral("schema%1.footcoach").arg(schema))).value("ok").toBool());
             }
@@ -192,7 +219,7 @@ private slots:
     void referenceFilesHaveTheV1Structure()
     {
         const QStringList keys = {"app", "exportedAt", "format", "schema", "tables", "version"};
-        for (int schema = 1; schema <= 4; ++schema) {
+        for (int schema = 1; schema <= 5; ++schema) {
             const QJsonObject o = readJson(fixturePath(schema));
             QVERIFY2(!o.isEmpty(), qPrintable(fixturePath(schema)));
             QCOMPARE(o.keys(), keys);
@@ -207,29 +234,39 @@ private slots:
             }
         }
         QCOMPARE(readJson(fixturePath(4)).value("app").toString(), QStringLiteral("0.8.0"));
+        QCOMPARE(readJson(fixturePath(5)).value("app").toString(), QStringLiteral("0.10.0"));
     }
 
-    // Un export fait aujourd'hui doit garder exactement la structure du fichier de référence de la 0.8.0.
+    // Un export fait aujourd'hui doit garder exactement la structure du fichier de référence du schéma courant (5),
+    // et ne retirer aucune colonne du fichier de référence de la 0.8.0 (schéma 4) : le format v1 évolue par ajout de colonnes.
     void currentExportKeepsTheV1Structure()
     {
         Backend b(m_db.handle());
         const QString p = m_dir.filePath(QStringLiteral("now.footcoach"));
         QVERIFY(b.exportDataFile(p).value("ok").toBool());
-        const QJsonObject now = readJson(p), ref = readJson(fixturePath(4));
+        const QJsonObject now = readJson(p), ref = readJson(fixturePath(5)), old = readJson(fixturePath(4));
         QCOMPARE(now.keys(), ref.keys());
         QCOMPARE(now.value("format"), ref.value("format"));
         QCOMPARE(now.value("version"), ref.value("version"));
         QCOMPARE(now.value("schema"), ref.value("schema"));
-        for (const QString &t : kTables)
-            QCOMPARE(now.value("tables").toObject().value(t).toObject().value("columns"),
-                     ref.value("tables").toObject().value(t).toObject().value("columns"));
+        QCOMPARE(now.value("schema").toInt(), 5);
+        for (const QString &t : kTables) {
+            const QJsonArray cols = now.value("tables").toObject().value(t).toObject().value("columns").toArray();
+            QCOMPARE(cols, ref.value("tables").toObject().value(t).toObject().value("columns").toArray());
+            // aucune colonne du schéma 4 n'a disparu, et les nouvelles viennent après
+            const QJsonArray oldCols = old.value("tables").toObject().value(t).toObject().value("columns").toArray();
+            for (int i = 0; i < oldCols.size(); ++i)
+                QCOMPARE(cols.at(i), oldCols.at(i));
+        }
+        QCOMPARE(now.value("tables").toObject().value("tactical_board").toObject().value("columns").toArray().size(),
+                 old.value("tables").toObject().value("tactical_board").toObject().value("columns").toArray().size() + 1);
     }
 
     // ----- Rétrocompatibilité : chaque fichier de référence s'importe sur le schéma courant -----
     void importReferenceFiles_data()
     {
         QTest::addColumn<int>("schema");
-        for (int s = 1; s <= 4; ++s)
+        for (int s = 1; s <= 5; ++s)
             QTest::newRow(qPrintable(QStringLiteral("schema %1").arg(s))) << s;
     }
 
@@ -245,7 +282,7 @@ private slots:
         QCOMPARE(info.value("counts").toMap().value("teams").toInt(), 2);
         QCOMPARE(info.value("counts").toMap().value("players").toInt(), 3);
         QCOMPARE(info.value("counts").toMap().value("sessions").toInt(), 2);
-        QCOMPARE(info.value("counts").toMap().value("boards").toInt(), 1);
+        QCOMPARE(info.value("counts").toMap().value("boards").toInt(), schema >= 5 ? 2 : 1);
 
         const QVariantMap r = b.importDataFile(url(file));
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
@@ -266,7 +303,13 @@ private slots:
         QCOMPARE(lastNames, (QStringList{QStringLiteral("Lefèvre"), QStringLiteral("O'Brien")}));
         QCOMPARE(b.plan(1).value("entries").toList().size(), 1);
         QVERIFY(b.attendanceSheet(1).value("ok").toBool());
-        QCOMPARE(b.boards().size(), 1);
+        QCOMPARE(b.boards().size(), 1);                          // la bibliothèque n'affiche pas les terrains de bloc
+
+        // Colonne apparue (schéma 5 : session_exercise_id) : absente des fichiers 1 à 4 → NULL, présente dans le 5
+        QSqlQuery qb(m_db.handle());
+        QVERIFY(qb.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NOT NULL")) && qb.next());
+        QCOMPARE(qb.value(0).toInt(), schema >= 5 ? 1 : 0);
+        QCOMPARE(b.plan(1).value("entries").toList().first().toMap().value("boardId").toInt() > 0, schema >= 5);
 
         // Colonne apparue après le schéma du fichier : valeur par défaut, exercice visible et non archivé.
         const QVariantList all = b.exercises(true);
@@ -282,6 +325,99 @@ private slots:
         const QJsonObject first = snapshot(b);
         QVERIFY(b.importDataFile(url(file)).value("ok").toBool());
         QCOMPARE(snapshot(b), first);
+
+        // Étape 2 : le terrain d'un bloc fonctionne sur les données issues de chaque schéma de fichier (1 à 5).
+        const QVariantMap block = b.plan(1).value("entries").toList().first().toMap();
+        const int item = block.value("itemId").toInt();
+        QCOMPARE(block.value("boardId").toInt() > 0, schema >= 5);               // seul le fichier 5 en contient un
+        const QVariantMap made = b.createBlockBoard(item);
+        QVERIFY2(made.value("ok").toBool(), qPrintable(made.value("error").toString()));
+        QCOMPARE(made.value("created").toBool(), schema < 5);                    // idempotent : le terrain du fichier 5 est retrouvé
+        const QVariantMap planned = b.plan(1).value("entries").toList().first().toMap();
+        QCOMPARE(planned.value("boardId").toInt(), made.value("boardId").toInt());
+        // Le contenu du terrain du fichier 5 est un JSON d'exemple qui n'est pas une scène valide : il est signalé
+        // illisible et jamais écrasé. Un terrain créé ici est vide, lisible et modifiable.
+        QCOMPARE(planned.value("boardReadable").toBool(), schema < 5);
+        QCOMPARE(b.saveBoard(made.value("boardId").toInt(), QStringLiteral("{\"version\":1,\"pitch\":\"full\",\"items\":[],\"arrows\":[]}")),
+                 schema < 5);
+        QCOMPARE(b.boards().size(), 1);                                          // la bibliothèque ne montre pas les terrains de bloc
+        // 2 terrains au total : le schéma de référence du fichier et le terrain du bloc (créé ici, ou celui du fichier 5)
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
+    }
+
+    // ----- Migration 005 : base réelle au schéma 4 ouverte par le code courant -----
+    void migrationFromSchema4KeepsExistingData()
+    {
+        const QString file = m_dir.filePath(QStringLiteral("old4.db"));
+        {
+            QString error;
+            QVERIFY2(buildDatabaseAtSchema(file, QStringLiteral("old4"), 4, &error), qPrintable(error));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("old4"));
+
+        Database db;
+        QString error;
+        QVERIFY2(db.open(file, &error), qPrintable(error));
+        QCOMPARE(db.schemaVersion(), 5);
+        QSqlQuery q(db.handle());
+        auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
+        QCOMPARE(count("SELECT COUNT(*) FROM team"), 2);
+        QCOMPARE(count("SELECT COUNT(*) FROM player"), 3);
+        QCOMPARE(count("SELECT COUNT(*) FROM training_session"), 2);
+        QCOMPARE(count("SELECT COUNT(*) FROM attendance"), 2);
+        QCOMPARE(count("SELECT COUNT(*) FROM session_exercise"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM injury"), 1);
+        QVERIFY(count("SELECT COUNT(*) FROM exercise") > 1);                     // exercices de départ de la 004 conservés
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NULL"), 1);
+        QVERIFY(q.exec(QStringLiteral("SELECT title, formation, scene_json, length(thumbnail), exercise_id, session_id FROM tactical_board")) && q.next());
+        QCOMPARE(q.value(0).toString(), QStringLiteral("Pressing haut"));
+        QCOMPARE(q.value(1).toString(), QStringLiteral("4-3-3"));
+        QCOMPARE(q.value(3).toInt(), 8);
+        QVERIFY(!q.value(4).isNull());
+        QCOMPARE(q.value(5).toInt(), 1);
+        QCOMPARE(count("PRAGMA foreign_keys"), 1);                               // actives sur la connexion de l'application
+        QCOMPARE(count("SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
+        QCOMPARE(count("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_board_session_exercise'"), 1);
+
+        // Rouvrir ne rejoue rien.
+        db.close();
+        QVERIFY2(db.open(file, &error), qPrintable(error));
+        QCOMPARE(db.schemaVersion(), 5);
+        QSqlQuery q2(db.handle());
+        QVERIFY(q2.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board")) && q2.next());
+        QCOMPARE(q2.value(0).toInt(), 1);
+    }
+
+    // Cascade réelle après import du fichier de référence du schéma 5 : bloc → terrain, séance → blocs → terrains.
+    void importedBlockBoardFollowsItsBlockAndSession()
+    {
+        Backend b(m_db.handle());
+        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());
+        QSqlQuery q(m_db.handle());
+        auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 2);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NOT NULL"), 1);
+        QVERIFY(q.exec(QStringLiteral("DELETE FROM training_session WHERE id = 1")));
+        QCOMPARE(count("SELECT COUNT(*) FROM session_exercise"), 0);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NOT NULL"), 0);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE exercise_id IS NOT NULL OR title = 'Pressing haut'"), 1);   // la référence reste
+    }
+
+    // Un fichier du schéma 5 est refusé par une application qui n'en connaît que 4 : la règle est « schema > schéma courant ».
+    void fileNewerThanCurrentSchemaIsRefusedWithAClearMessage()
+    {
+        Backend b(m_db.handle());
+        QJsonObject root = readJson(fixturePath(5));
+        root["schema"] = 6;
+        const QVariantMap r = b.importDataFile(url(tmpFile(root)));
+        QVERIFY(!r.value("ok").toBool());
+        QVERIFY2(r.value("error").toString().contains(QStringLiteral("plus récente")), qPrintable(r.value("error").toString()));
+        root = readJson(fixturePath(5));
+        root["version"] = 2;
+        const QVariantMap r2 = b.importDataFile(url(tmpFile(root)));
+        QVERIFY(!r2.value("ok").toBool());
+        QVERIFY(r2.value("error").toString().contains(QStringLiteral("Version de fichier")));
     }
 
     void referenceFileContainsTheSeedExercisesOnlyFromSchema4()
@@ -298,7 +434,7 @@ private slots:
     {
         QTest::addColumn<QByteArray>("mutation");
         QTest::addColumn<QString>("messagePart");
-        QTest::newRow("schema plus récent") << QByteArray("schema=5") << QString("plus récente");
+        QTest::newRow("schema plus récent") << QByteArray("schema=6") << QString("plus récente");
         QTest::newRow("schema très grand") << QByteArray("schema=999") << QString("plus récente");
         QTest::newRow("schema absent") << QByteArray("schema=remove") << QString("");
         QTest::newRow("schema nul") << QByteArray("schema=0") << QString("");

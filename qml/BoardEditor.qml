@@ -14,6 +14,10 @@ Item {
     property string loadError: ""
     property string tool: "select"
     property bool showBack: true
+    // Terrain propre à un bloc de séance (ouvert depuis le plan) : pas de renommage ni de duplication (le titre est
+    // celui de l'atelier, une copie ferait un schéma libre) ; « supprimer » devient « retirer du bloc ».
+    property bool blockMode: false
+    property string contextTitle: ""                 // titre affiché en en-tête à la place de celui du schéma
     // Plein écran du terrain : l'en-tête et la barre d'outils se masquent ; les outils restent accessibles par un bouton.
     property bool fullscreen: false
     readonly property bool landscape: width > height
@@ -189,6 +193,7 @@ Item {
 
     ActionSheet {
         id: moreSheet
+        objectName: "moreSheet"
         title: "Schéma"
         model: [
             { id: "full", text: "Terrain entier", icon: "pitch", checked: board.pitch === "full" },
@@ -197,8 +202,9 @@ Item {
             { id: "rename", text: "Renommer", icon: "edit" },
             { id: "duplicate", text: "Dupliquer", icon: "copy" },
             { id: "clear", text: "Tout effacer", icon: "close", danger: true },
-            { id: "delete", text: "Supprimer le schéma", icon: "trash", danger: true }
-        ]
+            { id: "delete", text: editor.blockMode ? "Retirer le terrain de ce bloc" : "Supprimer le schéma",
+              icon: "trash", danger: true }
+        ].filter(function (m) { return !editor.blockMode || (m.id !== "rename" && m.id !== "duplicate"); })
         onChosen: (id) => {
             if (id === "full" || id === "half") {
                 board.setPitch(id);
@@ -268,14 +274,14 @@ Item {
             anchors.leftMargin: editor.showBack ? 58 : 20
             anchors.right: headerButtons.left
             anchors.rightMargin: 8
-            text: editor.title
+            text: editor.contextTitle !== "" ? editor.contextTitle : editor.title
             elide: Text.ElideRight
             font.pixelSize: 20
             font.weight: Font.Bold
             color: Theme.text
             MouseArea {
                 anchors.fill: parent
-                enabled: editor.editable
+                enabled: editor.editable && !editor.blockMode
                 onClicked: {
                     editor.purpose = "rename";
                     prompt.ask("Titre du schéma", editor.title, false, 80);
@@ -688,7 +694,7 @@ Item {
                               + "reste intact).\n" + editor.loadError
                     }
                     AppButton {
-                        text: "Supprimer ce schéma"
+                        text: editor.blockMode ? "Retirer le terrain de ce bloc" : "Supprimer ce schéma"
                         kind: "danger"
                         onClicked: editor.deleteRequested()
                     }

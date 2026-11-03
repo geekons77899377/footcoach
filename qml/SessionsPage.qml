@@ -50,6 +50,7 @@ Item {
     }
 
     function closeEditor() {
+        editor.leave(false);               // un terrain de bloc encore ouvert est enregistré
         editing = false;
         currentId = -1;
     }
@@ -58,6 +59,8 @@ Item {
     function goBack() {
         if (!editing)
             return false;
+        if (editor.goBack())               // terrain d'un bloc ouvert : on revient d'abord au plan
+            return true;
         closeEditor();
         return true;
     }
@@ -65,6 +68,7 @@ Item {
     Connections {
         target: backend
         function onDataReplaced() {
+            editor.leave(true);            // les données ont changé : on n'enregistre plus vers l'ancien terrain
             page.closeEditor();
             page.refresh();
         }

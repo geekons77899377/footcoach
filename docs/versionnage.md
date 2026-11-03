@@ -176,6 +176,8 @@ l'option choisie, pas comme garantie.
 Dossier `tests/fixtures/`, test `tests/tst_dataformat.cpp`. Voir aussi `tests/fixtures/README.md`.
 
 - `schema4.footcoach` : export complet réel fait par le code de la version **0.8.0** (commit `aa65676`).
+- `schema5.footcoach` : export fait par le code courant (0.10.0, branche `v1`) sur une base au schéma 5 remplie de données
+  fictives, avec un terrain rattaché à un bloc. Ce n'est pas un export de version publiée.
 - `schema1.footcoach` à `schema3.footcoach` : **reconstitués**. Aucune version publiée n'a écrit de fichier
   `.footcoach` avec ces schémas (le format est né avec le schéma 4). Ils sont produits par le même code d'export
   sur une base créée avec les vraies migrations `001` à `00N`, remplie de données fictives. Ils prouvent que le
@@ -188,6 +190,13 @@ fichiers invalides (tableau du §2) : le message d'erreur est non vide et les do
 
 Un fichier de référence n'est jamais régénéré pour faire passer un test.
 
+**Schéma 5 et format d'échange.** La migration 005 ajoute une colonne nullable à `tactical_board` : le format reste en
+**version 1** (le mécanisme d'évolution du §2 ajoute la colonne à l'export ; un fichier des schémas 1 à 4 s'importe avec
+`NULL`, ce que `importReferenceFiles` vérifie). Un fichier de schéma 5 est refusé par une application plus ancienne (message
+« version plus récente »). L'ordre des tables de l'export (`session_exercise` avant `tactical_board`) convient déjà à la
+nouvelle clé étrangère : insertion des parents d'abord, suppression en ordre inverse. Le tag à poser après accord est
+`v0.10.0-sch5` ; il n'est pas créé.
+
 ## 8. Historique des schémas
 
 | Schéma | Migration | Contenu | Présent dans l'historique Git depuis | Fichier de référence |
@@ -196,6 +205,7 @@ Un fichier de référence n'est jamais régénéré pour faire passer un test.
 | 2 | `002_player_jersey_unique.sql` | numéro de maillot unique par équipe (index) | `3b9b2b0` (0.3.0) | reconstitué |
 | 3 | `003_exercise_archived.sql` | `exercise.archived` | `3b9b2b0` (0.3.0) | reconstitué |
 | 4 | `004_seed_exercises.sql` | exercices de départ | `3b9b2b0` (0.3.0) | réel (0.8.0) |
+| 5 | `005_block_board.sql` | `tactical_board.session_exercise_id` : terrain propre à un bloc de séance (NULL partout pour les données existantes) | 0.10.0 (branche `v1`, non publiée) | produit par le code d'export de la 0.10.0 |
 
 Les quatre migrations apparaissent dès le premier commit du dépôt : l'historique Git ne permet pas de dire dans quelle
 version de l'application chaque schéma est né, ni lesquels ont été installés sur un appareil. Seul le schéma 4 est

@@ -21,7 +21,8 @@ QList<PlanEntry> PlanRepository::entries(int sessionId, QString *error) const
     q.prepare(QStringLiteral(
         "SELECT se.id, se.position, se.duration_min, se.notes, "
         "e.id, e.title, e.category, e.objective, e.duration_min, e.players_min, e.players_max, "
-        "e.equipment, e.description, e.archived "
+        "e.equipment, e.description, e.archived, "
+        "(SELECT id FROM tactical_board WHERE session_exercise_id = se.id ORDER BY id LIMIT 1) "
         "FROM session_exercise se JOIN exercise e ON e.id = se.exercise_id "
         "WHERE se.session_id = ? ORDER BY se.position"));
     q.addBindValue(sessionId);
@@ -46,9 +47,23 @@ QList<PlanEntry> PlanRepository::entries(int sessionId, QString *error) const
         p.exercise.equipment = q.value(11).toString();
         p.exercise.description = q.value(12).toString();
         p.exercise.archived = q.value(13).toInt() != 0;
+        p.boardId = q.value(14).isNull() ? -1 : q.value(14).toInt();
         result.append(p);
     }
     return result;
+}
+
+int PlanRepository::sessionOf(int itemId, QString *error) const
+{
+    setError(error, QString());
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT session_id FROM session_exercise WHERE id = ?"));
+    q.addBindValue(itemId);
+    if (!q.exec()) {
+        setError(error, q.lastError().text());
+        return -1;
+    }
+    return q.next() ? q.value(0).toInt() : -1;
 }
 
 int PlanRepository::add(int sessionId, int exerciseId, int durationMin, const QString &notes, QString *error)

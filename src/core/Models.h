@@ -66,5 +66,6 @@ struct PlanEntry
     int position = 0;           // à partir de 1
     int durationMin = 0;        // durée prévue dans CE plan
     QString notes;
+    int boardId = -1;           // terrain tactique propre à ce bloc (table tactical_board), -1 : aucun
     Exercise exercise;          // copie des champs de l'exercice (même archivé)
 };

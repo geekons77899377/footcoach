@@ -27,18 +27,9 @@ void Backend::setError(const QString &message)
 bool Backend::find(int id, BoardRecord *out)
 {
     QString error;
-    const QList<BoardRecord> all = m_repo.list(&error);
-    if (!error.isEmpty()) {
-        setError(error);
-        return false;
-    }
-    for (const BoardRecord &r : all) {
-        if (r.id == id) {
-            *out = r;
-            return true;
-        }
-    }
-    setError(tr("Schéma introuvable."));
+    if (m_repo.get(id, out, &error))
+        return true;
+    setError(error.isEmpty() ? tr("Schéma introuvable.") : error);
     return false;
 }
 
@@ -46,7 +37,8 @@ QVariantList Backend::boards()
 {
     QVariantList result;
     QString error;
-    const QList<BoardRecord> all = m_repo.list(&error);
+    // Bibliothèque de schémas : les terrains des blocs de séance (copies propres à une séance) n'y figurent pas.
+    const QList<BoardRecord> all = m_repo.list(&error, false);
     setError(error);
     for (const BoardRecord &r : all) {
         Tactics::Board parsed;
@@ -56,6 +48,7 @@ QVariantList Backend::boards()
         m.insert(QStringLiteral("updatedAt"), r.updatedAt);
         m.insert(QStringLiteral("exerciseId"), r.exerciseId);
         m.insert(QStringLiteral("sessionId"), r.sessionId);
+        m.insert(QStringLiteral("sessionExerciseId"), r.sessionExerciseId);
         const bool readable = Tactics::fromJson(r.sceneJson, &parsed);
         m.insert(QStringLiteral("readable"), readable);
         m.insert(QStringLiteral("itemCount"), readable ? int(parsed.items.size()) : 0);
@@ -106,6 +99,10 @@ int Backend::duplicateBoard(int id)
         return -1;
     r.id = -1;
     r.title = tr("%1 (copie)").arg(r.title);
+    // La copie est un schéma libre : elle ne devient ni un deuxième schéma de référence d'un exercice ni un
+    // deuxième terrain du même bloc.
+    r.exerciseId = -1;
+    r.sessionExerciseId = -1;
     QString error;
     if (!m_repo.insert(r, &error)) {
         setError(error);

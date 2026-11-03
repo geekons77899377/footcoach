@@ -31,7 +31,8 @@ public:
 
     QString lastError() const { return m_lastError; }
 
-    // Liste des schémas, triés par titre : {id, title, updatedAt, exerciseId, sessionId, readable}.
+    // Liste des schémas, triés par titre : {id, title, updatedAt, exerciseId, sessionId, sessionExerciseId, readable, itemCount, json}.
+    // Les terrains des blocs de séance n'y figurent pas (voir plan() : boardId, boardJson).
     Q_INVOKABLE QVariantList boards();
     // {id, title, json, readable, error}. readable == false : le JSON stocké est illisible (le schéma est alors
     // à ne pas modifier, pour ne pas écraser ce qu'il contient). Map vide si l'id n'existe pas.
@@ -110,7 +111,9 @@ public:
 
     // --- Plan de séance -------------------------------------------------------------------------------
     // {ok, error, session: {...}, entries: [{itemId, position, start, end (HH:mm), durationMin, notes, exerciseId,
-    // title, category, categoryLabel, objective, equipment, description, archived}], totalMin, sessionMin,
+    // title, category, categoryLabel, objective, equipment, description, archived,
+    // boardId (terrain du bloc, -1 s'il n'en a pas), boardReadable, boardJson (JSON normalisé, vide si illisible)}],
+    // totalMin, sessionMin,
     // equipment: [matériel à prévoir, sans doublon]}.
     Q_INVOKABLE QVariantMap plan(int sessionId);
     // durationMin <= 0 : la durée conseillée de l'exercice, ou 15 min à défaut.
@@ -118,6 +121,11 @@ public:
     Q_INVOKABLE QVariantMap updatePlanItem(int itemId, int durationMin, const QString &notes);
     Q_INVOKABLE QVariantMap removePlanItem(int itemId);
     Q_INVOKABLE QVariantMap movePlanItem(int itemId, int delta);       // -1 : monte, +1 : descend
+    // Terrain propre au bloc itemId. Créé seulement à la demande de l'entraîneur (règle B) : terrain vide, au nom de
+    // l'exercice. Idempotent : si le bloc a déjà un terrain, c'est celui-là qui est renvoyé (created = false).
+    // {ok, error, id: id du bloc, boardId, created}. Refusé si le bloc n'existe pas ou si la séance est annulée.
+    // L'ouverture, l'enregistrement et le retrait se font avec board(), saveBoard() et deleteBoard().
+    Q_INVOKABLE QVariantMap createBlockBoard(int itemId);
 
     // --- Écran ------------------------------------------------------------------------------------------
     // Garde l'écran allumé tant que la séance du jour est affichée (Android : drapeau FLAG_KEEP_SCREEN_ON de la
