@@ -20,7 +20,7 @@ QtObject {
     readonly property color accentSoft: "#1e3d33"          // dérivé : fond des pastilles vertes
     readonly property color textOnAccent: "#0b1120"        // primary.foreground
     readonly property color warn: "#f39c12"                // warning
-    readonly property color danger: "#e74c3c"              // destructive
+    readonly property color danger: "#f26456"              // destructive : #e74c3c de DESIGN.md éclairci (4,35:1 sur surface < WCAG AA) ; 5,3:1 sur surface, 4,9:1 sur surfaceHi
     readonly property color info: "#3498db"                // info
     readonly property color success: "#2ecc71"             // success
     readonly property color selection: "#facc15"           // dérivé : sélection dans l'éditeur de schémas
@@ -28,7 +28,7 @@ QtObject {
     // Texte
     readonly property color text: "#f8fafc"                // foreground
     readonly property color textMuted: "#8a99ad"           // muted.foreground
-    readonly property color textDim: "#64748b"             // dérivé : texte désactivé (contraste faible, jamais pour une information)
+    readonly property color textDim: "#8190a5"             // dérivé : texte secondaire discret ; #64748b faisait 3,5:1, ici 5,1:1 sur surface et 4,8:1 sur surfaceHi (AA)
 
     // Formes et mesures (grille de 4 px)
     readonly property int radius: 24                       // rounded-24px : cartes, boutons
