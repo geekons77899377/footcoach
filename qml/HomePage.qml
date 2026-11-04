@@ -151,6 +151,26 @@ Item {
                 }
             }
 
+            // Accès explicites aux données et aux paramètres (plus de feuille « Plus » sur téléphone).
+            Row {
+                width: parent.width
+                spacing: 12
+                AppButton {
+                    objectName: "dataButton"
+                    width: (parent.width - 12) / 2
+                    text: "Données"
+                    iconName: "copy"
+                    onClicked: root.navigate("data", -1)
+                }
+                AppButton {
+                    objectName: "settingsButton"
+                    width: (parent.width - 12) / 2
+                    text: "Paramètres"
+                    iconName: "gear"
+                    onClicked: root.navigate("settings", -1)
+                }
+            }
+
             // Derniers schémas.
             Text {
                 visible: root.boards.length > 0

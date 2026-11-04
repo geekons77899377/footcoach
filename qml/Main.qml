@@ -82,8 +82,8 @@ ApplicationWindow {
         { id: "data", text: "Données", icon: "copy" },
         { id: "settings", text: "Paramètres", icon: "gear" }
     ]
-    readonly property var primaryIds: ["home", "squad", "calendar", "attendance"]
-    readonly property var moreIds: ["exercises", "sessions", "tactics", "data", "settings"]
+    // Barre mobile : six entrées, sans feuille « Plus ». Tactique, Données et Paramètres sont atteints depuis l'accueil.
+    readonly property var primaryIds: ["home", "sessions", "exercises", "calendar", "squad", "attendance"]
 
     function indexOf(id) {
         for (var i = 0; i < sections.length; ++i) {
@@ -128,18 +128,6 @@ ApplicationWindow {
         value: (bottomBar.visible ? bottomBar.height : 0) + win.SafeArea.margins.bottom
     }
 
-    ActionSheet {
-        id: moreSheet
-        title: "Plus"
-        model: [
-            { id: "exercises", text: "Exercices", icon: "dumbbell", checked: win.section === "exercises" },
-            { id: "sessions", text: "Séances", icon: "clipboard", checked: win.section === "sessions" },
-            { id: "tactics", text: "Tactique", icon: "board", checked: win.section === "tactics" },
-            { id: "data", text: "Données", icon: "copy", checked: win.section === "data" },
-            { id: "settings", text: "Paramètres", icon: "gear", checked: win.section === "settings" }
-        ]
-        onChosen: (id) => win.go(id, -1)
-    }
 
     // Toucher en dehors d'un champ de saisie ferme le clavier. Couche transparente au-dessus des pages (et de leurs
     // listes défilantes, qui sinon interceptent le toucher) mais sous les boîtes de dialogue, qui ont la leur.
@@ -310,6 +298,7 @@ ApplicationWindow {
 
         Rectangle {
             id: bottomBar
+            objectName: "bottomBar"
             // Masquée pendant la saisie : le clavier réduit déjà la fenêtre, la barre ne doit pas lui prendre la place.
             visible: win.navMode === "bottom" && !win.immersive && !win.keyboardUp
             anchors.bottom: parent.bottom
@@ -326,14 +315,14 @@ ApplicationWindow {
             Row {
                 anchors.fill: parent
                 Repeater {
-                    model: win.primaryIds.concat(["more"])
+                    model: win.primaryIds
                     delegate: Item {
                         id: tab
                         required property string modelData
-                        readonly property bool isMore: modelData === "more"
-                        readonly property var def: isMore ? { text: "Plus", icon: "menu" } : win.sections[win.indexOf(modelData)]
-                        readonly property bool active: isMore ? win.moreIds.indexOf(win.section) >= 0 : win.section === modelData
-                        width: parent.width / 5
+                        readonly property var def: win.sections[win.indexOf(modelData)]
+                        readonly property bool active: win.section === modelData
+                        objectName: "navTab_" + modelData
+                        width: parent.width / win.primaryIds.length
                         height: parent.height
                         Accessible.role: Accessible.Button
                         Accessible.name: def.text
@@ -347,17 +336,21 @@ ApplicationWindow {
                                 color: tab.active ? Theme.accent : Theme.textMuted
                             }
                             Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: (tab.def.short || tab.def.text).toUpperCase()
+                                objectName: "navLabel_" + tab.modelData
+                                width: tab.width - 8
+                                horizontalAlignment: Text.AlignHCenter
+                                text: tab.def.short || tab.def.text
+                                // Taille uniforme pour toutes les entrées (pas de réduction individuelle) : à 360 px,
+                                // chaque entrée fait 60 px ; le test vérifie que chaque libellé tient dans sa largeur.
                                 font.pixelSize: 10
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0.8
+                                font.weight: Font.DemiBold
+                                maximumLineCount: 1
                                 color: tab.active ? Theme.accent : Theme.textMuted
                             }
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: tab.isMore ? moreSheet.open() : win.go(tab.modelData, -1)
+                            onClicked: win.go(tab.modelData, -1)
                         }
                     }
                 }
