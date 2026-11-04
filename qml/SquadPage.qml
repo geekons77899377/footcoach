@@ -1,8 +1,11 @@
 import QtQuick
 import QtQuick.Controls
+import "DateUtil.js" as DateUtil
+import "Status.js" as Status
 
 // Page « Effectif » : choix de l'équipe, recherche, filtre par poste, liste des joueurs et fiche. En grand écran, liste
-// et fiche côte à côte ; sur téléphone, l'une après l'autre.
+// et fiche côte à côte (sans fiche ouverte : vue d'ensemble de l'effectif) ; sur tablette, grille de cartes joueurs ;
+// sur téléphone, l'une après l'autre.
 Item {
     id: page
 
@@ -27,6 +30,13 @@ Item {
     property bool editing: false          // fiche ouverte (joueur existant ou nouveau)
     readonly property bool split: width >= 900
     readonly property int listWidth: 380
+    // Tablette (page trop étroite pour liste + fiche) sans fiche ouverte : grille de cartes joueurs.
+    readonly property bool gridMode: width >= 600 && height >= 520 && !split && !editing
+    readonly property int pad: gridMode ? Theme.gutter + 4 : Theme.gutter       // aligné sur le titre d'en-tête
+    readonly property int gridGap: 14
+    readonly property int gridCols: Math.max(1, Math.floor((width - 2 * pad + gridGap) / (250 + gridGap)))
+    // Vue d'ensemble (calculée sur les joueurs actifs de l'équipe ; présence : backend.attendanceStats, 30 jours).
+    property var overview: ({ count: 0, avgAge: -1, byPosition: ({}), rate: -1, top: [] })
     readonly property var team: {
         for (var i = 0; i < teams.length; ++i)
             if (teams[i].id === teamId)
@@ -61,6 +71,41 @@ Item {
 
     function refreshPlayers() {
         players = teamId > 0 ? backend.players(teamId, showInactive) : [];
+        loadOverview();
+    }
+
+    function loadOverview() {
+        var by = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+        var n = 0, ageSum = 0, ageN = 0;
+        for (var i = 0; i < players.length; ++i) {
+            var p = players[i];
+            if (!p.active)
+                continue;
+            n++;
+            if (by[p.position] !== undefined)
+                by[p.position]++;
+            if (p.age >= 0) {
+                ageSum += p.age;
+                ageN++;
+            }
+        }
+        var rate = -1, top = [];
+        if (teamId > 0 && n > 0) {
+            var today = DateUtil.todayIso();
+            var st = backend.attendanceStats(teamId, DateUtil.addDays(today, -30), today);
+            var sum = 0, m = 0, ranked = [];
+            for (var j = 0; j < st.players.length; ++j) {
+                if (st.players[j].rate >= 0) {
+                    sum += st.players[j].rate;
+                    m++;
+                    ranked.push(st.players[j]);
+                }
+            }
+            rate = m > 0 ? sum / m : -1;
+            ranked.sort(function (a, b) { return b.rate - a.rate; });
+            top = ranked.slice(0, 5);
+        }
+        overview = { count: n, avgAge: ageN > 0 ? Math.round(ageSum / ageN) : -1, byPosition: by, rate: rate, top: top };
     }
 
     function openPlayer(p) {
@@ -215,14 +260,14 @@ Item {
             visible: page.team !== null
             anchors.top: listHeader.bottom
             anchors.left: parent.left
-            anchors.leftMargin: Theme.gutter
+            anchors.leftMargin: page.pad
             anchors.right: parent.right
-            anchors.rightMargin: Theme.gutter
+            anchors.rightMargin: page.pad
             anchors.topMargin: 4
             spacing: 10
 
             Rectangle {
-                width: parent.width
+                width: page.gridMode ? Math.min(parent.width, 480) : parent.width
                 height: 48
                 radius: 24
                 color: Theme.surface
@@ -277,13 +322,14 @@ Item {
 
         ListView {
             id: list
+            visible: !page.gridMode
             anchors.top: filters.visible ? filters.bottom : listHeader.bottom
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.topMargin: 10
-            leftMargin: Theme.gutter
-            rightMargin: Theme.gutter
+            leftMargin: page.pad
+            rightMargin: page.pad
             bottomMargin: 16
             spacing: 10
             clip: true
@@ -363,8 +409,114 @@ Item {
                 }
             }
 
-            footer: Item {
-                width: list.width - 2 * Theme.gutter
+            footer: emptyState
+        }
+
+        // Grille de cartes joueurs (tablette) : mêmes données et filtres que la liste.
+        GridView {
+            id: grid
+            objectName: "playerGrid"
+            visible: page.gridMode
+            anchors.top: filters.visible ? filters.bottom : listHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 14
+            leftMargin: page.pad
+            rightMargin: page.pad - page.gridGap
+            bottomMargin: 16
+            clip: true
+            model: page.team ? page.shown : []
+            boundsBehavior: Flickable.StopAtBounds
+            cellWidth: (width - leftMargin - rightMargin) / page.gridCols
+            cellHeight: 96 + page.gridGap
+            footer: emptyState
+
+            delegate: Item {
+                id: cell
+                required property var modelData
+                width: grid.cellWidth
+                height: grid.cellHeight
+                Card {
+                    objectName: "playerCard"
+                    width: cell.width - page.gridGap
+                    height: 96
+                    padding: 14
+                    radius: Theme.radiusLg
+                    opacity: cell.modelData.active ? 1 : 0.55
+                    Rectangle {
+                        id: gbadge
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 52
+                        height: 52
+                        radius: 26
+                        color: Theme.accentSoft
+                        border.width: 1
+                        border.color: Theme.accent
+                        Text {
+                            anchors.centerIn: parent
+                            text: cell.modelData.jerseyNumber > 0 ? cell.modelData.jerseyNumber : "–"
+                            font.family: Theme.fontHeading
+                            font.pixelSize: 20
+                            font.weight: Font.ExtraBold
+                            color: Theme.accent
+                        }
+                    }
+                    Column {
+                        anchors.left: gbadge.right
+                        anchors.leftMargin: 14
+                        anchors.right: gchevron.left
+                        anchors.rightMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 3
+                        Text {
+                            width: parent.width
+                            text: cell.modelData.fullName
+                            elide: Text.ElideRight
+                            font.family: Theme.fontHeading
+                            font.pixelSize: 18
+                            font.weight: Font.Bold
+                            color: Theme.text
+                        }
+                        Text {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                            color: Theme.textMuted
+                            text: {
+                                var parts = [];
+                                if (cell.modelData.position)
+                                    parts.push(page.positionLabels[cell.modelData.position].toUpperCase());
+                                if (cell.modelData.age >= 0)
+                                    parts.push(cell.modelData.age + " ANS");
+                                if (!cell.modelData.active)
+                                    parts.push("INACTIF");
+                                return parts.length > 0 ? parts.join("  ·  ") : "—";
+                            }
+                        }
+                    }
+                    Icon {
+                        id: gchevron
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "chevron"
+                        color: Theme.accent
+                        size: 20
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: page.openPlayer(cell.modelData)
+                    }
+                }
+            }
+        }
+
+        Component {
+            id: emptyState
+            Item {
+                width: page.gridMode ? page.width - 2 * page.pad : list.width - 2 * page.pad
                 height: visible ? 200 : 0
                 visible: page.team === null || (page.shown.length === 0)
                 Card {
@@ -439,17 +591,216 @@ Item {
         }
     }
 
+    // Grand écran sans fiche ouverte : vue d'ensemble de l'effectif (ou invite à créer joueur / équipe).
     Item {
+        id: overviewPane
+        objectName: "overviewPane"
         visible: page.split && !page.editing
         x: page.listWidth
         width: page.width - x
         height: page.height
         Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: Theme.border }
         Column {
+            visible: page.team === null || page.overview.count === 0
             anchors.centerIn: parent
             spacing: 12
             Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "users"; color: Theme.textDim; size: 56 }
             Text { text: "Choisissez un joueur ou ajoutez-en un"; font.pixelSize: 16; color: Theme.textMuted }
+        }
+        Flickable {
+            visible: page.team !== null && page.overview.count > 0
+            anchors.fill: parent
+            anchors.leftMargin: 1
+            contentWidth: width
+            contentHeight: ovCol.height + 48
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            Column {
+                id: ovCol
+                x: 24
+                y: 20
+                width: Math.min(parent.width - 48, 760)
+                spacing: 18
+                Column {
+                    spacing: 2
+                    Text {
+                        text: "Vue d'ensemble"
+                        font.family: Theme.fontHeading
+                        font.pixelSize: 24
+                        font.weight: Font.Bold
+                        color: Theme.text
+                    }
+                    Text {
+                        text: (page.team ? page.team.name : "") + " · joueurs actifs · choisissez un joueur pour ouvrir sa fiche"
+                        font.pixelSize: 13
+                        color: Theme.textMuted
+                    }
+                }
+                Row {
+                    spacing: 12
+                    Repeater {
+                        model: [
+                            { label: "JOUEURS ACTIFS", value: page.overview.count + "", color: Theme.accent },
+                            { label: "ÂGE MOYEN", value: page.overview.avgAge < 0 ? "—" : page.overview.avgAge + " ans", color: Theme.info },
+                            { label: "PRÉSENCE · 30 J", value: page.overview.rate < 0 ? "—" : Math.round(page.overview.rate * 100) + " %",
+                              color: page.overview.rate < 0 ? Theme.textMuted : Status.rateColor(page.overview.rate) }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: (ovCol.width - 24) / 3
+                            height: 100
+                            radius: Theme.radiusLg
+                            color: Theme.surface
+                            border.width: 1
+                            border.color: Theme.border
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: parent.parent.modelData.label
+                                    font.pixelSize: 10
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 1
+                                    color: Theme.textMuted
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: parent.parent.modelData.value
+                                    font.family: Theme.fontHeading
+                                    font.pixelSize: 32
+                                    font.weight: Font.ExtraBold
+                                    color: parent.parent.modelData.color
+                                }
+                            }
+                        }
+                    }
+                }
+                Card {
+                    width: parent.width
+                    height: posCol.height + 2 * padding
+                    padding: 20
+                    radius: Theme.radiusLg
+                    Column {
+                        id: posCol
+                        width: parent.width
+                        spacing: 14
+                        Text {
+                            text: "Répartition par poste"
+                            font.family: Theme.fontHeading
+                            font.pixelSize: 18
+                            font.weight: Font.Bold
+                            color: Theme.text
+                        }
+                        Repeater {
+                            model: [{ id: "GK", text: "Gardiens" }, { id: "DEF", text: "Défenseurs" },
+                                    { id: "MID", text: "Milieux" }, { id: "FWD", text: "Attaquants" }]
+                            delegate: Item {
+                                required property var modelData
+                                readonly property int n: page.overview.byPosition[modelData.id] || 0
+                                width: posCol.width
+                                height: 24
+                                Text {
+                                    id: plabel
+                                    width: 110
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: parent.modelData.text
+                                    font.pixelSize: 14
+                                    color: Theme.textMuted
+                                }
+                                Rectangle {
+                                    anchors.left: plabel.right
+                                    anchors.right: pcount.left
+                                    anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    height: 8
+                                    radius: 4
+                                    color: Theme.bgDeep
+                                    Rectangle {
+                                        width: page.overview.count > 0 ? parent.width * parent.parent.n / page.overview.count : 0
+                                        height: parent.height
+                                        radius: 4
+                                        color: Theme.accent
+                                    }
+                                }
+                                Text {
+                                    id: pcount
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: parent.n
+                                    font.family: Theme.fontHeading
+                                    font.pixelSize: 16
+                                    font.weight: Font.Bold
+                                    color: Theme.text
+                                }
+                            }
+                        }
+                    }
+                }
+                Card {
+                    visible: page.overview.top.length > 0
+                    width: parent.width
+                    height: topCol.height + 2 * padding
+                    padding: 20
+                    radius: Theme.radiusLg
+                    Column {
+                        id: topCol
+                        width: parent.width
+                        spacing: 12
+                        Text {
+                            text: "Meilleure présence · 30 jours"
+                            font.family: Theme.fontHeading
+                            font.pixelSize: 18
+                            font.weight: Font.Bold
+                            color: Theme.text
+                        }
+                        Repeater {
+                            model: page.overview.top
+                            delegate: Item {
+                                required property var modelData
+                                width: topCol.width
+                                height: 24
+                                Text {
+                                    id: tname
+                                    width: 170
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                    text: parent.modelData.name
+                                    font.pixelSize: 14
+                                    font.weight: Font.DemiBold
+                                    color: Theme.text
+                                }
+                                Rectangle {
+                                    anchors.left: tname.right
+                                    anchors.right: trate.left
+                                    anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    height: 8
+                                    radius: 4
+                                    color: Theme.bgDeep
+                                    Rectangle {
+                                        width: parent.width * Math.max(0, parent.parent.modelData.rate)
+                                        height: parent.height
+                                        radius: 4
+                                        color: Status.rateColor(parent.parent.modelData.rate)
+                                    }
+                                }
+                                Text {
+                                    id: trate
+                                    width: 44
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    horizontalAlignment: Text.AlignRight
+                                    text: Math.round(parent.modelData.rate * 100) + " %"
+                                    font.pixelSize: 14
+                                    font.weight: Font.Bold
+                                    color: Status.rateColor(parent.modelData.rate)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
