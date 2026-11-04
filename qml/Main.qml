@@ -79,10 +79,11 @@ ApplicationWindow {
         { id: "exercises", text: "Exercices", icon: "dumbbell" },
         { id: "sessions", text: "Séances", icon: "clipboard" },
         { id: "tactics", text: "Tactique", icon: "board" },
-        { id: "data", text: "Données", icon: "copy" }
+        { id: "data", text: "Données", icon: "copy" },
+        { id: "settings", text: "Paramètres", icon: "gear" }
     ]
     readonly property var primaryIds: ["home", "squad", "calendar", "attendance"]
-    readonly property var moreIds: ["exercises", "sessions", "tactics", "data"]
+    readonly property var moreIds: ["exercises", "sessions", "tactics", "data", "settings"]
 
     function indexOf(id) {
         for (var i = 0; i < sections.length; ++i) {
@@ -96,7 +97,7 @@ ApplicationWindow {
     // Retourne true si le geste a été utilisé ; sinon (accueil, rien à fermer) l'application peut se fermer.
     function handleBack() {
         var page = ({ squad: squadPage, calendar: calendarPage, attendance: attendancePage,
-                      exercises: exercisesPage, sessions: sessionsPage, tactics: tactics })[section];
+                      exercises: exercisesPage, sessions: sessionsPage, tactics: tactics, settings: settingsPage })[section];
         if (page && page.goBack())
             return true;
         if (section !== "home") {
@@ -134,7 +135,8 @@ ApplicationWindow {
             { id: "exercises", text: "Exercices", icon: "dumbbell", checked: win.section === "exercises" },
             { id: "sessions", text: "Séances", icon: "clipboard", checked: win.section === "sessions" },
             { id: "tactics", text: "Tactique", icon: "board", checked: win.section === "tactics" },
-            { id: "data", text: "Données", icon: "copy", checked: win.section === "data" }
+            { id: "data", text: "Données", icon: "copy", checked: win.section === "data" },
+            { id: "settings", text: "Paramètres", icon: "gear", checked: win.section === "settings" }
         ]
         onChosen: (id) => win.go(id, -1)
     }
@@ -301,6 +303,7 @@ ApplicationWindow {
             SessionsPage { id: sessionsPage }
             TacticsPage { id: tactics }
             DataPage { onImported: win.go("home", -1) }
+            SettingsPage { id: settingsPage; onNavigate: (section) => win.go(section, -1) }
         }
 
         // --- Barre du bas (téléphone en portrait) ------------------------------------------------

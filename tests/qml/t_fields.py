@@ -69,6 +69,7 @@ test_form("Séance", opener("calendar","CalendarPage","month","newSession"))
 test_form("Récurrence", opener("calendar","CalendarPage","month","newRecurrence"))
 test_form("Exercice", opener("exercises","ExercisesPage","categoryFilter","newExercise"))
 test_form("Joueur", opener("squad","SquadPage","currentId","newPlayer"))
+test_form("Ticket d'assistance", lambda: (sec("settings"), QMetaObject.invokeMethod(target("SettingsPage","mode"),"openSupport",Q_ARG("QVariant","bug"))))
 
 # --- fenêtres (popups) et champs de recherche ---------------------------------------------------------------
 def popup_inputs(p):

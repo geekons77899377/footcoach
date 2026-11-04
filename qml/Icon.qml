@@ -55,6 +55,12 @@ Item {
         "dumbbell": '<path d="M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12"/>',
         "clipboard": '<rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4.5h6M9 10h6M9 14h4"/>',
         "copy": '<rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+        "flag": '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+        "bulb": '<path d="M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.8 10.6c.6.6 1.1 1.3 1.1 2.4h5.4c0-1.1.5-1.8 1.1-2.4A6 6 0 0 0 12 3z"/>',
+        "mail": '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>',
+        "info": '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.01"/>',
+        "shield": '<path d="M12 3.5 19 6v5.5c0 4.3-3 7.3-7 9-4-1.7-7-4.7-7-9V6z"/>',
+        "gear": '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3 7 7M17 17l1.7 1.7M5.3 18.7 7 17M17 7l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/>',
         "close": '<path d="M6 6l12 12M18 6 6 18"/>',
         "pitch": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M3 10h3v4H3M21 10h-3v4h3"/>',
         // Outils du terrain : pictogrammes en couleur (indépendants de la couleur demandée).

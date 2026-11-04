@@ -1,7 +1,7 @@
 # Politique de confidentialité — FootCoach
 
 *Brouillon, à publier sur une page web publique (par ex. GitHub Pages) puis à renseigner dans Play Console.
-Dernière mise à jour : 31 octobre 2026.*
+Dernière mise à jour : 4 novembre 2026.*
 
 **FootCoach** est une application d'organisation d'entraînements de football. Cette politique explique quelles
 données elle traite.
@@ -15,7 +15,7 @@ Uniquement **sur votre appareil**, dans le stockage privé de l'application (bas
 l'application ne reçoit, ne collecte et ne consulte aucune de ces données.
 
 ## Partage et collecte
-- Aucune donnée n'est envoyée sur Internet : l'application n'utilise pas de connexion réseau.
+- Aucune donnée n'est envoyée sur Internet par l'application, qui n'utilise pas de connexion réseau (seule exception : les liens d'assistance ci-dessous, ouverts dans votre navigateur ou votre messagerie à votre initiative).
 - Aucune publicité, aucun outil de mesure d'audience, aucun service tiers.
 - Aucune permission Android n'est demandée.
 
@@ -24,6 +24,13 @@ La page « Données » permet de créer un fichier contenant toutes vos données
 par WhatsApp ou e-mail) à un autre de vos appareils. Ce transfert est initié par vous, passe par l'application de votre
 choix et n'implique aucun serveur de l'éditeur de FootCoach. L'application elle-même n'envoie rien. Le fichier contient
 les noms, dates de naissance, téléphones et adresses e-mail saisis : traitez-le comme vos données d'origine.
+
+## Assistance (tickets GitHub, e-mail)
+Le menu « Paramètres » permet de signaler un problème, de proposer une amélioration ou de contacter le support. L'application
+ne transmet rien d'elle-même : elle ouvre votre navigateur sur un formulaire de ticket GitHub pré-rempli (titre « SUP - … »,
+description, version de l'application et système si vous le choisissez) ou votre application de messagerie. C'est vous qui
+relisez puis envoyez. Un ticket GitHub est **public** et nécessite un compte GitHub : n'y indiquez aucune donnée
+personnelle (joueurs, téléphones, adresses e-mail). GitHub traite ces informations selon sa propre politique de confidentialité.
 
 ## Durée de conservation et suppression
 Les données restent sur l'appareil jusqu'à leur suppression dans l'application ou jusqu'à la désinstallation
