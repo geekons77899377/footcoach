@@ -5,7 +5,7 @@ Usage : python3 tests/qml/run_all.py   (PySide6 et un affichage « offscreen » 
 import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py", "t_blockboard.py", "t_home.py", "t_exgrid.py", "t_squad.py"]
+TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py", "t_blockboard.py", "t_home.py", "t_exgrid.py", "t_squad.py", "t_calendar.py"]
 env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
 bad = []
 for t in TESTS:

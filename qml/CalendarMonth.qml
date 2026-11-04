@@ -37,7 +37,8 @@ Item {
                 var d = DateUtil.fromIso(root.month);
                 return DateUtil.MONTHS[d.getMonth()].charAt(0).toUpperCase() + DateUtil.MONTHS[d.getMonth()].slice(1) + " " + d.getFullYear();
             }
-            font.pixelSize: 18
+            font.family: Theme.fontHeading
+            font.pixelSize: 19
             font.weight: Font.Bold
             color: Theme.text
             MouseArea {
