@@ -14,7 +14,7 @@ Item {
     property int attendanceSessions: 0
     readonly property bool twoCol: width >= 760 && height >= 520   // téléphone en paysage : colonne unique
     readonly property bool showSide: width >= 600 && height >= 520
-    readonly property int pad: twoCol ? (width >= 900 ? 32 : 24) : Theme.gutter
+    readonly property int pad: twoCol ? Theme.gutter + 4 : Theme.gutter   // aligné sur le titre de l'en-tête
     readonly property int sideW: width >= 1100 ? 340 : 300
     readonly property var months: ["JANV", "FÉVR", "MARS", "AVR", "MAI", "JUIN", "JUIL", "AOÛT", "SEPT", "OCT", "NOV", "DÉC"]
     signal navigate(string section, int boardId)

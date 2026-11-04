@@ -53,7 +53,7 @@ check(up.property("visible") and pr.property("visible"), "bureau : cartes visibl
 pu = up.mapToScene(QPointF(0, 0)); pl = lv.mapToScene(QPointF(0, 0))
 check(pu.x() > pl.x() + lv.width(), f"bureau : colonne latérale à droite de la séance du jour ({pu.x():.0f} > {pl.x()+lv.width():.0f})")
 check(abs(pu.y() - pl.y()) < 2, "bureau : colonnes alignées en haut")
-check(pu.x() + up.width() <= 1280 - 24, "bureau : colonne latérale dans la fenêtre")
+check(pu.x() + up.width() <= 1280 - 16, "bureau : colonne latérale dans la fenêtre")
 shot(h, "home_1280")
 
 # Contenu : 2 séances à venir (l'annulée est exclue), 2 tuiles de présence.

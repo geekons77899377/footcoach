@@ -16,6 +16,11 @@ Item {
     property bool editing: false
     readonly property bool split: width >= 900
     readonly property int listWidth: 380
+    // Aucun exercice ouvert et écran assez grand : bibliothèque en grille de cartes (bureau, tablette).
+    readonly property bool gridMode: width >= 600 && height >= 520 && !editing
+    readonly property int pad: gridMode ? Theme.gutter + 4 : Theme.gutter     // aligné sur le titre de l'en-tête
+    readonly property int gridGap: 16
+    readonly property int gridCols: Math.max(1, Math.floor((width - 2 * pad + gridGap) / (260 + gridGap)))   // cartes d'au moins 260 px
     readonly property var shown: {
         var q = query.trim().toLowerCase();
         var out = [];
@@ -120,7 +125,7 @@ Item {
 
     Item {
         id: listPane
-        width: page.split ? page.listWidth : page.width
+        width: page.gridMode || !page.split ? page.width : page.listWidth
         height: page.height
         visible: page.split || !page.editing
 
@@ -145,14 +150,14 @@ Item {
             id: filters
             anchors.top: listHeader.bottom
             anchors.left: parent.left
-            anchors.leftMargin: Theme.gutter
+            anchors.leftMargin: page.pad
             anchors.right: parent.right
-            anchors.rightMargin: Theme.gutter
+            anchors.rightMargin: page.pad
             anchors.topMargin: 4
             spacing: 10
 
             Rectangle {
-                width: parent.width
+                width: page.gridMode ? Math.min(parent.width, 480) : parent.width
                 height: 48
                 radius: 24
                 color: Theme.surface
@@ -205,13 +210,14 @@ Item {
 
         ListView {
             id: list
+            visible: !page.gridMode
             anchors.top: filters.bottom
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.topMargin: 10
-            leftMargin: Theme.gutter
-            rightMargin: Theme.gutter
+            leftMargin: page.pad
+            rightMargin: page.pad
             bottomMargin: 16
             spacing: 10
             clip: true
@@ -291,8 +297,152 @@ Item {
                 }
             }
 
-            footer: Item {
-                width: list.width - 2 * Theme.gutter
+            footer: emptyState
+        }
+
+        // Grille de cartes (grand écran, aucun exercice ouvert) : mêmes données et même filtre que la liste.
+        GridView {
+            id: grid
+            objectName: "exerciseGrid"
+            visible: page.gridMode
+            anchors.top: filters.bottom
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 14
+            leftMargin: page.pad
+            rightMargin: page.pad - page.gridGap        // le dernier écart de chaque ligne est dans la cellule
+            bottomMargin: 16
+            clip: true
+            model: page.shown
+            boundsBehavior: Flickable.StopAtBounds
+            cellWidth: (width - leftMargin - rightMargin) / page.gridCols
+            cellHeight: 270 + page.gridGap
+            footer: emptyState
+
+            delegate: Item {
+                id: cell
+                required property var modelData
+                readonly property color tint: Status.categoryColor(modelData.category)
+                width: grid.cellWidth
+                height: grid.cellHeight
+                Card {
+                    id: tile
+                    objectName: "exerciseCard"
+                    width: cell.width - page.gridGap
+                    height: 270
+                    padding: 0
+                    radius: Theme.radiusLg
+                    opacity: cell.modelData.archived ? 0.55 : 1
+
+                    // Tête : pastille de catégorie sur un dégradé teinté.
+                    Rectangle {
+                        id: top
+                        x: 1
+                        y: 1
+                        width: parent.width - 2
+                        height: 92
+                        radius: tile.radius - 1             // suit les coins arrondis de la carte
+                        gradient: Gradient {
+                            GradientStop { position: 0; color: Qt.rgba(cell.tint.r, cell.tint.g, cell.tint.b, 0.16) }
+                            GradientStop { position: 1; color: "transparent" }
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 56
+                            height: 56
+                            radius: 28
+                            color: Theme.bgDeep
+                            border.width: 1
+                            border.color: Theme.border
+                            Icon {
+                                anchors.centerIn: parent
+                                name: "dumbbell"
+                                color: cell.tint
+                                size: 26
+                            }
+                        }
+                    }
+                    Column {
+                        anchors.top: top.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 20
+                        anchors.rightMargin: 20
+                        spacing: 6
+                        Text {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1
+                            color: cell.tint
+                            text: (cell.modelData.categoryLabel + "").toUpperCase()
+                                  + (cell.modelData.durationMin > 0 ? "  ·  " + cell.modelData.durationMin + " MIN" : "")
+                                  + (cell.modelData.archived ? "  ·  ARCHIVÉ" : "")
+                        }
+                        Text {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            maximumLineCount: 2
+                            wrapMode: Text.Wrap
+                            font.family: Theme.fontHeading
+                            font.pixelSize: 19
+                            font.weight: Font.Bold
+                            color: Theme.text
+                            text: cell.modelData.title
+                        }
+                        Text {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            maximumLineCount: 2
+                            wrapMode: Text.Wrap
+                            font.pixelSize: 13
+                            color: Theme.textMuted
+                            text: cell.modelData.objective
+                        }
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: 20
+                        anchors.rightMargin: 20
+                        anchors.bottomMargin: 46
+                        height: 1
+                        color: Theme.borderSubtle
+                    }
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 20
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 14
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        color: Theme.textMuted
+                        text: page.players(cell.modelData) !== "" ? page.players(cell.modelData) : "Tous effectifs"
+                    }
+                    Icon {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 18
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 12
+                        name: "chevron"
+                        color: Theme.accent
+                        size: 20
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: page.openExercise(cell.modelData)
+                    }
+                }
+            }
+        }
+
+        Component {
+            id: emptyState
+            Item {
+                width: page.gridMode ? page.width - 2 * page.pad : list.width - 2 * page.pad
                 height: visible ? 160 : 0
                 visible: page.shown.length === 0
                 Card {
@@ -361,7 +511,7 @@ Item {
     }
 
     Item {
-        visible: page.split && !page.editing
+        visible: page.split && !page.editing && !page.gridMode
         x: page.listWidth
         width: page.width - x
         height: page.height
