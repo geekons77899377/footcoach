@@ -21,7 +21,11 @@ def prepare():
         shutil.rmtree(RUN)
     os.makedirs(RUN)
     for f in os.listdir(SRC):
-        shutil.copy(os.path.join(SRC, f), RUN)
+        p = os.path.join(SRC, f)
+        if os.path.isdir(p):
+            shutil.copytree(p, os.path.join(RUN, f))      # qml/fonts
+        else:
+            shutil.copy(p, RUN)
     with open(os.path.join(RUN, "qmldir"), "w") as q:
         q.write("singleton Theme 1.0 Theme.qml\nsingleton AppState 1.0 AppState.qml\n")
     os.makedirs(OUT, exist_ok=True)

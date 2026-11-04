@@ -22,6 +22,7 @@ Item {
             width: parent.width
             text: root.title
             elide: Text.ElideRight
+            font.family: Theme.fontHeading
             font.pixelSize: 26
             font.weight: Font.ExtraBold
             color: Theme.text

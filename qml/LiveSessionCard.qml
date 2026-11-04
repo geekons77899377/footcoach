@@ -345,6 +345,7 @@ Item {
                             maximumLineCount: 2
                             elide: Text.ElideRight
                             text: root.session ? root.sessionTitle(root.session) : ""
+                            font.family: Theme.fontHeading
                             font.pixelSize: 24
                             font.weight: Font.ExtraBold
                             color: Theme.text
@@ -424,6 +425,7 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 36
+                    font.family: Theme.fontHeading
                     font.pixelSize: 96
                     font.weight: Font.Black
                     font.features: { "tnum": 1 }
@@ -687,6 +689,7 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 40
+                    font.family: Theme.fontHeading
                     font.pixelSize: 220
                     font.weight: Font.Black
                     font.features: { "tnum": 1 }

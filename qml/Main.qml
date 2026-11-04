@@ -196,6 +196,7 @@ ApplicationWindow {
                     visible: win.navMode === "sidebar"
                     anchors.verticalCenter: parent.verticalCenter
                     text: "FootCoach"
+                    font.family: Theme.fontHeading
                     font.pixelSize: 20
                     font.weight: Font.ExtraBold
                     color: Theme.text

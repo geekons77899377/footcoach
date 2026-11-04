@@ -174,11 +174,19 @@ if(FOOTCOACH_HAVE_QML)
         set_source_files_properties(qml/${f} PROPERTIES QT_RESOURCE_ALIAS ${f})
     endforeach()
     set_source_files_properties(qml/Theme.qml qml/AppState.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+    # Polices Outfit (licence SIL OFL 1.1, fichier OFL.txt joint) : titres et chronomètre.
+    set(FONT_FILES fonts/Outfit-SemiBold.ttf fonts/Outfit-Bold.ttf fonts/Outfit-ExtraBold.ttf fonts/OFL.txt)
+    set(FONT_FILES_PATHS)
+    foreach(f ${FONT_FILES})
+        list(APPEND FONT_FILES_PATHS qml/${f})
+        set_source_files_properties(qml/${f} PROPERTIES QT_RESOURCE_ALIAS ${f})
+    endforeach()
 
     qt_add_qml_module(FootCoach
         URI FootCoachUi
         VERSION 1.0
         QML_FILES ${QML_FILES_PATHS}
+        RESOURCES ${FONT_FILES_PATHS}
     )
 
     target_include_directories(FootCoach PRIVATE src)
