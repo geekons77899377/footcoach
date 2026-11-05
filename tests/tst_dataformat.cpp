@@ -539,6 +539,202 @@ private slots:
         QCOMPARE(snapshot(b), before);                           // aucune donnée modifiée
     }
 
+    // --- Règles de liens des terrains à l'import (SDD 5.3, décision D18 : refus total, aucune réparation) ---
+
+    static int columnIndex(const QJsonObject &table, const QString &name)
+    {
+        const QJsonArray cols = table.value("columns").toArray();
+        for (int i = 0; i < cols.size(); ++i)
+            if (cols.at(i).toString() == name)
+                return i;
+        return -1;
+    }
+
+    // Copie d'un terrain du fichier (ligne « from ») ajoutée avec l'identifiant 99 ; set : colonne -> valeur à écraser.
+    static QJsonObject withExtraBoard(QJsonObject root, int from, const QMap<QString, QJsonValue> &set)
+    {
+        QJsonObject tables = root.value("tables").toObject();
+        QJsonObject tb = tables.value("tactical_board").toObject();
+        QJsonArray rows = tb.value("rows").toArray();
+        QJsonArray r = rows.at(from).toArray();
+        r[columnIndex(tb, "id")] = 99;
+        for (auto it = set.begin(); it != set.end(); ++it)
+            r[columnIndex(tb, it.key())] = it.value();
+        rows.append(r);
+        tb["rows"] = rows;
+        tables["tactical_board"] = tb;
+        root["tables"] = tables;
+        return root;
+    }
+
+    QDir backupDir() const { return QDir(QFileInfo(m_db.path()).absolutePath() + "/sauvegardes"); }
+    QStringList backupNames() const
+    {
+        return backupDir().entryList({QStringLiteral("avant-import-*.footcoach")}, QDir::Files, QDir::Name);
+    }
+
+    void invalidBoardLinksRefuseTheWholeImport_data()
+    {
+        QTest::addColumn<int>("copyOfRow");                   // ligne du fichier dont on copie le terrain
+        QTest::addColumn<QStringList>("overrideKeyValues");   // colonne, valeur, colonne, valeur…
+        // Ligne 1 : terrain de bloc (session_exercise_id = 1) ; ligne 0 : schéma de référence de l'exercice 18.
+        QTest::newRow("terrain de bloc aussi lié à un exercice") << 1 << QStringList{"exercise_id", "18"};
+        QTest::newRow("terrain de bloc aussi lié à une séance") << 1 << QStringList{"session_id", "1"};
+        QTest::newRow("deux terrains pour un même bloc") << 1 << QStringList{"title", "Doublon"};
+        QTest::newRow("deux schémas de référence pour un exercice") << 0 << QStringList{"title", "Doublon"};
+    }
+
+    void invalidBoardLinksRefuseTheWholeImport()
+    {
+        QFETCH(int, copyOfRow);
+        QFETCH(QStringList, overrideKeyValues);
+        Backend b(m_db.handle());
+        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());       // état de départ connu
+        const QJsonObject before = snapshot(b);
+        const QStringList backupsBefore = backupNames();
+
+        QMap<QString, QJsonValue> set;
+        for (int i = 0; i + 1 < overrideKeyValues.size(); i += 2) {
+            const QString key = overrideKeyValues.at(i), val = overrideKeyValues.at(i + 1);
+            set.insert(key, key == "title" ? QJsonValue(val) : QJsonValue(val.toInt()));
+        }
+        const QString file = tmpFile(withExtraBoard(readJson(fixturePath(5)), copyOfRow, set));
+        const QVariantMap r = b.importDataFile(url(file));
+
+        QVERIFY2(!r.value("ok").toBool(), "un import avec des liens invalides aurait dû être refusé");
+        QVERIFY(!b.lastError().isEmpty());                                      // l'erreur est consultable (avant tout export)
+        const QString message = r.value("error").toString();
+        QVERIFY2(message.contains(QStringLiteral("Import refusé")), qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("liens de terrains incohérents")), qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("Doublon")) || message.contains(QStringLiteral("Atelier"))
+                     || message.contains(QStringLiteral("Pressing")),
+                 qPrintable(message));                                          // le terrain fautif est nommé
+        QCOMPARE(snapshot(b), before);                                          // aucune donnée modifiée
+        QCOMPARE(backupNames(), backupsBefore);                                 // aucune sauvegarde créée ni évincée
+    }
+
+    // Avant le schéma 5, plusieurs schémas de référence pour un même exercice étaient possibles : une ancienne
+    // sauvegarde valable ne doit pas être refusée (la règle ne vaut que pour les fichiers du schéma 5 ou plus récent).
+    void olderFileWithSeveralReferenceBoardsIsStillAccepted()
+    {
+        Backend b(m_db.handle());
+        QJsonObject root = withExtraBoard(readJson(fixturePath(4)), 0, {{"title", QJsonValue(QStringLiteral("Second schéma"))}});
+        const QVariantMap r = b.importDataFile(url(tmpFile(root)));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
+    }
+
+    void validBoardLinksAreAccepted()
+    {
+        Backend b(m_db.handle());
+        const QVariantMap r = b.importDataFile(url(fixturePath(5)));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
+    }
+
+    // Un import refusé ne doit pas faire tourner les trois sauvegardes ; un import réussi garde les trois plus récentes.
+    void backupsRotateOnlyAfterASuccessfulImport()
+    {
+        Backend b(m_db.handle());
+        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());
+        QVERIFY(backupDir().exists());
+        const QStringList fake = {"avant-import-20200101-000001.footcoach", "avant-import-20200101-000002.footcoach",
+                                  "avant-import-20200101-000003.footcoach"};
+        for (const QString &n : fake) {
+            QFile f(backupDir().filePath(n));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("{}");
+        }
+        const QStringList existing = backupNames();
+
+        // Import refusé (liens invalides) : toutes les sauvegardes sont conservées, aucune n'est ajoutée.
+        const QString bad = tmpFile(withExtraBoard(readJson(fixturePath(5)), 1, {{"exercise_id", QJsonValue(18)}}));
+        QVERIFY(!b.importDataFile(url(bad)).value("ok").toBool());
+        QCOMPARE(backupNames(), existing);
+
+        // Import refusé pour une autre raison (colonne inconnue) : idem.
+        QJsonObject root = readJson(fixturePath(5));
+        QJsonObject tables = root.value("tables").toObject();
+        QJsonObject tb = tables.value("team").toObject();
+        QJsonArray cols = tb.value("columns").toArray();
+        cols.append("colonne_fantome");
+        tb["columns"] = cols;
+        tables["team"] = tb;
+        root["tables"] = tables;
+        QVERIFY(!b.importDataFile(url(tmpFile(root))).value("ok").toBool());
+        QCOMPARE(backupNames(), existing);
+
+        // Import réussi : une nouvelle sauvegarde, et seules les trois plus récentes restent.
+        const QVariantMap ok = b.importDataFile(url(fixturePath(5)));
+        QVERIFY(ok.value("ok").toBool());
+        const QStringList after = backupNames();
+        QCOMPARE(after.size(), 3);
+        QVERIFY(after.contains(ok.value("backupName").toString()));
+        QVERIFY(!after.contains(fake.at(0)));
+    }
+
+    // Deux imports dans la même seconde : la sauvegarde existante n'est jamais écrasée ni supprimée, et la rotation
+    // supprime bien la plus ancienne (« …-120000 » avant « …-120000-2 »).
+    void backupNamesNeverCollide()
+    {
+        Backend b(m_db.handle());
+        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());   // la base n'est plus vide
+        QDir d = backupDir();
+        for (const QString &n : backupNames())
+            QVERIFY(QFile::remove(d.filePath(n)));
+        QVERIFY(d.exists());
+
+        // Les trois premiers noms de la seconde courante sont déjà pris (si la seconde change pendant le test, le nom
+        // du nouvel import diffère et le test reste valable : il vérifie alors seulement la rotation).
+        QStringList taken;
+        const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
+        for (const QString &suffix : {QString(), QString("-2"), QString("-3")}) {
+            const QString n = "avant-import-" + stamp + suffix + ".footcoach";
+            QFile f(d.filePath(n));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("sauvegarde-existante-" + n.toUtf8());
+            taken << n;
+        }
+        auto untouched = [&]() {
+            for (const QString &n : taken) {
+                QFile f(d.filePath(n));
+                if (!f.exists())
+                    return false;
+                f.open(QIODevice::ReadOnly);
+                if (f.readAll() != "sauvegarde-existante-" + n.toUtf8())
+                    return false;
+            }
+            return true;
+        };
+
+        // Import refusé : aucune sauvegarde existante n'est supprimée (la sienne n'est pas celle d'un autre).
+        const QString bad = tmpFile(withExtraBoard(readJson(fixturePath(5)), 1, {{"exercise_id", QJsonValue(18)}}));
+        QVERIFY(!b.importDataFile(url(bad)).value("ok").toBool());
+        QVERIFY2(untouched(), "un import refusé a modifié une sauvegarde existante");
+        QCOMPARE(backupNames().size(), taken.size());
+
+        // Import réussi dans la même seconde : nouveau nom, aucune sauvegarde existante tronquée.
+        const QVariantMap ok = b.importDataFile(url(fixturePath(5)));
+        QVERIFY(ok.value("ok").toBool());
+        const QString created = ok.value("backupName").toString();
+        QVERIFY2(!taken.contains(created), qPrintable("nom déjà pris : " + created));
+        QVERIFY(QFile::exists(d.filePath(created)));
+        QVERIFY(QFileInfo(d.filePath(created)).size() > 100);          // le vrai export, pas un marqueur
+        // Rotation : trois restent, la nouvelle en fait partie, les plus anciennes ont disparu en premier.
+        const QStringList after = backupNames();
+        QCOMPARE(after.size(), 3);
+        QVERIFY(after.contains(created));
+        for (const QString &n : after)
+            if (n != created && taken.contains(n)) {
+                QFile f(d.filePath(n));
+                f.open(QIODevice::ReadOnly);
+                QCOMPARE(f.readAll(), "sauvegarde-existante-" + n.toUtf8());   // intacte
+            }
+        QVERIFY(!after.contains(taken.first()));
+        for (const QString &n : backupNames())
+            QFile::remove(d.filePath(n));                           // ne pas peser sur les tests suivants
+    }
+
     void notAnExportAtAll()
     {
         Backend b(m_db.handle());

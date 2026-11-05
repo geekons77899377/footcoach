@@ -108,12 +108,39 @@ ApplicationWindow {
     }
 
     // Android : le bouton retour demande la fermeture de la fenêtre ; on la refuse tant qu'il y a quelque chose à fermer.
+    // Fermeture de la fenêtre (Windows comme Android) : refusée tant qu'un terrain ne peut pas être enregistré ;
+    // le dialogue propose de réessayer ou de quitter sans enregistrer, puis la fermeture reprend (forceClose).
+    property bool forceClose: false
     onClosing: (close) => {
-        if (Qt.platform.os === "android" && handleBack())
+        if (Qt.platform.os === "android" && handleBack()) {
             close.accepted = false;
+            return;
+        }
+        if (forceClose)
+            return;
+        var pages = [tactics, sessionsPage];
+        for (var i = 0; i < pages.length; ++i) {
+            if (!pages[i].flushBoard()) {
+                close.accepted = false;
+                pages[i].showSaveFailed(function () {     // flushBoard() vient d'échouer : pas de seconde tentative
+                    win.forceClose = true;
+                    win.close();
+                });
+                return;
+            }
+        }
     }
 
+    // Quitter la section courante : un terrain dont l'enregistrement échoue garde l'utilisateur sur son écran.
     function go(id, boardId) {
+        var page = ({ sessions: sessionsPage, tactics: tactics })[section];
+        if (id !== section && page)
+            page.guardLeave(function () { enter(id, boardId); });
+        else
+            enter(id, boardId);
+    }
+
+    function enter(id, boardId) {
         section = id;
         if (id === "tactics" && boardId > 0)
             tactics.openBoard(boardId);

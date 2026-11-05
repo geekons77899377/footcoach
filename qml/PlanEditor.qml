@@ -27,7 +27,8 @@ Item {
     signal changed()                          // le plan a changé (la liste des séances se met à jour)
 
     function openSession(s, team) {
-        leave(false);                      // un terrain encore ouvert est enregistré avant de changer de séance
+        if (!leave(false))                 // un terrain encore ouvert est enregistré avant de changer de séance
+            return;
         session = s;
         teamName = team;
         reload(false);
@@ -84,26 +85,48 @@ Item {
     function closeBoard() {
         if (!boardOpen)
             return;
-        if (boardLoader.item)
-            boardLoader.item.flush();
-        boardOpen = false;
-        openBoardId = -1;
-        reload();
-        changed();
+        guardLeave(function () {
+            boardOpen = false;
+            openBoardId = -1;
+            reload();
+            changed();
+        });
+    }
+
+    // Exécute action (sortie du plan ou de la page) une fois le terrain ouvert enregistré ; si l'enregistrement échoue,
+    // on reste sur le terrain (dialogue : réessayer ou quitter sans enregistrer).
+    function guardLeave(action) {
+        if (boardOpen && boardLoader.item)
+            boardLoader.item.leaveGuarded(action);
+        else
+            action();
+    }
+
+    // Dialogue d'échec pour une sortie dont l'enregistrement vient d'échouer (voir BoardEditor.showSaveFailed()).
+    function showSaveFailed(action) {
+        if (boardOpen && boardLoader.item)
+            boardLoader.item.showSaveFailed(action);
+    }
+
+    // Vrai si rien n'est en attente d'enregistrement (réessaie l'enregistrement le cas échéant).
+    function flushBoard() {
+        return !boardOpen || !boardLoader.item || boardLoader.item.flush();
     }
 
     // Quitte le terrain sans relire le plan. discard : abandonne l'enregistrement en attente (données remplacées).
+    // Faux (on reste sur le terrain) si l'enregistrement en attente échoue : les appelants passent d'abord par guardLeave().
     function leave(discard) {
         if (!boardOpen)
-            return;
+            return true;
         if (boardLoader.item) {
             if (discard === true)
                 boardLoader.item.discard();
-            else
-                boardLoader.item.flush();
+            else if (!boardLoader.item.flush())
+                return false;
         }
         boardOpen = false;
         openBoardId = -1;
+        return true;
     }
 
     // Bouton retour du téléphone : quitte le plein écran du terrain, puis le terrain. Vrai si le geste a servi.
@@ -175,19 +198,17 @@ Item {
         objectName: "removeBoardConfirm"
         onAccepted: {
             var id = root.openBoardId;
+            if (!(id > 0) || !backend.deleteBoard(id)) {
+                // Suppression en échec : le terrain reste ouvert, enregistrable, et l'erreur est affichée.
+                toast.show("Impossible de retirer le terrain : " + backend.lastError);
+                return;
+            }
             if (boardLoader.item)
                 boardLoader.item.discard();           // plus d'enregistrement vers un terrain supprimé
-            if (id > 0 && backend.deleteBoard(id)) {
-                root.boardOpen = false;
-                root.openBoardId = -1;
-                root.reload();
-                root.changed();
-            } else {
-                toast.show("Impossible de retirer le terrain : " + backend.lastError);
-                root.boardOpen = false;
-                root.openBoardId = -1;
-                root.reload();
-            }
+            root.boardOpen = false;
+            root.openBoardId = -1;
+            root.reload();
+            root.changed();
         }
     }
     PlanItemDialog {

@@ -51,10 +51,19 @@ Item {
 
     // --- Chargement et enregistrement ---------------------------------------------------------
 
+    // Des modifications ne sont pas encore enregistrées (en attente du minuteur, ou enregistrement en échec). Tant
+    // qu'elles le sont, flush() réessaie et les sorties passent par leaveGuarded().
+    property bool dirty: false
+    // Sortie en attente de l'issue du dialogue d'échec (voir leaveGuarded()).
+    property var exitAction: null
+
     BoardModel {
         id: board
         objectName: "board"
-        onEdited: saveTimer.restart()
+        onEdited: {
+            editor.dirty = true;
+            saveTimer.restart();
+        }
     }
 
     Timer {
@@ -63,8 +72,11 @@ Item {
         onTriggered: editor.save()
     }
 
+    // Charge un schéma. Faux (sans rien charger) si le schéma ouvert a des modifications qui n'ont pas pu être
+    // enregistrées : les appelants passent d'abord par leaveGuarded().
     function open(id) {
-        flush();
+        if (!flush())
+            return false;
         boardId = id;
         tool = "select";
         fullscreen = false;
@@ -73,28 +85,91 @@ Item {
         editable = b.readable === true;
         loadError = b.error || "";
         board.load(editable ? b.json : "");
+        dirty = false;
         view.fit();
+        return true;
     }
 
+    // Vrai si le contenu est enregistré (ou s'il n'y a rien à enregistrer). Faux : l'enregistrement a échoué, les
+    // modifications restent en attente (dirty) et l'erreur est affichée.
     function save() {
         saveTimer.stop();
-        if (!editable || boardId < 0)
-            return;
-        if (backend.saveBoard(boardId, board.toJson()))
+        if (!editable || boardId < 0) {
+            dirty = false;
+            return true;
+        }
+        if (backend.saveBoard(boardId, board.toJson())) {
+            dirty = false;
             changed();
-        else
-            toast.show("Enregistrement impossible : " + backend.lastError);
+            return true;
+        }
+        toast.show("Enregistrement impossible : " + backend.lastError);
+        return false;
     }
 
     // Les données de l'appareil ont été remplacées : abandonne l'enregistrement en attente du schéma ouvert.
     function discard() {
         saveTimer.stop();
+        dirty = false;
         boardId = -1;
     }
 
+    // Enregistre ce qui est en attente. Faux si l'enregistrement a échoué : l'appelant ne doit pas quitter l'écran.
     function flush() {
-        if (saveTimer.running)
-            save();
+        if (!dirty && !saveTimer.running)
+            return true;
+        return save();
+    }
+
+    // Quitte le terrain en exécutant action, sauf si l'enregistrement échoue : on reste alors sur l'écran, l'erreur
+    // est affichée et l'utilisateur choisit de réessayer ou de quitter sans enregistrer (après confirmation).
+    function leaveGuarded(action) {
+        if (flush()) {
+            exitAction = null;
+            action();
+            return;
+        }
+        showSaveFailed(action);
+    }
+
+    // Ouvre le dialogue d'échec pour une sortie dont l'enregistrement vient d'échouer (sans le retenter : l'appelant
+    // l'a déjà fait, par exemple flush() à la fermeture de la fenêtre). action ne s'exécute que si l'utilisateur
+    // réessaie avec succès ou confirme de quitter sans enregistrer ; « Rester » et Échap l'abandonnent.
+    function showSaveFailed(action) {
+        exitAction = action;
+        saveFailed.message = backend.lastError;
+        saveFailed.open();
+    }
+
+    SaveFailedDialog {
+        id: saveFailed
+        onRetry: {
+            var a = editor.exitAction;
+            editor.exitAction = null;
+            editor.leaveGuarded(a);
+        }
+        onLeaveWithoutSaving: {
+            discardConfirm.pendingAction = editor.exitAction;   // propre à cette confirmation : Annuler = rester
+            editor.exitAction = null;
+            discardConfirm.confirm("Quitter sans enregistrer ?",
+                "Les dernières modifications de ce terrain seront perdues.", "Quitter sans enregistrer", true);
+        }
+        onStay: editor.exitAction = null
+    }
+
+    // Seconde confirmation : perdre des modifications n'est jamais le résultat d'un seul toucher.
+    PromptDialog {
+        id: discardConfirm
+        objectName: "discardConfirm"
+        property var pendingAction: null
+        onAccepted: {
+            var a = pendingAction;
+            pendingAction = null;
+            saveTimer.stop();
+            editor.dirty = false;                  // choix explicite de l'utilisateur : rien n'est perdu en silence
+            if (a)
+                a();
+        }
     }
 
     // --- Dialogues ------------------------------------------------------------------------------
@@ -217,8 +292,7 @@ Item {
                 editor.purpose = "rename";
                 prompt.ask("Titre du schéma", editor.title, false, 80);
             } else if (id === "duplicate") {
-                editor.flush();
-                editor.duplicateRequested();
+                editor.leaveGuarded(function () { editor.duplicateRequested(); });
             } else if (id === "clear") {
                 editor.purpose = "clear";
                 prompt.confirm("Tout effacer ?", "Tous les éléments de ce schéma seront retirés (vous pourrez annuler).",
@@ -260,10 +334,8 @@ Item {
                 visible: editor.showBack
                 iconName: "back"
                 accessibleName: "Retour à la liste"
-                onClicked: {
-                    editor.flush();
-                    editor.closeRequested();
-                }
+                // Les pages hôtes ferment le terrain par leaveGuarded() : l'écran n'est quitté que si tout est enregistré.
+                onClicked: editor.closeRequested()
             }
         }
 
@@ -742,5 +814,7 @@ Item {
         }
     }
 
+    // Dernier recours seulement : une destruction ne peut pas être bloquée et l'erreur ne serait plus visible. Les
+    // sorties (retour, autre terrain, navigation, fermeture de la fenêtre) passent par leaveGuarded().
     Component.onDestruction: flush()
 }

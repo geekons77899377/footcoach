@@ -12,6 +12,9 @@ Item {
         return null;
     }
     signal changed()
+    // Optionnel : function (apply) appelée avant de changer d'équipe ; elle exécute apply() quand le changement est
+    // permis (par exemple une fois le terrain ouvert enregistré). Sans elle, le changement est immédiat.
+    property var beforeChange: null
 
     // À appeler après avoir relu les équipes : garde une équipe valide sélectionnée.
     function load() {
@@ -46,8 +49,15 @@ Item {
         id: sheet
         title: "Équipe"
         onChosen: (id) => {
-            AppState.teamId = parseInt(id.substring(1), 10);
-            root.changed();
+            var team = parseInt(id.substring(1), 10);
+            var apply = function () {
+                AppState.teamId = team;
+                root.changed();
+            };
+            if (root.beforeChange)
+                root.beforeChange(apply);
+            else
+                apply();
         }
     }
 }

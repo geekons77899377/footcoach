@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QList>
+#include <QStringList>
 #include <QSqlDatabase>
 #include <QString>
 
@@ -53,6 +54,12 @@ public:
     // le contenu d'un schéma ancien déjà lié.
     bool update(const BoardRecord &board, QString *error = nullptr);
     bool remove(int id, QString *error = nullptr);
+
+    // Contrôle tous les terrains présents avec les règles de insert() (import de données). Un message par anomalie
+    // dans *problems ; false s'il y en a au moins une, ou en cas d'erreur de la base. referenceUniqueness : vérifie
+    // aussi « un seul schéma de référence par exercice » (faux pour les données d'avant le schéma 5, qui pouvaient
+    // en compter plusieurs).
+    bool validateAllLinks(bool referenceUniqueness, QStringList *problems, QString *error = nullptr) const;
 
 private:
     bool checkLinks(const BoardRecord &board, int previousExerciseId, int previousBlockId, QString *error) const;

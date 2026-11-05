@@ -1,6 +1,8 @@
 // Export et import de toutes les données (fichier « .footcoach ») de Backend (voir Backend.h).
 #include "Backend.h"
 
+#include <algorithm>
+
 #include <QCoreApplication>
 #include <QDate>
 #include <QDateTime>
@@ -300,25 +302,14 @@ QVariantMap Backend::importDataFile(const QString &url)
         fileCols.insert(t, cols);
     }
 
-    // Sauvegarde de l'état actuel, pour pouvoir revenir en arrière.
+    // État actuel, lu avant toute écriture : il sert de sauvegarde pour pouvoir revenir en arrière.
+    // Le fichier de sauvegarde n'est écrit qu'une fois le fichier importé validé (voir plus bas) : un import refusé
+    // ne crée aucune sauvegarde et ne fait donc pas tourner les trois sauvegardes existantes.
     const QByteArray before = buildExport();
     QString backupName;
-    if (!before.isEmpty()) {
-        const QDir dir(QFileInfo(m_db.databaseName()).absolutePath() + QStringLiteral("/sauvegardes"));
-        QDir().mkpath(dir.absolutePath());
-        backupName = QStringLiteral("avant-import-%1.footcoach").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
-        QFile bf(dir.filePath(backupName));
-        if (!bf.open(QIODevice::WriteOnly | QIODevice::Truncate) || bf.write(before) != before.size()) {
-            error = tr("Import annulé : la sauvegarde de vos données actuelles a échoué.");
-            setError(error);
-            return done(false, error);
-        }
-        bf.close();
-        // Garde les trois plus récentes.
-        const QStringList all = dir.entryList({QStringLiteral("avant-import-*.footcoach")}, QDir::Files, QDir::Name);
-        for (int i = 0; i < all.size() - 3; ++i)
-            QFile::remove(dir.filePath(all.at(i)));
-    }
+    QString backupPath;
+    bool backupFailed = false;
+    bool backupCreated = false;                 // fichier créé par CET import (seul celui-là peut être supprimé)
 
     // Tout ou rien : un seul passage dans une transaction.
     if (!m_db.transaction()) {
@@ -365,13 +356,89 @@ QVariantMap Backend::importDataFile(const QString &url)
             }
         }
     }
+
+    // Règles de liens des terrains (SDD 5.3, décision D18) : refus total, rien n'est réparé. Le contrôle se fait sur
+    // les lignes insérées dans la transaction, avec les règles de BoardRepository::insert() (pas de règle dupliquée).
+    // Avant le schéma 5, plusieurs schémas de référence par exercice étaient possibles : cette unicité ne s'applique
+    // qu'aux fichiers du schéma 5 ou plus récents, pour ne pas refuser d'anciennes sauvegardes valables.
+    if (ok) {
+        QStringList problems;
+        QString linkError;
+        const bool referenceUniqueness = root.value(QStringLiteral("schema")).toInt(-1) >= 5;
+        if (!m_repo.validateAllLinks(referenceUniqueness, &problems, &linkError)) {
+            ok = false;
+            if (problems.isEmpty()) {
+                failure = linkError;
+            } else {
+                constexpr int kShown = 5;
+                failure = tr("liens de terrains incohérents : ") + problems.mid(0, kShown).join(QStringLiteral(" ; "));
+                if (problems.size() > kShown)
+                    failure += tr(" ; et %n autre(s)", nullptr, problems.size() - kShown);
+            }
+        }
+    }
+
+    // Sauvegarde de l'état actuel : seulement maintenant que l'import est valide, et avant de le valider (commit).
+    if (ok && !before.isEmpty()) {
+        const QDir dir(QFileInfo(m_db.databaseName()).absolutePath() + QStringLiteral("/sauvegardes"));
+        QDir().mkpath(dir.absolutePath());
+        // Jamais d'écrasement : deux imports dans la même seconde reçoivent des noms distincts (-2, -3, ...), et le
+        // fichier est créé en exclusivité (NewOnly) pour qu'une sauvegarde existante ne soit ni tronquée ni supprimée.
+        const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+        QFile bf;
+        // Le numéro suit le plus grand déjà utilisé cette seconde (jamais un trou comblé) : l'ordre chronologique
+        // des noms reste vrai, donc la rotation supprime toujours la plus ancienne.
+        int first = 1;
+        const QStringList sameSecond = dir.entryList({QStringLiteral("avant-import-%1*.footcoach").arg(stamp)}, QDir::Files);
+        for (const QString &f : sameSecond) {
+            const QString base = QFileInfo(f).completeBaseName();
+            const int cut = QStringLiteral("avant-import-yyyyMMdd-HHmmss").size();
+            const int seq = base.size() > cut + 1 && base.at(cut) == QLatin1Char('-') ? base.mid(cut + 1).toInt() : 1;
+            first = std::max(first, seq + 1);
+        }
+        for (int n = first; n < first + 1000 && !backupCreated; ++n) {
+            backupName = n == 1 ? QStringLiteral("avant-import-%1.footcoach").arg(stamp)
+                                : QStringLiteral("avant-import-%1-%2.footcoach").arg(stamp).arg(n);
+            backupPath = dir.filePath(backupName);
+            if (QFile::exists(backupPath))
+                continue;
+            bf.setFileName(backupPath);
+            backupCreated = bf.open(QIODevice::WriteOnly | QIODevice::NewOnly);
+        }
+        if (!backupCreated || bf.write(before) != before.size()) {
+            ok = false;
+            backupFailed = true;
+        } else {
+            bf.close();
+        }
+    }
     if (ok)
         ok = m_db.commit();
     if (!ok) {
         m_db.rollback();
-        error = tr("Import refusé, vos données n'ont pas été modifiées (%1).").arg(failure);
+        if (backupCreated)
+            QFile::remove(backupPath);              // la sauvegarde écrite par cet import, devenue sans objet
+        error = backupFailed ? tr("Import annulé : la sauvegarde de vos données actuelles a échoué.")
+                             : tr("Import refusé, vos données n'ont pas été modifiées (%1).").arg(failure);
         setError(error);
         return done(false, error);
+    }
+
+    // Import réussi : seulement maintenant, on garde les trois sauvegardes les plus récentes.
+    if (!backupPath.isEmpty()) {
+        const QDir dir = QFileInfo(backupPath).absoluteDir();
+        QStringList all = dir.entryList({QStringLiteral("avant-import-*.footcoach")}, QDir::Files, QDir::Name);
+        // Ordre chronologique : horodatage, puis numéro (« …-120000 » = 1, « …-120000-2 » = 2, ..., « …-10 » après « …-9 »).
+        // Un tri brut par nom les mettrait dans le désordre et supprimerait la mauvaise sauvegarde.
+        const auto order = [](const QString &file) {
+            const QString base = QFileInfo(file).completeBaseName();
+            const int cut = QStringLiteral("avant-import-yyyyMMdd-HHmmss").size();
+            const int seq = base.size() > cut + 1 && base.at(cut) == QLatin1Char('-') ? base.mid(cut + 1).toInt() : 1;
+            return qMakePair(base.left(cut), seq);
+        };
+        std::sort(all.begin(), all.end(), [&](const QString &a, const QString &b) { return order(a) < order(b); });
+        for (int i = 0; i < all.size() - 3; ++i)
+            QFile::remove(dir.filePath(all.at(i)));
     }
 
     setError(QString());

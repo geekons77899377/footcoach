@@ -191,6 +191,27 @@ bool BoardRepository::checkLinks(const BoardRecord &board, int previousExerciseI
     return true;
 }
 
+bool BoardRepository::validateAllLinks(bool referenceUniqueness, QStringList *problems, QString *error) const
+{
+    QString listError;
+    const QList<BoardRecord> all = list(&listError, true);
+    if (!listError.isEmpty()) {
+        setError(error, listError);
+        return false;
+    }
+    bool valid = true;
+    for (const BoardRecord &b : all) {
+        QString why;
+        // Sans unicité de référence, l'exercice lié est traité comme « déjà lié » : seul le lien d'un bloc est contrôlé.
+        if (!checkLinks(b, referenceUniqueness ? -1 : b.exerciseId, -1, &why)) {
+            valid = false;
+            if (problems)
+                problems->append(QStringLiteral("terrain n° %1 « %2 » : %3").arg(b.id).arg(b.title, why));
+        }
+    }
+    return valid;
+}
+
 bool BoardRepository::insert(BoardRecord &board, QString *error)
 {
     if (!checkLinks(board, -1, -1, error))

@@ -44,15 +44,32 @@ Item {
     }
 
     function openSession(s) {
-        currentId = s.id;
-        editor.openSession(s, switcher.current ? switcher.current.name : "");
-        editing = true;
+        editor.guardLeave(function () {    // un terrain de bloc ouvert doit d'abord être enregistré
+            currentId = s.id;
+            editor.openSession(s, switcher.current ? switcher.current.name : "");
+            editing = true;
+        });
     }
 
     function closeEditor() {
-        editor.leave(false);               // un terrain de bloc encore ouvert est enregistré
-        editing = false;
-        currentId = -1;
+        editor.guardLeave(function () {    // un terrain de bloc encore ouvert est enregistré
+            editor.leave(false);
+            editing = false;
+            currentId = -1;
+        });
+    }
+
+    // Quitter la page (autre section, fermeture de la fenêtre) : même garde que la fermeture du plan.
+    function guardLeave(action) {
+        editor.guardLeave(action);
+    }
+
+    function flushBoard() {
+        return editor.flushBoard();
+    }
+
+    function showSaveFailed(action) {
+        editor.showSaveFailed(action);
     }
 
     // Bouton retour du téléphone : ferme le plan ouvert. Retourne true si la page a utilisé le geste.
@@ -93,6 +110,8 @@ Item {
                         + (page.rows.length > 1 ? " séances" : " séance")
             TeamSwitcher {
                 id: switcher
+                // L'équipe ne change qu'une fois le terrain ouvert enregistré : sinon on reste sur l'ancienne équipe.
+                beforeChange: (apply) => page.guardLeave(apply)
                 onChanged: { page.closeEditor(); page.refreshRows(); }
             }
         }
@@ -109,7 +128,7 @@ Item {
             allowClear: false
             value: page.scope
             options: [{ id: "upcoming", text: "À venir" }, { id: "past", text: "Passées" }]
-            onPicked: (id) => page.scope = id
+            onPicked: (id) => page.guardLeave(function () { page.scope = id; })
         }
 
         ListView {

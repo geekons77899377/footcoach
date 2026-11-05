@@ -15,10 +15,14 @@ Item {
         boards = backend.boards();
     }
 
+    // Ouvre un schéma. Si le schéma déjà ouvert a des modifications qui ne s'enregistrent pas, on reste dessus
+    // (dialogue : réessayer ou quitter sans enregistrer).
     function openBoard(id) {
-        refresh();
-        currentId = id;
-        editor.open(id);
+        editor.leaveGuarded(function () {
+            refresh();
+            currentId = id;
+            editor.open(id);
+        });
     }
 
     function createBoard() {
@@ -38,9 +42,27 @@ Item {
     }
 
     function closeEditor() {
-        editor.flush();
-        currentId = -1;
-        refresh();
+        editor.leaveGuarded(function () {
+            currentId = -1;
+            refresh();
+        });
+    }
+
+    // Quitter la page (autre section, fermeture de la fenêtre) : même garde que la fermeture du schéma.
+    function guardLeave(action) {
+        if (currentId < 0)
+            action();
+        else
+            editor.leaveGuarded(action);
+    }
+
+    function showSaveFailed(action) {
+        editor.showSaveFailed(action);
+    }
+
+    // Vrai si rien n'est en attente d'enregistrement (réessaie l'enregistrement le cas échéant).
+    function flushBoard() {
+        return currentId < 0 || editor.flush();
     }
 
     // Bouton retour du téléphone : quitte le plein écran du terrain, puis ferme le schéma ouvert.
@@ -72,10 +94,17 @@ Item {
     PromptDialog {
         id: confirm
         onAccepted: {
-            if (page.pendingDelete > 0 && backend.deleteBoard(page.pendingDelete)) {
-                if (page.currentId === page.pendingDelete)
-                    page.currentId = -1;
-                page.refresh();
+            if (page.pendingDelete > 0) {
+                if (backend.deleteBoard(page.pendingDelete)) {
+                    if (page.currentId === page.pendingDelete) {
+                        editor.discard();             // plus d'enregistrement vers un schéma supprimé
+                        page.currentId = -1;
+                    }
+                    page.refresh();
+                } else {
+                    // Suppression en échec : le schéma reste ouvert et listé, l'erreur est affichée.
+                    errorToast.show("Impossible de supprimer le schéma : " + backend.lastError);
+                }
             }
             page.pendingDelete = -1;
         }

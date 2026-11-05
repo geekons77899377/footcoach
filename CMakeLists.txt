@@ -163,7 +163,7 @@ if(FOOTCOACH_HAVE_QML)
     set(QML_FILES
         ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml BoardThumb.qml BoardToken.qml
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
-        Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml TacticsPage.qml Theme.qml
+        Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
         CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
         BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
