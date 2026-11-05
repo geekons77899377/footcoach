@@ -1,0 +1,16 @@
+Périmètre L0 (15 fichiers, tests/qml/t_live.py exclu) — 2026-11-05
+M	CMakeLists.txt
+M	qml/BoardEditor.qml
+M	qml/Main.qml
+M	qml/PlanEditor.qml
+M	qml/SessionsPage.qml
+M	qml/TacticsPage.qml
+M	qml/TeamSwitcher.qml
+M	src/app/BackendData.cpp
+M	src/core/BoardRepository.cpp
+M	src/core/BoardRepository.h
+M	tests/qml/run_all.py
+M	tests/tst_dataformat.cpp
+A	qml/SaveFailedDialog.qml
+A	tests/qml/t_l0a.py
+A	tests/qml/t_l0c.py

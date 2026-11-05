@@ -1,0 +1,13 @@
+ CMakeLists.txt               |   2 +-
+ qml/BoardEditor.qml          | 104 +++++++++++++++++++----
+ qml/Main.qml                 |  29 ++++++-
+ qml/PlanEditor.qml           |  63 +++++++++-----
+ qml/SessionsPage.qml         |  33 ++++++--
+ qml/TacticsPage.qml          |  49 ++++++++---
+ qml/TeamSwitcher.qml         |  14 +++-
+ src/app/BackendData.cpp      | 103 +++++++++++++++++++----
+ src/core/BoardRepository.cpp |  21 +++++
+ src/core/BoardRepository.h   |   7 ++
+ tests/qml/run_all.py         |   2 +-
+ tests/tst_dataformat.cpp     | 196 +++++++++++++++++++++++++++++++++++++++++++
+ 12 files changed, 547 insertions(+), 76 deletions(-)

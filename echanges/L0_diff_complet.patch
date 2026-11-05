@@ -1,0 +1,1378 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9aba34c..bbcd33e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -163,7 +163,7 @@ if(FOOTCOACH_HAVE_QML)
+     set(QML_FILES
+         ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml BoardThumb.qml BoardToken.qml
+         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
+-        Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml TacticsPage.qml Theme.qml
++        Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
+         CalendarPage.qml AttendancePage.qml SessionForm.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
+         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
+         BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
+diff --git a/qml/BoardEditor.qml b/qml/BoardEditor.qml
+index 84a9b60..f495b53 100644
+--- a/qml/BoardEditor.qml
++++ b/qml/BoardEditor.qml
+@@ -51,10 +51,19 @@ Item {
+ 
+     // --- Chargement et enregistrement ---------------------------------------------------------
+ 
++    // Des modifications ne sont pas encore enregistrées (en attente du minuteur, ou enregistrement en échec). Tant
++    // qu'elles le sont, flush() réessaie et les sorties passent par leaveGuarded().
++    property bool dirty: false
++    // Sortie en attente de l'issue du dialogue d'échec (voir leaveGuarded()).
++    property var exitAction: null
++
+     BoardModel {
+         id: board
+         objectName: "board"
+-        onEdited: saveTimer.restart()
++        onEdited: {
++            editor.dirty = true;
++            saveTimer.restart();
++        }
+     }
+ 
+     Timer {
+@@ -63,8 +72,11 @@ Item {
+         onTriggered: editor.save()
+     }
+ 
++    // Charge un schéma. Faux (sans rien charger) si le schéma ouvert a des modifications qui n'ont pas pu être
++    // enregistrées : les appelants passent d'abord par leaveGuarded().
+     function open(id) {
+-        flush();
++        if (!flush())
++            return false;
+         boardId = id;
+         tool = "select";
+         fullscreen = false;
+@@ -73,28 +85,91 @@ Item {
+         editable = b.readable === true;
+         loadError = b.error || "";
+         board.load(editable ? b.json : "");
++        dirty = false;
+         view.fit();
++        return true;
+     }
+ 
++    // Vrai si le contenu est enregistré (ou s'il n'y a rien à enregistrer). Faux : l'enregistrement a échoué, les
++    // modifications restent en attente (dirty) et l'erreur est affichée.
+     function save() {
+         saveTimer.stop();
+-        if (!editable || boardId < 0)
+-            return;
+-        if (backend.saveBoard(boardId, board.toJson()))
++        if (!editable || boardId < 0) {
++            dirty = false;
++            return true;
++        }
++        if (backend.saveBoard(boardId, board.toJson())) {
++            dirty = false;
+             changed();
+-        else
+-            toast.show("Enregistrement impossible : " + backend.lastError);
++            return true;
++        }
++        toast.show("Enregistrement impossible : " + backend.lastError);
++        return false;
+     }
+ 
+     // Les données de l'appareil ont été remplacées : abandonne l'enregistrement en attente du schéma ouvert.
+     function discard() {
+         saveTimer.stop();
++        dirty = false;
+         boardId = -1;
+     }
+ 
++    // Enregistre ce qui est en attente. Faux si l'enregistrement a échoué : l'appelant ne doit pas quitter l'écran.
+     function flush() {
+-        if (saveTimer.running)
+-            save();
++        if (!dirty && !saveTimer.running)
++            return true;
++        return save();
++    }
++
++    // Quitte le terrain en exécutant action, sauf si l'enregistrement échoue : on reste alors sur l'écran, l'erreur
++    // est affichée et l'utilisateur choisit de réessayer ou de quitter sans enregistrer (après confirmation).
++    function leaveGuarded(action) {
++        if (flush()) {
++            exitAction = null;
++            action();
++            return;
++        }
++        showSaveFailed(action);
++    }
++
++    // Ouvre le dialogue d'échec pour une sortie dont l'enregistrement vient d'échouer (sans le retenter : l'appelant
++    // l'a déjà fait, par exemple flush() à la fermeture de la fenêtre). action ne s'exécute que si l'utilisateur
++    // réessaie avec succès ou confirme de quitter sans enregistrer ; « Rester » et Échap l'abandonnent.
++    function showSaveFailed(action) {
++        exitAction = action;
++        saveFailed.message = backend.lastError;
++        saveFailed.open();
++    }
++
++    SaveFailedDialog {
++        id: saveFailed
++        onRetry: {
++            var a = editor.exitAction;
++            editor.exitAction = null;
++            editor.leaveGuarded(a);
++        }
++        onLeaveWithoutSaving: {
++            discardConfirm.pendingAction = editor.exitAction;   // propre à cette confirmation : Annuler = rester
++            editor.exitAction = null;
++            discardConfirm.confirm("Quitter sans enregistrer ?",
++                "Les dernières modifications de ce terrain seront perdues.", "Quitter sans enregistrer", true);
++        }
++        onStay: editor.exitAction = null
++    }
++
++    // Seconde confirmation : perdre des modifications n'est jamais le résultat d'un seul toucher.
++    PromptDialog {
++        id: discardConfirm
++        objectName: "discardConfirm"
++        property var pendingAction: null
++        onAccepted: {
++            var a = pendingAction;
++            pendingAction = null;
++            saveTimer.stop();
++            editor.dirty = false;                  // choix explicite de l'utilisateur : rien n'est perdu en silence
++            if (a)
++                a();
++        }
+     }
+ 
+     // --- Dialogues ------------------------------------------------------------------------------
+@@ -217,8 +292,7 @@ Item {
+                 editor.purpose = "rename";
+                 prompt.ask("Titre du schéma", editor.title, false, 80);
+             } else if (id === "duplicate") {
+-                editor.flush();
+-                editor.duplicateRequested();
++                editor.leaveGuarded(function () { editor.duplicateRequested(); });
+             } else if (id === "clear") {
+                 editor.purpose = "clear";
+                 prompt.confirm("Tout effacer ?", "Tous les éléments de ce schéma seront retirés (vous pourrez annuler).",
+@@ -260,10 +334,8 @@ Item {
+                 visible: editor.showBack
+                 iconName: "back"
+                 accessibleName: "Retour à la liste"
+-                onClicked: {
+-                    editor.flush();
+-                    editor.closeRequested();
+-                }
++                // Les pages hôtes ferment le terrain par leaveGuarded() : l'écran n'est quitté que si tout est enregistré.
++                onClicked: editor.closeRequested()
+             }
+         }
+ 
+@@ -742,5 +814,7 @@ Item {
+         }
+     }
+ 
++    // Dernier recours seulement : une destruction ne peut pas être bloquée et l'erreur ne serait plus visible. Les
++    // sorties (retour, autre terrain, navigation, fermeture de la fenêtre) passent par leaveGuarded().
+     Component.onDestruction: flush()
+ }
+diff --git a/qml/Main.qml b/qml/Main.qml
+index c8a7ae4..7fa914b 100644
+--- a/qml/Main.qml
++++ b/qml/Main.qml
+@@ -108,12 +108,39 @@ ApplicationWindow {
+     }
+ 
+     // Android : le bouton retour demande la fermeture de la fenêtre ; on la refuse tant qu'il y a quelque chose à fermer.
++    // Fermeture de la fenêtre (Windows comme Android) : refusée tant qu'un terrain ne peut pas être enregistré ;
++    // le dialogue propose de réessayer ou de quitter sans enregistrer, puis la fermeture reprend (forceClose).
++    property bool forceClose: false
+     onClosing: (close) => {
+-        if (Qt.platform.os === "android" && handleBack())
++        if (Qt.platform.os === "android" && handleBack()) {
+             close.accepted = false;
++            return;
++        }
++        if (forceClose)
++            return;
++        var pages = [tactics, sessionsPage];
++        for (var i = 0; i < pages.length; ++i) {
++            if (!pages[i].flushBoard()) {
++                close.accepted = false;
++                pages[i].showSaveFailed(function () {     // flushBoard() vient d'échouer : pas de seconde tentative
++                    win.forceClose = true;
++                    win.close();
++                });
++                return;
++            }
++        }
+     }
+ 
++    // Quitter la section courante : un terrain dont l'enregistrement échoue garde l'utilisateur sur son écran.
+     function go(id, boardId) {
++        var page = ({ sessions: sessionsPage, tactics: tactics })[section];
++        if (id !== section && page)
++            page.guardLeave(function () { enter(id, boardId); });
++        else
++            enter(id, boardId);
++    }
++
++    function enter(id, boardId) {
+         section = id;
+         if (id === "tactics" && boardId > 0)
+             tactics.openBoard(boardId);
+diff --git a/qml/PlanEditor.qml b/qml/PlanEditor.qml
+index 506bd4a..7f17766 100644
+--- a/qml/PlanEditor.qml
++++ b/qml/PlanEditor.qml
+@@ -27,7 +27,8 @@ Item {
+     signal changed()                          // le plan a changé (la liste des séances se met à jour)
+ 
+     function openSession(s, team) {
+-        leave(false);                      // un terrain encore ouvert est enregistré avant de changer de séance
++        if (!leave(false))                 // un terrain encore ouvert est enregistré avant de changer de séance
++            return;
+         session = s;
+         teamName = team;
+         reload(false);
+@@ -84,26 +85,48 @@ Item {
+     function closeBoard() {
+         if (!boardOpen)
+             return;
+-        if (boardLoader.item)
+-            boardLoader.item.flush();
+-        boardOpen = false;
+-        openBoardId = -1;
+-        reload();
+-        changed();
++        guardLeave(function () {
++            boardOpen = false;
++            openBoardId = -1;
++            reload();
++            changed();
++        });
++    }
++
++    // Exécute action (sortie du plan ou de la page) une fois le terrain ouvert enregistré ; si l'enregistrement échoue,
++    // on reste sur le terrain (dialogue : réessayer ou quitter sans enregistrer).
++    function guardLeave(action) {
++        if (boardOpen && boardLoader.item)
++            boardLoader.item.leaveGuarded(action);
++        else
++            action();
++    }
++
++    // Dialogue d'échec pour une sortie dont l'enregistrement vient d'échouer (voir BoardEditor.showSaveFailed()).
++    function showSaveFailed(action) {
++        if (boardOpen && boardLoader.item)
++            boardLoader.item.showSaveFailed(action);
++    }
++
++    // Vrai si rien n'est en attente d'enregistrement (réessaie l'enregistrement le cas échéant).
++    function flushBoard() {
++        return !boardOpen || !boardLoader.item || boardLoader.item.flush();
+     }
+ 
+     // Quitte le terrain sans relire le plan. discard : abandonne l'enregistrement en attente (données remplacées).
++    // Faux (on reste sur le terrain) si l'enregistrement en attente échoue : les appelants passent d'abord par guardLeave().
+     function leave(discard) {
+         if (!boardOpen)
+-            return;
++            return true;
+         if (boardLoader.item) {
+             if (discard === true)
+                 boardLoader.item.discard();
+-            else
+-                boardLoader.item.flush();
++            else if (!boardLoader.item.flush())
++                return false;
+         }
+         boardOpen = false;
+         openBoardId = -1;
++        return true;
+     }
+ 
+     // Bouton retour du téléphone : quitte le plein écran du terrain, puis le terrain. Vrai si le geste a servi.
+@@ -175,19 +198,17 @@ Item {
+         objectName: "removeBoardConfirm"
+         onAccepted: {
+             var id = root.openBoardId;
+-            if (boardLoader.item)
+-                boardLoader.item.discard();           // plus d'enregistrement vers un terrain supprimé
+-            if (id > 0 && backend.deleteBoard(id)) {
+-                root.boardOpen = false;
+-                root.openBoardId = -1;
+-                root.reload();
+-                root.changed();
+-            } else {
++            if (!(id > 0) || !backend.deleteBoard(id)) {
++                // Suppression en échec : le terrain reste ouvert, enregistrable, et l'erreur est affichée.
+                 toast.show("Impossible de retirer le terrain : " + backend.lastError);
+-                root.boardOpen = false;
+-                root.openBoardId = -1;
+-                root.reload();
++                return;
+             }
++            if (boardLoader.item)
++                boardLoader.item.discard();           // plus d'enregistrement vers un terrain supprimé
++            root.boardOpen = false;
++            root.openBoardId = -1;
++            root.reload();
++            root.changed();
+         }
+     }
+     PlanItemDialog {
+diff --git a/qml/SessionsPage.qml b/qml/SessionsPage.qml
+index ca111a7..8190cf4 100644
+--- a/qml/SessionsPage.qml
++++ b/qml/SessionsPage.qml
+@@ -44,15 +44,32 @@ Item {
+     }
+ 
+     function openSession(s) {
+-        currentId = s.id;
+-        editor.openSession(s, switcher.current ? switcher.current.name : "");
+-        editing = true;
++        editor.guardLeave(function () {    // un terrain de bloc ouvert doit d'abord être enregistré
++            currentId = s.id;
++            editor.openSession(s, switcher.current ? switcher.current.name : "");
++            editing = true;
++        });
+     }
+ 
+     function closeEditor() {
+-        editor.leave(false);               // un terrain de bloc encore ouvert est enregistré
+-        editing = false;
+-        currentId = -1;
++        editor.guardLeave(function () {    // un terrain de bloc encore ouvert est enregistré
++            editor.leave(false);
++            editing = false;
++            currentId = -1;
++        });
++    }
++
++    // Quitter la page (autre section, fermeture de la fenêtre) : même garde que la fermeture du plan.
++    function guardLeave(action) {
++        editor.guardLeave(action);
++    }
++
++    function flushBoard() {
++        return editor.flushBoard();
++    }
++
++    function showSaveFailed(action) {
++        editor.showSaveFailed(action);
+     }
+ 
+     // Bouton retour du téléphone : ferme le plan ouvert. Retourne true si la page a utilisé le geste.
+@@ -93,6 +110,8 @@ Item {
+                         + (page.rows.length > 1 ? " séances" : " séance")
+             TeamSwitcher {
+                 id: switcher
++                // L'équipe ne change qu'une fois le terrain ouvert enregistré : sinon on reste sur l'ancienne équipe.
++                beforeChange: (apply) => page.guardLeave(apply)
+                 onChanged: { page.closeEditor(); page.refreshRows(); }
+             }
+         }
+@@ -109,7 +128,7 @@ Item {
+             allowClear: false
+             value: page.scope
+             options: [{ id: "upcoming", text: "À venir" }, { id: "past", text: "Passées" }]
+-            onPicked: (id) => page.scope = id
++            onPicked: (id) => page.guardLeave(function () { page.scope = id; })
+         }
+ 
+         ListView {
+diff --git a/qml/TacticsPage.qml b/qml/TacticsPage.qml
+index 899a0bb..17d1e23 100644
+--- a/qml/TacticsPage.qml
++++ b/qml/TacticsPage.qml
+@@ -15,10 +15,14 @@ Item {
+         boards = backend.boards();
+     }
+ 
++    // Ouvre un schéma. Si le schéma déjà ouvert a des modifications qui ne s'enregistrent pas, on reste dessus
++    // (dialogue : réessayer ou quitter sans enregistrer).
+     function openBoard(id) {
+-        refresh();
+-        currentId = id;
+-        editor.open(id);
++        editor.leaveGuarded(function () {
++            refresh();
++            currentId = id;
++            editor.open(id);
++        });
+     }
+ 
+     function createBoard() {
+@@ -38,9 +42,27 @@ Item {
+     }
+ 
+     function closeEditor() {
+-        editor.flush();
+-        currentId = -1;
+-        refresh();
++        editor.leaveGuarded(function () {
++            currentId = -1;
++            refresh();
++        });
++    }
++
++    // Quitter la page (autre section, fermeture de la fenêtre) : même garde que la fermeture du schéma.
++    function guardLeave(action) {
++        if (currentId < 0)
++            action();
++        else
++            editor.leaveGuarded(action);
++    }
++
++    function showSaveFailed(action) {
++        editor.showSaveFailed(action);
++    }
++
++    // Vrai si rien n'est en attente d'enregistrement (réessaie l'enregistrement le cas échéant).
++    function flushBoard() {
++        return currentId < 0 || editor.flush();
+     }
+ 
+     // Bouton retour du téléphone : quitte le plein écran du terrain, puis ferme le schéma ouvert.
+@@ -72,10 +94,17 @@ Item {
+     PromptDialog {
+         id: confirm
+         onAccepted: {
+-            if (page.pendingDelete > 0 && backend.deleteBoard(page.pendingDelete)) {
+-                if (page.currentId === page.pendingDelete)
+-                    page.currentId = -1;
+-                page.refresh();
++            if (page.pendingDelete > 0) {
++                if (backend.deleteBoard(page.pendingDelete)) {
++                    if (page.currentId === page.pendingDelete) {
++                        editor.discard();             // plus d'enregistrement vers un schéma supprimé
++                        page.currentId = -1;
++                    }
++                    page.refresh();
++                } else {
++                    // Suppression en échec : le schéma reste ouvert et listé, l'erreur est affichée.
++                    errorToast.show("Impossible de supprimer le schéma : " + backend.lastError);
++                }
+             }
+             page.pendingDelete = -1;
+         }
+diff --git a/qml/TeamSwitcher.qml b/qml/TeamSwitcher.qml
+index 5e55950..97c5614 100644
+--- a/qml/TeamSwitcher.qml
++++ b/qml/TeamSwitcher.qml
+@@ -12,6 +12,9 @@ Item {
+         return null;
+     }
+     signal changed()
++    // Optionnel : function (apply) appelée avant de changer d'équipe ; elle exécute apply() quand le changement est
++    // permis (par exemple une fois le terrain ouvert enregistré). Sans elle, le changement est immédiat.
++    property var beforeChange: null
+ 
+     // À appeler après avoir relu les équipes : garde une équipe valide sélectionnée.
+     function load() {
+@@ -46,8 +49,15 @@ Item {
+         id: sheet
+         title: "Équipe"
+         onChosen: (id) => {
+-            AppState.teamId = parseInt(id.substring(1), 10);
+-            root.changed();
++            var team = parseInt(id.substring(1), 10);
++            var apply = function () {
++                AppState.teamId = team;
++                root.changed();
++            };
++            if (root.beforeChange)
++                root.beforeChange(apply);
++            else
++                apply();
+         }
+     }
+ }
+diff --git a/src/app/BackendData.cpp b/src/app/BackendData.cpp
+index fd9a5aa..5dc6724 100644
+--- a/src/app/BackendData.cpp
++++ b/src/app/BackendData.cpp
+@@ -1,6 +1,8 @@
+ // Export et import de toutes les données (fichier « .footcoach ») de Backend (voir Backend.h).
+ #include "Backend.h"
+ 
++#include <algorithm>
++
+ #include <QCoreApplication>
+ #include <QDate>
+ #include <QDateTime>
+@@ -300,25 +302,14 @@ QVariantMap Backend::importDataFile(const QString &url)
+         fileCols.insert(t, cols);
+     }
+ 
+-    // Sauvegarde de l'état actuel, pour pouvoir revenir en arrière.
++    // État actuel, lu avant toute écriture : il sert de sauvegarde pour pouvoir revenir en arrière.
++    // Le fichier de sauvegarde n'est écrit qu'une fois le fichier importé validé (voir plus bas) : un import refusé
++    // ne crée aucune sauvegarde et ne fait donc pas tourner les trois sauvegardes existantes.
+     const QByteArray before = buildExport();
+     QString backupName;
+-    if (!before.isEmpty()) {
+-        const QDir dir(QFileInfo(m_db.databaseName()).absolutePath() + QStringLiteral("/sauvegardes"));
+-        QDir().mkpath(dir.absolutePath());
+-        backupName = QStringLiteral("avant-import-%1.footcoach").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+-        QFile bf(dir.filePath(backupName));
+-        if (!bf.open(QIODevice::WriteOnly | QIODevice::Truncate) || bf.write(before) != before.size()) {
+-            error = tr("Import annulé : la sauvegarde de vos données actuelles a échoué.");
+-            setError(error);
+-            return done(false, error);
+-        }
+-        bf.close();
+-        // Garde les trois plus récentes.
+-        const QStringList all = dir.entryList({QStringLiteral("avant-import-*.footcoach")}, QDir::Files, QDir::Name);
+-        for (int i = 0; i < all.size() - 3; ++i)
+-            QFile::remove(dir.filePath(all.at(i)));
+-    }
++    QString backupPath;
++    bool backupFailed = false;
++    bool backupCreated = false;                 // fichier créé par CET import (seul celui-là peut être supprimé)
+ 
+     // Tout ou rien : un seul passage dans une transaction.
+     if (!m_db.transaction()) {
+@@ -365,15 +356,91 @@ QVariantMap Backend::importDataFile(const QString &url)
+             }
+         }
+     }
++
++    // Règles de liens des terrains (SDD 5.3, décision D18) : refus total, rien n'est réparé. Le contrôle se fait sur
++    // les lignes insérées dans la transaction, avec les règles de BoardRepository::insert() (pas de règle dupliquée).
++    // Avant le schéma 5, plusieurs schémas de référence par exercice étaient possibles : cette unicité ne s'applique
++    // qu'aux fichiers du schéma 5 ou plus récents, pour ne pas refuser d'anciennes sauvegardes valables.
++    if (ok) {
++        QStringList problems;
++        QString linkError;
++        const bool referenceUniqueness = root.value(QStringLiteral("schema")).toInt(-1) >= 5;
++        if (!m_repo.validateAllLinks(referenceUniqueness, &problems, &linkError)) {
++            ok = false;
++            if (problems.isEmpty()) {
++                failure = linkError;
++            } else {
++                constexpr int kShown = 5;
++                failure = tr("liens de terrains incohérents : ") + problems.mid(0, kShown).join(QStringLiteral(" ; "));
++                if (problems.size() > kShown)
++                    failure += tr(" ; et %n autre(s)", nullptr, problems.size() - kShown);
++            }
++        }
++    }
++
++    // Sauvegarde de l'état actuel : seulement maintenant que l'import est valide, et avant de le valider (commit).
++    if (ok && !before.isEmpty()) {
++        const QDir dir(QFileInfo(m_db.databaseName()).absolutePath() + QStringLiteral("/sauvegardes"));
++        QDir().mkpath(dir.absolutePath());
++        // Jamais d'écrasement : deux imports dans la même seconde reçoivent des noms distincts (-2, -3, ...), et le
++        // fichier est créé en exclusivité (NewOnly) pour qu'une sauvegarde existante ne soit ni tronquée ni supprimée.
++        const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
++        QFile bf;
++        // Le numéro suit le plus grand déjà utilisé cette seconde (jamais un trou comblé) : l'ordre chronologique
++        // des noms reste vrai, donc la rotation supprime toujours la plus ancienne.
++        int first = 1;
++        const QStringList sameSecond = dir.entryList({QStringLiteral("avant-import-%1*.footcoach").arg(stamp)}, QDir::Files);
++        for (const QString &f : sameSecond) {
++            const QString base = QFileInfo(f).completeBaseName();
++            const int cut = QStringLiteral("avant-import-yyyyMMdd-HHmmss").size();
++            const int seq = base.size() > cut + 1 && base.at(cut) == QLatin1Char('-') ? base.mid(cut + 1).toInt() : 1;
++            first = std::max(first, seq + 1);
++        }
++        for (int n = first; n < first + 1000 && !backupCreated; ++n) {
++            backupName = n == 1 ? QStringLiteral("avant-import-%1.footcoach").arg(stamp)
++                                : QStringLiteral("avant-import-%1-%2.footcoach").arg(stamp).arg(n);
++            backupPath = dir.filePath(backupName);
++            if (QFile::exists(backupPath))
++                continue;
++            bf.setFileName(backupPath);
++            backupCreated = bf.open(QIODevice::WriteOnly | QIODevice::NewOnly);
++        }
++        if (!backupCreated || bf.write(before) != before.size()) {
++            ok = false;
++            backupFailed = true;
++        } else {
++            bf.close();
++        }
++    }
+     if (ok)
+         ok = m_db.commit();
+     if (!ok) {
+         m_db.rollback();
+-        error = tr("Import refusé, vos données n'ont pas été modifiées (%1).").arg(failure);
++        if (backupCreated)
++            QFile::remove(backupPath);              // la sauvegarde écrite par cet import, devenue sans objet
++        error = backupFailed ? tr("Import annulé : la sauvegarde de vos données actuelles a échoué.")
++                             : tr("Import refusé, vos données n'ont pas été modifiées (%1).").arg(failure);
+         setError(error);
+         return done(false, error);
+     }
+ 
++    // Import réussi : seulement maintenant, on garde les trois sauvegardes les plus récentes.
++    if (!backupPath.isEmpty()) {
++        const QDir dir = QFileInfo(backupPath).absoluteDir();
++        QStringList all = dir.entryList({QStringLiteral("avant-import-*.footcoach")}, QDir::Files, QDir::Name);
++        // Ordre chronologique : horodatage, puis numéro (« …-120000 » = 1, « …-120000-2 » = 2, ..., « …-10 » après « …-9 »).
++        // Un tri brut par nom les mettrait dans le désordre et supprimerait la mauvaise sauvegarde.
++        const auto order = [](const QString &file) {
++            const QString base = QFileInfo(file).completeBaseName();
++            const int cut = QStringLiteral("avant-import-yyyyMMdd-HHmmss").size();
++            const int seq = base.size() > cut + 1 && base.at(cut) == QLatin1Char('-') ? base.mid(cut + 1).toInt() : 1;
++            return qMakePair(base.left(cut), seq);
++        };
++        std::sort(all.begin(), all.end(), [&](const QString &a, const QString &b) { return order(a) < order(b); });
++        for (int i = 0; i < all.size() - 3; ++i)
++            QFile::remove(dir.filePath(all.at(i)));
++    }
++
+     setError(QString());
+     emit dataReplaced();
+     QVariantMap m = done(true);
+diff --git a/src/core/BoardRepository.cpp b/src/core/BoardRepository.cpp
+index 3245aea..113f82c 100644
+--- a/src/core/BoardRepository.cpp
++++ b/src/core/BoardRepository.cpp
+@@ -191,6 +191,27 @@ bool BoardRepository::checkLinks(const BoardRecord &board, int previousExerciseI
+     return true;
+ }
+ 
++bool BoardRepository::validateAllLinks(bool referenceUniqueness, QStringList *problems, QString *error) const
++{
++    QString listError;
++    const QList<BoardRecord> all = list(&listError, true);
++    if (!listError.isEmpty()) {
++        setError(error, listError);
++        return false;
++    }
++    bool valid = true;
++    for (const BoardRecord &b : all) {
++        QString why;
++        // Sans unicité de référence, l'exercice lié est traité comme « déjà lié » : seul le lien d'un bloc est contrôlé.
++        if (!checkLinks(b, referenceUniqueness ? -1 : b.exerciseId, -1, &why)) {
++            valid = false;
++            if (problems)
++                problems->append(QStringLiteral("terrain n° %1 « %2 » : %3").arg(b.id).arg(b.title, why));
++        }
++    }
++    return valid;
++}
++
+ bool BoardRepository::insert(BoardRecord &board, QString *error)
+ {
+     if (!checkLinks(board, -1, -1, error))
+diff --git a/src/core/BoardRepository.h b/src/core/BoardRepository.h
+index 726a90f..d729f4b 100644
+--- a/src/core/BoardRepository.h
++++ b/src/core/BoardRepository.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <QList>
++#include <QStringList>
+ #include <QSqlDatabase>
+ #include <QString>
+ 
+@@ -54,6 +55,12 @@ public:
+     bool update(const BoardRecord &board, QString *error = nullptr);
+     bool remove(int id, QString *error = nullptr);
+ 
++    // Contrôle tous les terrains présents avec les règles de insert() (import de données). Un message par anomalie
++    // dans *problems ; false s'il y en a au moins une, ou en cas d'erreur de la base. referenceUniqueness : vérifie
++    // aussi « un seul schéma de référence par exercice » (faux pour les données d'avant le schéma 5, qui pouvaient
++    // en compter plusieurs).
++    bool validateAllLinks(bool referenceUniqueness, QStringList *problems, QString *error = nullptr) const;
++
+ private:
+     bool checkLinks(const BoardRecord &board, int previousExerciseId, int previousBlockId, QString *error) const;
+ 
+diff --git a/tests/qml/run_all.py b/tests/qml/run_all.py
+index 0c629fd..4e82b0b 100644
+--- a/tests/qml/run_all.py
++++ b/tests/qml/run_all.py
+@@ -5,7 +5,7 @@ Usage : python3 tests/qml/run_all.py   (PySide6 et un affichage « offscreen »
+ import os, subprocess, sys
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+-TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py", "t_blockboard.py", "t_home.py", "t_exgrid.py", "t_squad.py", "t_calendar.py", "t_support.py", "t_nav.py"]
++TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py", "t_blockboard.py", "t_home.py", "t_exgrid.py", "t_squad.py", "t_calendar.py", "t_support.py", "t_nav.py", "t_l0a.py", "t_l0c.py"]
+ env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
+ bad = []
+ for t in TESTS:
+diff --git a/tests/tst_dataformat.cpp b/tests/tst_dataformat.cpp
+index f227372..592f98d 100644
+--- a/tests/tst_dataformat.cpp
++++ b/tests/tst_dataformat.cpp
+@@ -539,6 +539,202 @@ private slots:
+         QCOMPARE(snapshot(b), before);                           // aucune donnée modifiée
+     }
+ 
++    // --- Règles de liens des terrains à l'import (SDD 5.3, décision D18 : refus total, aucune réparation) ---
++
++    static int columnIndex(const QJsonObject &table, const QString &name)
++    {
++        const QJsonArray cols = table.value("columns").toArray();
++        for (int i = 0; i < cols.size(); ++i)
++            if (cols.at(i).toString() == name)
++                return i;
++        return -1;
++    }
++
++    // Copie d'un terrain du fichier (ligne « from ») ajoutée avec l'identifiant 99 ; set : colonne -> valeur à écraser.
++    static QJsonObject withExtraBoard(QJsonObject root, int from, const QMap<QString, QJsonValue> &set)
++    {
++        QJsonObject tables = root.value("tables").toObject();
++        QJsonObject tb = tables.value("tactical_board").toObject();
++        QJsonArray rows = tb.value("rows").toArray();
++        QJsonArray r = rows.at(from).toArray();
++        r[columnIndex(tb, "id")] = 99;
++        for (auto it = set.begin(); it != set.end(); ++it)
++            r[columnIndex(tb, it.key())] = it.value();
++        rows.append(r);
++        tb["rows"] = rows;
++        tables["tactical_board"] = tb;
++        root["tables"] = tables;
++        return root;
++    }
++
++    QDir backupDir() const { return QDir(QFileInfo(m_db.path()).absolutePath() + "/sauvegardes"); }
++    QStringList backupNames() const
++    {
++        return backupDir().entryList({QStringLiteral("avant-import-*.footcoach")}, QDir::Files, QDir::Name);
++    }
++
++    void invalidBoardLinksRefuseTheWholeImport_data()
++    {
++        QTest::addColumn<int>("copyOfRow");                   // ligne du fichier dont on copie le terrain
++        QTest::addColumn<QStringList>("overrideKeyValues");   // colonne, valeur, colonne, valeur…
++        // Ligne 1 : terrain de bloc (session_exercise_id = 1) ; ligne 0 : schéma de référence de l'exercice 18.
++        QTest::newRow("terrain de bloc aussi lié à un exercice") << 1 << QStringList{"exercise_id", "18"};
++        QTest::newRow("terrain de bloc aussi lié à une séance") << 1 << QStringList{"session_id", "1"};
++        QTest::newRow("deux terrains pour un même bloc") << 1 << QStringList{"title", "Doublon"};
++        QTest::newRow("deux schémas de référence pour un exercice") << 0 << QStringList{"title", "Doublon"};
++    }
++
++    void invalidBoardLinksRefuseTheWholeImport()
++    {
++        QFETCH(int, copyOfRow);
++        QFETCH(QStringList, overrideKeyValues);
++        Backend b(m_db.handle());
++        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());       // état de départ connu
++        const QJsonObject before = snapshot(b);
++        const QStringList backupsBefore = backupNames();
++
++        QMap<QString, QJsonValue> set;
++        for (int i = 0; i + 1 < overrideKeyValues.size(); i += 2) {
++            const QString key = overrideKeyValues.at(i), val = overrideKeyValues.at(i + 1);
++            set.insert(key, key == "title" ? QJsonValue(val) : QJsonValue(val.toInt()));
++        }
++        const QString file = tmpFile(withExtraBoard(readJson(fixturePath(5)), copyOfRow, set));
++        const QVariantMap r = b.importDataFile(url(file));
++
++        QVERIFY2(!r.value("ok").toBool(), "un import avec des liens invalides aurait dû être refusé");
++        QVERIFY(!b.lastError().isEmpty());                                      // l'erreur est consultable (avant tout export)
++        const QString message = r.value("error").toString();
++        QVERIFY2(message.contains(QStringLiteral("Import refusé")), qPrintable(message));
++        QVERIFY2(message.contains(QStringLiteral("liens de terrains incohérents")), qPrintable(message));
++        QVERIFY2(message.contains(QStringLiteral("Doublon")) || message.contains(QStringLiteral("Atelier"))
++                     || message.contains(QStringLiteral("Pressing")),
++                 qPrintable(message));                                          // le terrain fautif est nommé
++        QCOMPARE(snapshot(b), before);                                          // aucune donnée modifiée
++        QCOMPARE(backupNames(), backupsBefore);                                 // aucune sauvegarde créée ni évincée
++    }
++
++    // Avant le schéma 5, plusieurs schémas de référence pour un même exercice étaient possibles : une ancienne
++    // sauvegarde valable ne doit pas être refusée (la règle ne vaut que pour les fichiers du schéma 5 ou plus récent).
++    void olderFileWithSeveralReferenceBoardsIsStillAccepted()
++    {
++        Backend b(m_db.handle());
++        QJsonObject root = withExtraBoard(readJson(fixturePath(4)), 0, {{"title", QJsonValue(QStringLiteral("Second schéma"))}});
++        const QVariantMap r = b.importDataFile(url(tmpFile(root)));
++        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
++        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
++    }
++
++    void validBoardLinksAreAccepted()
++    {
++        Backend b(m_db.handle());
++        const QVariantMap r = b.importDataFile(url(fixturePath(5)));
++        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
++        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
++    }
++
++    // Un import refusé ne doit pas faire tourner les trois sauvegardes ; un import réussi garde les trois plus récentes.
++    void backupsRotateOnlyAfterASuccessfulImport()
++    {
++        Backend b(m_db.handle());
++        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());
++        QVERIFY(backupDir().exists());
++        const QStringList fake = {"avant-import-20200101-000001.footcoach", "avant-import-20200101-000002.footcoach",
++                                  "avant-import-20200101-000003.footcoach"};
++        for (const QString &n : fake) {
++            QFile f(backupDir().filePath(n));
++            QVERIFY(f.open(QIODevice::WriteOnly));
++            f.write("{}");
++        }
++        const QStringList existing = backupNames();
++
++        // Import refusé (liens invalides) : toutes les sauvegardes sont conservées, aucune n'est ajoutée.
++        const QString bad = tmpFile(withExtraBoard(readJson(fixturePath(5)), 1, {{"exercise_id", QJsonValue(18)}}));
++        QVERIFY(!b.importDataFile(url(bad)).value("ok").toBool());
++        QCOMPARE(backupNames(), existing);
++
++        // Import refusé pour une autre raison (colonne inconnue) : idem.
++        QJsonObject root = readJson(fixturePath(5));
++        QJsonObject tables = root.value("tables").toObject();
++        QJsonObject tb = tables.value("team").toObject();
++        QJsonArray cols = tb.value("columns").toArray();
++        cols.append("colonne_fantome");
++        tb["columns"] = cols;
++        tables["team"] = tb;
++        root["tables"] = tables;
++        QVERIFY(!b.importDataFile(url(tmpFile(root))).value("ok").toBool());
++        QCOMPARE(backupNames(), existing);
++
++        // Import réussi : une nouvelle sauvegarde, et seules les trois plus récentes restent.
++        const QVariantMap ok = b.importDataFile(url(fixturePath(5)));
++        QVERIFY(ok.value("ok").toBool());
++        const QStringList after = backupNames();
++        QCOMPARE(after.size(), 3);
++        QVERIFY(after.contains(ok.value("backupName").toString()));
++        QVERIFY(!after.contains(fake.at(0)));
++    }
++
++    // Deux imports dans la même seconde : la sauvegarde existante n'est jamais écrasée ni supprimée, et la rotation
++    // supprime bien la plus ancienne (« …-120000 » avant « …-120000-2 »).
++    void backupNamesNeverCollide()
++    {
++        Backend b(m_db.handle());
++        QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());   // la base n'est plus vide
++        QDir d = backupDir();
++        for (const QString &n : backupNames())
++            QVERIFY(QFile::remove(d.filePath(n)));
++        QVERIFY(d.exists());
++
++        // Les trois premiers noms de la seconde courante sont déjà pris (si la seconde change pendant le test, le nom
++        // du nouvel import diffère et le test reste valable : il vérifie alors seulement la rotation).
++        QStringList taken;
++        const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
++        for (const QString &suffix : {QString(), QString("-2"), QString("-3")}) {
++            const QString n = "avant-import-" + stamp + suffix + ".footcoach";
++            QFile f(d.filePath(n));
++            QVERIFY(f.open(QIODevice::WriteOnly));
++            f.write("sauvegarde-existante-" + n.toUtf8());
++            taken << n;
++        }
++        auto untouched = [&]() {
++            for (const QString &n : taken) {
++                QFile f(d.filePath(n));
++                if (!f.exists())
++                    return false;
++                f.open(QIODevice::ReadOnly);
++                if (f.readAll() != "sauvegarde-existante-" + n.toUtf8())
++                    return false;
++            }
++            return true;
++        };
++
++        // Import refusé : aucune sauvegarde existante n'est supprimée (la sienne n'est pas celle d'un autre).
++        const QString bad = tmpFile(withExtraBoard(readJson(fixturePath(5)), 1, {{"exercise_id", QJsonValue(18)}}));
++        QVERIFY(!b.importDataFile(url(bad)).value("ok").toBool());
++        QVERIFY2(untouched(), "un import refusé a modifié une sauvegarde existante");
++        QCOMPARE(backupNames().size(), taken.size());
++
++        // Import réussi dans la même seconde : nouveau nom, aucune sauvegarde existante tronquée.
++        const QVariantMap ok = b.importDataFile(url(fixturePath(5)));
++        QVERIFY(ok.value("ok").toBool());
++        const QString created = ok.value("backupName").toString();
++        QVERIFY2(!taken.contains(created), qPrintable("nom déjà pris : " + created));
++        QVERIFY(QFile::exists(d.filePath(created)));
++        QVERIFY(QFileInfo(d.filePath(created)).size() > 100);          // le vrai export, pas un marqueur
++        // Rotation : trois restent, la nouvelle en fait partie, les plus anciennes ont disparu en premier.
++        const QStringList after = backupNames();
++        QCOMPARE(after.size(), 3);
++        QVERIFY(after.contains(created));
++        for (const QString &n : after)
++            if (n != created && taken.contains(n)) {
++                QFile f(d.filePath(n));
++                f.open(QIODevice::ReadOnly);
++                QCOMPARE(f.readAll(), "sauvegarde-existante-" + n.toUtf8());   // intacte
++            }
++        QVERIFY(!after.contains(taken.first()));
++        for (const QString &n : backupNames())
++            QFile::remove(d.filePath(n));                           // ne pas peser sur les tests suivants
++    }
++
+     void notAnExportAtAll()
+     {
+         Backend b(m_db.handle());
+diff --git a/qml/SaveFailedDialog.qml b/qml/SaveFailedDialog.qml
+new file mode 100644
+index 0000000..06998a7
+--- /dev/null
++++ b/qml/SaveFailedDialog.qml
+@@ -0,0 +1,95 @@
++import QtQuick
++import QtQuick.Controls
++
++// Échec d'enregistrement d'un terrain au moment de le quitter : on reste sur l'écran, l'erreur est affichée et
++// l'utilisateur choisit de réessayer ou de quitter sans enregistrer (cette seconde issue est confirmée à part).
++Popup {
++    id: root
++    objectName: "saveFailedDialog"
++
++    property string message: ""
++    signal retry()
++    signal leaveWithoutSaving()
++    signal stay()
++
++    // Une fermeture sans choix (Échap) vaut « Rester sur le terrain » : la sortie en attente est abandonnée.
++    property bool decided: false
++    onAboutToShow: decided = false
++    onClosed: if (!decided) root.stay()
++
++    parent: Overlay.overlay
++    modal: true
++    dim: true
++    padding: 20
++    width: Math.min(parent ? parent.width - 32 : 360, 420)
++    x: parent ? (parent.width - width) / 2 : 0
++    y: parent ? Math.min(parent.height * 0.18, Math.max(12, parent.height - height - 12)) : 0
++    closePolicy: Popup.CloseOnEscape
++
++    Overlay.modal: Rectangle { color: "#99000000" }
++
++    background: Rectangle {
++        radius: 26
++        color: Theme.surface
++        border.width: 1
++        border.color: Theme.border
++    }
++
++    contentItem: Column {
++        spacing: 14
++
++        Text {
++            width: parent.width
++            text: "Enregistrement impossible"
++            font.pixelSize: 20
++            font.weight: Font.Bold
++            color: Theme.text
++            wrapMode: Text.Wrap
++        }
++        Text {
++            objectName: "saveFailedMessage"
++            width: parent.width
++            text: root.message + "\nVos dernières modifications de ce terrain ne sont pas enregistrées."
++            font.pixelSize: 15
++            color: Theme.textMuted
++            wrapMode: Text.Wrap
++        }
++        Column {
++            width: parent.width
++            spacing: 10
++            AppButton {
++                objectName: "saveRetryButton"
++                width: parent.width
++                kind: "primary"
++                text: "Réessayer"
++                onClicked: {
++                    root.decided = true;
++                    root.close();
++                    root.retry();
++                }
++            }
++            AppButton {
++                objectName: "saveDiscardButton"
++                width: parent.width
++                kind: "danger"
++                text: "Quitter sans enregistrer"
++                onClicked: {
++                    root.decided = true;
++                    root.close();
++                    root.leaveWithoutSaving();
++                }
++            }
++            AppButton {
++                objectName: "saveStayButton"
++                width: parent.width
++                kind: "ghost"
++                text: "Rester sur le terrain"
++                onClicked: {
++                    root.decided = true;
++                    root.close();
++                    root.stay();
++                }
++            }
++        }
++    }
++}
+diff --git a/tests/qml/t_l0a.py b/tests/qml/t_l0a.py
+new file mode 100644
+index 0000000..34b77be
+--- /dev/null
++++ b/tests/qml/t_l0a.py
+@@ -0,0 +1,269 @@
++"""L0-a : sortie contrôlée d'un terrain quand l'enregistrement échoue (AUD-01, décision « Option A »).
++
++Le Backend est SIMULÉ (comme dans les autres tests de ce dossier) : saveBoard() peut échouer à la demande. Ce test valide
++la logique QML de BoardEditor.leaveGuarded() et de ses hôtes (PlanEditor, TacticsPage, Main) ; l'échec d'écriture réel
++de SQLite n'est pas exercé ici et ce test ne remplace ni un essai sur appareil ni une validation Qt 6.9.
++
++Règles vérifiées : en cas d'échec on reste sur l'écran, l'erreur est affichée, l'utilisateur peut réessayer ou quitter
++sans enregistrer (confirmation explicite) ; aucune perte silencieuse.
++"""
++exec(open('t_blockboard.py').read().split("# --- 1.")[0])
++
++class B4(B3):
++    fail_save = False
++    fail_msg = "Disque plein"
++    attempts = 0
++    @Slot(int, str, result=bool)
++    def saveBoard(self, i, js):
++        if self.fail_save:
++            self.attempts += 1
++            self._err = self.fail_msg; self.lastErrorChanged.emit()
++            return False
++        return super().saveBoard(i, js)
++
++def run4(w=412, hh=892):
++    B4.status = "planned"
++    b = B4(); b.keep = []
++    h = Harness(w, hh, backend=b)
++    QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "sessions"), Q_ARG("QVariant", -1)); h.spin(500)
++    return h, b
++
++def popup(h, name):
++    for o in h.win.findChildren(QObject):
++        if o.objectName() == name: return o
++def is_open(h, name):
++    p = popup(h, name); return p is not None and bool(p.property("opened"))
++def n_items(b, bid): return len(json.loads(b._boards[bid]["json"])["items"])
++def find_text(root, text):
++    todo = [root]
++    while todo:
++        it = todo.pop()
++        if it.property("text") == text and it.property("kind") is not None: return it
++        todo.extend(it.childItems())
++def tap_it(h, it):
++    p = it.mapToScene(QPointF(it.width() / 2, it.height() / 2)); h.click(p.x(), p.y())
++def tap_popup(h, popup_name, objname=None, text=None):
++    p = popup(h, popup_name); root = p.property("contentItem")
++    it = F_in(root, objname) if objname else find_text(root, text)
++    tap_it(h, it); h.spin(350)
++def F_in(root, name):
++    todo = [root]
++    while todo:
++        it = todo.pop()
++        if it.objectName() == name: return it
++        todo.extend(it.childItems())
++def add(ed, h, kind="player", x=0.5):
++    QMetaObject.invokeMethod(ed.findChild(QObject, "board"), "addItem", Q_ARG("QVariant", kind), Q_ARG("QVariant", x),
++                             Q_ARG("QVariant", 0.5), Q_ARG("QVariant", "9"))
++def open_block(h, b, item=101):
++    open_plan(h); tapname(h, f"openBoard_{item}"); h.spin(400)
++    return editor_of(h), b.blocks[item]
++
++# === SCENARIOS ===
++# --- 1. Cas nominal : enregistrement réussi, aucune boîte de dialogue ---------------------------------------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid)
++add(ed, h); check(ed.property("dirty") is True, "après une modification : des changements sont en attente")
++h.spin(900)
++check(ed.property("dirty") is False and n_items(b, bid) == n0 + 1, "enregistrement automatique réussi : plus rien en attente")
++add(ed, h, "opponent", 0.7)
++r = back(h)
++check(r is True and plan(h).property("boardOpen") is False and not is_open(h, "saveFailedDialog"),
++      "retour immédiat avec enregistrement réussi : le terrain se ferme sans dialogue")
++check(n_items(b, bid) == n0 + 2, "aucune perte au retour immédiat")
++
++# --- 2. Échec : on reste sur l'écran, l'erreur est affichée, réessayer ------------------------------------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++check(ed.property("dirty") is True and n_items(b, bid) == n0, "échec de l'enregistrement automatique : modifications en attente, base inchangée")
++r = back(h)
++check(r is True and plan(h).property("boardOpen") is True, "retour pendant l'échec : le terrain reste ouvert")
++check(is_open(h, "saveFailedDialog"), "le dialogue d'échec est affiché")
++msg = F_in(popup(h, "saveFailedDialog").property("contentItem"), "saveFailedMessage").property("text")
++check("Disque plein" in msg, f"l'erreur est affichée dans le dialogue ({msg!r})")
++a0 = b.attempts
++tap_popup(h, "saveFailedDialog", objname="saveRetryButton")
++check(b.attempts > a0 and plan(h).property("boardOpen") is True and is_open(h, "saveFailedDialog"),
++      "Réessayer : nouvel essai, toujours en échec -> on reste, le dialogue revient")
++b.fail_save = False
++tap_popup(h, "saveFailedDialog", objname="saveRetryButton")
++check(plan(h).property("boardOpen") is False and n_items(b, bid) == n0 + 1,
++      "Réessayer après rétablissement : modifications enregistrées, le terrain se ferme")
++
++# --- 3. Quitter sans enregistrer : confirmation explicite ---------------------------------------------------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++back(h)
++tap_popup(h, "saveFailedDialog", objname="saveDiscardButton")
++check(is_open(h, "discardConfirm") and plan(h).property("boardOpen") is True,
++      "Quitter sans enregistrer : une confirmation est demandée, le terrain reste ouvert")
++tap_popup(h, "discardConfirm", text="Annuler")
++check(plan(h).property("boardOpen") is True and ed.property("dirty") is True,
++      "Annuler la confirmation : rien n'est perdu, les modifications restent en attente")
++back(h)
++tap_popup(h, "saveFailedDialog", objname="saveDiscardButton")
++tap_popup(h, "discardConfirm", text="Quitter sans enregistrer")
++check(plan(h).property("boardOpen") is False and n_items(b, bid) == n0,
++      "Quitter sans enregistrer, confirmé : le terrain se ferme, la base garde la dernière version enregistrée")
++
++# --- 4. Rester sur le terrain ---------------------------------------------------------------------------------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900); back(h)
++tap_popup(h, "saveFailedDialog", objname="saveStayButton")
++shown = json.loads(QMetaObject.invokeMethod(ed.findChild(QObject, "board"), "toJson", Qt.DirectConnection, Q_RETURN_ARG("QVariant")))
++check(plan(h).property("boardOpen") is True and len(shown["items"]) == n0 + 1 and ed.property("dirty") is True,
++      "Rester : le terrain garde les modifications non enregistrées")
++b.fail_save = False
++back(h)
++check(plan(h).property("boardOpen") is False and n_items(b, bid) == n0 + 1,
++      "retour une fois le problème résolu : enregistré puis fermé, sans dialogue")
++
++# --- 5. Autres chemins de sortie : changement de section, fermeture du plan, fermeture de la fenêtre ---------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "home"), Q_ARG("QVariant", -1)); h.spin(300)
++check(h.win.property("section") == "sessions" and is_open(h, "saveFailedDialog"),
++      "navigation vers une autre section : refusée pendant l'échec, dialogue affiché")
++b.fail_save = False
++tap_popup(h, "saveFailedDialog", objname="saveRetryButton")
++check(h.win.property("section") == "home" and n_items(b, bid) == n0 + 1,
++      "après Réessayer : enregistré, puis la navigation reprend")
++
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++QMetaObject.invokeMethod(page(h), "closeEditor"); h.spin(300)
++check(page(h).property("editing") is True and plan(h).property("boardOpen") is True and is_open(h, "saveFailedDialog"),
++      "fermeture du plan depuis la page : refusée pendant l'échec")
++tap_popup(h, "saveFailedDialog", objname="saveStayButton")
++
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++h.win.close(); h.spin(300)
++check(h.win.isVisible() and is_open(h, "saveFailedDialog"),
++      "fermeture de la fenêtre : refusée pendant l'échec, dialogue affiché (Component.onDestruction n'est pas utilisé)")
++b.fail_save = False
++tap_popup(h, "saveFailedDialog", objname="saveRetryButton")
++check(n_items(b, bid) == n0 + 1 and not h.win.isVisible(),
++      "Réessayer : enregistré, puis la fenêtre se ferme")
++
++# --- 6. Page Tactique : ouvrir un autre schéma, dupliquer ---------------------------------------------------------------------
++h, b = run4()
++A = b.add("Schéma A", PLAYERS_HALF); Bd = b.add("Schéma B", PLAYERS_HALF)
++QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "tactics"), Q_ARG("QVariant", A)); h.spin(500)
++tp = find_obj(h, "pendingDelete"); ed = tp.findChild(QObject, "editor")
++check(tp.property("currentId") == A, "page Tactique : schéma A ouvert")
++b.fail_save = True
++add(ed, h); h.spin(900)
++QMetaObject.invokeMethod(tp, "openBoard", Q_ARG("QVariant", Bd)); h.spin(300)
++check(tp.property("currentId") == A and is_open(h, "saveFailedDialog"), "ouvrir un autre schéma : refusé pendant l'échec")
++tap_popup(h, "saveFailedDialog", objname="saveStayButton")
++n_boards = len(b._boards)
++QMetaObject.invokeMethod(ed.findChild(QObject, "moreSheet"), "chosen", Q_ARG("QString", "duplicate")); h.spin(300)
++check(len(b._boards) == n_boards and is_open(h, "saveFailedDialog"), "dupliquer : refusé pendant l'échec (aucune copie créée)")
++b.fail_save = False
++tap_popup(h, "saveFailedDialog", objname="saveRetryButton")
++check(len(b._boards) == n_boards + 1 and n_items(b, A) == 3, "Réessayer : enregistré, puis la copie est créée")
++
++
++# --- 7. Fermeture de la fenêtre : UNE seule tentative d'enregistrement avant le dialogue -------------------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++a0 = b.attempts
++h.win.close(); h.spin(300)
++check(is_open(h, "saveFailedDialog") and b.attempts == a0 + 1,
++      f"fermeture de la fenêtre en échec : une seule tentative d'enregistrement ({b.attempts - a0})")
++tap_popup(h, "saveFailedDialog", objname="saveStayButton")
++check(h.win.isVisible() and plan(h).property("boardOpen") is True, "Rester : la fenêtre reste ouverte")
++b.fail_save = False
++h.win.close(); h.spin(300)
++check(not h.win.isVisible() and n_items(b, bid) == n0 + 1, "problème résolu : un nouvel essai enregistre puis la fenêtre se ferme")
++
++# --- 8. Échap = « Rester sur le terrain » : aucune sortie obsolète n'est exécutée plus tard -------------------------------
++h, b = run4(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++back(h)
++check(is_open(h, "saveFailedDialog"), "échec : dialogue affiché")
++QMetaObject.invokeMethod(popup(h, "saveFailedDialog"), "close"); h.spin(500)   # fermeture sans choix, comme Échap
++check(not is_open(h, "saveFailedDialog") and plan(h).property("boardOpen") is True and ed.property("dirty") is True,
++      "Échap : dialogue fermé, on reste sur le terrain, modifications conservées")
++check(ed.property("exitAction") is None, "Échap : la sortie en attente est abandonnée (exitAction vidé)")
++b.fail_save = False
++h.spin(900)
++check(plan(h).property("boardOpen") is True, "problème résolu ensuite : rien ne se ferme tout seul (pas de sortie obsolète)")
++ed.setProperty("dirty", True)
++QMetaObject.invokeMethod(ed, "flush", Qt.DirectConnection, Q_RETURN_ARG("QVariant")); h.spin(300)
++check(plan(h).property("boardOpen") is True and n_items(b, bid) == n0 + 1,
++      "un enregistrement réussi plus tard enregistre sans exécuter l'ancienne sortie")
++
++h, b = run4(); ed, bid = open_block(h, b)
++b.fail_save = True
++add(ed, h); h.spin(900); back(h)
++tap_popup(h, "saveFailedDialog", objname="saveDiscardButton")
++check(is_open(h, "discardConfirm"), "Quitter sans enregistrer : confirmation demandée")
++QMetaObject.invokeMethod(popup(h, "discardConfirm"), "close"); h.spin(500)
++check(not is_open(h, "discardConfirm") and plan(h).property("boardOpen") is True and ed.property("dirty") is True and ed.property("exitAction") is None,
++      "Échap sur la confirmation : on reste sur le terrain, aucune sortie en attente")
++b.fail_save = False
++back(h)
++check(plan(h).property("boardOpen") is False and not is_open(h, "discardConfirm"),
++      "retour ensuite : enregistré puis fermé, sans réutiliser l'ancienne confirmation")
++
++# --- 9. Changement d'équipe / de période pendant un échec : on reste dans le contexte du terrain ----------------------------
++class B6(B4):
++    @Slot(result="QVariantList")
++    def teams(self):
++        return [{"id": 1, "name": "U15", "category": ""}, {"id": 2, "name": "U17", "category": ""}]
++def team_sheet(h):
++    for o in page(h).findChildren(QObject):
++        if o.property("title") == "Équipe" and o.property("model") is not None: return o
++def current_team(h):
++    sw = [o for o in page(h).findChildren(QObject) if o.property("teams") is not None and o.property("current") is not None]
++    cur = sw[0].property("current") if sw else None
++    if cur is None: return None
++    cur = cur.toVariant() if hasattr(cur, "toVariant") else cur
++    return cur.get("id") if isinstance(cur, dict) else None
++
++B6.status = "planned"
++b = B6(); b.keep = []
++h = Harness(412, 892, backend=b)
++QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "sessions"), Q_ARG("QVariant", -1)); h.spin(500)
++check(current_team(h) == 1, f"équipe de départ : 1 ({current_team(h)})")
++ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_save = True
++add(ed, h); h.spin(900)
++QMetaObject.invokeMethod(team_sheet(h), "chosen", Q_ARG("QString", "t2")); h.spin(400)
++check(current_team(h) == 1, "changement d'équipe refusé pendant l'échec : l'équipe n'a pas changé")
++check(plan(h).property("boardOpen") is True and is_open(h, "saveFailedDialog"), "le terrain reste ouvert, dialogue affiché")
++tap_popup(h, "saveFailedDialog", objname="saveStayButton")
++check(current_team(h) == 1 and plan(h).property("boardOpen") is True and ed.property("dirty") is True,
++      "Rester : équipe inchangée, terrain ouvert, modifications en attente (enregistrables dans le bon contexte)")
++b.fail_save = False
++h.spin(900)
++# la sauvegarde se fait sur le terrain d'origine (identifiant du terrain), l'équipe n'y intervient pas
++QMetaObject.invokeMethod(ed, "flush", Qt.DirectConnection, Q_RETURN_ARG("QVariant")); h.spin(300)
++check(n_items(b, bid) == n0 + 1, "le terrain est enregistré sur le bon bloc")
++QMetaObject.invokeMethod(team_sheet(h), "chosen", Q_ARG("QString", "t2")); h.spin(500)
++check(current_team(h) == 2 and plan(h).property("boardOpen") is False, "une fois enregistré : l'équipe change et le plan se ferme")
++
++b = B6(); b.keep = []
++h = Harness(412, 892, backend=b)
++QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "sessions"), Q_ARG("QVariant", -1)); h.spin(500)
++ed, bid = open_block(h, b)
++b.fail_save = True
++add(ed, h); h.spin(900)
++pg = page(h)
++sc_obj = [o for o in page(h).findChildren(QObject) if o.property("allowClear") is False and o.property("options") is not None]
++QMetaObject.invokeMethod(sc_obj[0], "picked", Q_ARG("QString", "past")); h.spin(400)
++check(pg.property("scope") == "upcoming" and plan(h).property("boardOpen") is True and is_open(h, "saveFailedDialog"),
++      "changement de période refusé pendant l'échec : la liste ne change pas sous le terrain ouvert")
++tap_popup(h, "saveFailedDialog", objname="saveStayButton")
++
++print("ECHECS" if errs else "TOUT OK", errs)
+diff --git a/tests/qml/t_l0c.py b/tests/qml/t_l0c.py
+new file mode 100644
+index 0000000..b2c5c29
+--- /dev/null
++++ b/tests/qml/t_l0c.py
+@@ -0,0 +1,86 @@
++"""L0-c : suppression d'un terrain en échec (AUD-07) : l'accès au terrain est conservé et l'erreur est visible.
++
++Le Backend est SIMULÉ : deleteBoard() peut échouer à la demande. Ce test valide la logique QML de PlanEditor et de
++TacticsPage ; l'échec réel de SQLite n'est pas exercé ici (voir tests/tst_board.cpp pour le dépôt de données) et ce test ne
++remplace ni un essai sur appareil ni une validation Qt 6.9.
++"""
++exec(open('t_l0a.py').read().split("# === SCENA" + "RIOS ===")[0])
++
++class B5(B4):
++    fail_delete = False
++    @Slot(int, result=bool)
++    def deleteBoard(self, i):
++        if self.fail_delete:
++            self._err = "Base verrouillée"; self.lastErrorChanged.emit()
++            return False
++        return super().deleteBoard(i)
++
++def run5(w=412, hh=892):
++    B5.status = "planned"
++    b = B5(); b.keep = []
++    h = Harness(w, hh, backend=b)
++    QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "sessions"), Q_ARG("QVariant", -1)); h.spin(500)
++    return h, b
++
++def toast_text(h, start):
++    for o in h.win.findChildren(QObject):
++        m = o.property("message")
++        if isinstance(m, str) and m.startswith(start) and bool(o.property("visible")):
++            return m
++def dialog_with_title(h, title):
++    for o in h.win.findChildren(QObject):
++        if o.property("title") == title and o.property("okText") is not None: return o
++
++# --- 1. Terrain d'un bloc (PlanEditor) : échec de suppression -----------------------------------------------------------------
++h, b = run5(); ed, bid = open_block(h, b)
++n0 = n_items(b, bid); b.fail_delete = True
++QMetaObject.invokeMethod(ed.findChild(QObject, "moreSheet"), "chosen", Q_ARG("QString", "delete")); h.spin(300)
++check(is_open(h, "removeBoardConfirm"), "« Retirer le terrain » : confirmation demandée")
++tap_popup(h, "removeBoardConfirm", text="Retirer")
++check(plan(h).property("boardOpen") is True and plan(h).property("openBoardId") == bid,
++      "suppression en échec : le terrain reste ouvert (accès conservé)")
++check(editor_of(h) is ed and ed.property("boardId") == bid, "l'éditeur garde son terrain (pas d'identifiant perdu)")
++check(bid in b._boards, "le terrain existe toujours dans la base")
++t = toast_text(h, "Impossible de retirer le terrain")
++check(t is not None and "Base verrouillée" in t, f"l'erreur est affichée ({t!r})")
++add(ed, h); h.spin(900)
++check(n_items(b, bid) == n0 + 1 and ed.property("dirty") is False,
++      "après l'échec, le terrain reste modifiable et s'enregistre toujours")
++
++# --- 2. Même terrain : la suppression réussit une fois le problème levé --------------------------------------------------------
++b.fail_delete = False
++QMetaObject.invokeMethod(ed.findChild(QObject, "moreSheet"), "chosen", Q_ARG("QString", "delete")); h.spin(300)
++tap_popup(h, "removeBoardConfirm", text="Retirer")
++check(plan(h).property("boardOpen") is False and bid not in b._boards,
++      "suppression réussie : le terrain est retiré et le plan est affiché")
++check(vis(h, "blockBoardEmpty_101"), "le bloc n'a plus de terrain (état vide)")
++
++# --- 3. Page Tactique : échec de suppression d'un schéma ------------------------------------------------------------------------
++h, b = run5()
++A = b.add("Schéma A", PLAYERS_HALF); Bd = b.add("Schéma B", PLAYERS_HALF)
++QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "tactics"), Q_ARG("QVariant", A)); h.spin(500)
++tp = find_obj(h, "pendingDelete"); ed = tp.findChild(QObject, "editor")
++b.fail_delete = True
++QMetaObject.invokeMethod(ed.findChild(QObject, "moreSheet"), "chosen", Q_ARG("QString", "delete")); h.spin(300)
++dlg = dialog_with_title(h, "Supprimer le schéma ?")
++check(dlg is not None and bool(dlg.property("opened")), "« Supprimer le schéma ? » : confirmation demandée")
++tap_it(h, find_text(dlg.property("contentItem"), "Supprimer")); h.spin(400)
++check(tp.property("currentId") == A and A in b._boards, "suppression en échec : le schéma reste ouvert et existe toujours")
++t = toast_text(h, "Impossible de supprimer le schéma")
++check(t is not None and "Base verrouillée" in t, f"l'erreur est affichée, plus d'échec silencieux ({t!r})")
++add(ed, h); h.spin(900)
++check(n_items(b, A) == 3 and ed.property("dirty") is False, "le schéma reste modifiable et s'enregistre toujours")
++
++# --- 4. Suppression réussie avec des modifications en attente : aucune garde résiduelle -------------------------------------------
++b.fail_delete = False; b.fail_save = True
++add(ed, h); h.spin(900)
++check(ed.property("dirty") is True, "modification non enregistrable en attente avant la suppression")
++QMetaObject.invokeMethod(ed.findChild(QObject, "moreSheet"), "chosen", Q_ARG("QString", "delete")); h.spin(300)
++dlg = dialog_with_title(h, "Supprimer le schéma ?")
++tap_it(h, find_text(dlg.property("contentItem"), "Supprimer")); h.spin(400)
++check(tp.property("currentId") == -1 and A not in b._boards, "suppression réussie : le schéma est supprimé")
++check(ed.property("dirty") is False, "les modifications destinées au schéma supprimé ne bloquent plus rien")
++QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "home"), Q_ARG("QVariant", -1)); h.spin(300)
++check(h.win.property("section") == "home" and not is_open(h, "saveFailedDialog"), "la navigation n'est pas bloquée par un schéma supprimé")
++
++print("ECHECS" if errs else "TOUT OK", errs)
