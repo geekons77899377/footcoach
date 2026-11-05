@@ -31,6 +31,7 @@ Item {
             return;
         session = s;
         teamName = team;
+        infos.openSession(s);
         reload(false);
         scroll.contentY = 0;
     }
@@ -189,6 +190,8 @@ Item {
         onClicked: root.closeRequested()
     }
 
+    EnsureVisible { flick: scroll }
+
     ExercisePicker {
         id: picker
         onPicked: (e) => root.act(backend.addToPlan(root.session.id, e.id, 0))
@@ -235,6 +238,25 @@ Item {
             y: 12
             width: Math.min(scroll.width - 2 * Theme.gutter, 640)
             spacing: 12
+
+            // Informations de la séance (date, heure, durée, lieu, thème, statut, notes) : modifiables ici, au-dessus du
+            // plan, pour tout voir et tout changer sur le même écran.
+            Card {
+                objectName: "sessionInfosCard"
+                width: parent.width
+                SessionFields {
+                    id: infos
+                    width: parent.width
+                    spacing: 14
+                    onSaved: (day) => {
+                        // La séance affichée suit les valeurs enregistrées (en-tête, durée prévue, annulation).
+                        root.session = Object.assign({}, root.session, infos.snapshot());
+                        root.reload();
+                        root.changed();
+                        toast.show("Séance enregistrée");
+                    }
+                }
+            }
 
             // Durée planifiée par rapport à la séance.
             Card {

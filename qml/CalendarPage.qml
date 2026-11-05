@@ -104,6 +104,10 @@ Item {
         return true;
     }
 
+    // « Modifier » une séance existante : informations et plan d'exercices sur le même écran (section Séances).
+    signal planRequested(var session)
+    function editSession(s) { planRequested(s); }
+
     function newSession() {
         sessionForm.openNew(teamId, selected);
         mode = "session";
@@ -195,8 +199,7 @@ Item {
             if (id === "attendance") {
                 page.openAttendance(target.id);
             } else if (id === "edit") {
-                sessionForm.openSession(target);
-                page.mode = "session";
+                page.editSession(target);
             } else if (id === "delete") {
                 confirm.action = "delete";
                 confirm.targetId = target.id;
@@ -328,8 +331,7 @@ Item {
                                 if (page.split) {
                                     page.expandedId = card.expanded ? -1 : entry.modelData.id;
                                 } else {
-                                    sessionForm.openSession(entry.modelData);
-                                    page.mode = "session";
+                                    page.editSession(entry.modelData);
                                 }
                             }
                         }
@@ -441,8 +443,7 @@ Item {
                                     text: "Modifier"
                                     iconName: "edit"
                                     onClicked: {
-                                        sessionForm.openSession(entry.modelData);
-                                        page.mode = "session";
+                                        page.editSession(entry.modelData);
                                     }
                                 }
                             }

@@ -140,6 +140,14 @@ ApplicationWindow {
             enter(id, boardId);
     }
 
+    // Ouvre une séance existante : informations et plan sur le même écran (section Séances, équipe de la séance).
+    function openSessionPlan(s) {
+        AppState.teamId = s.teamId;              // avant l'entrée dans la page : sa liste se charge pour la bonne équipe
+        go("sessions", -1);
+        if (section === "sessions")
+            sessionsPage.openSession(s);
+    }
+
     function enter(id, boardId) {
         section = id;
         if (id === "tactics" && boardId > 0)
@@ -312,7 +320,7 @@ ApplicationWindow {
                 onNavigate: (section, boardId) => win.go(section, boardId)
             }
             SquadPage { id: squadPage }
-            CalendarPage { id: calendarPage }
+            CalendarPage { id: calendarPage; onPlanRequested: (s) => win.openSessionPlan(s) }
             AttendancePage { id: attendancePage }
             ExercisesPage { id: exercisesPage }
             SessionsPage { id: sessionsPage }
