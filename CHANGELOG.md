@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## Non publié — terrain d'un match : joueurs de la convocation
+- Sur le terrain tactique d'un match, **« Joueur » ouvre la liste des convoqués** (titulaires d'abord, avec leur rôle) au lieu d'ajouter un rond anonyme ; le joueur choisi est posé avec son nom sous le rond (24 caractères : prénom + initiale du nom si trop long). Un même joueur peut être posé plusieurs fois. Aucun convoqué : message, rien n'est posé.
+- **Formation** sur un match : les postes se remplissent avec les titulaires convoqués, dans l'ordre de la liste ; les postes sans titulaire restent vides.
+- La liste suit l'état courant de la fiche (convocations modifiées, même non enregistrées). Les schémas libres et les blocs de séance sont inchangés. Le texte posé est un libellé : renommer un joueur plus tard ne met pas le schéma à jour.
+- Test : `t_squadboard.py` (backend **simulé**). Non vérifié sur appareil.
+
 ## Non publié — texte sous le joueur (schéma tactique)
 - Le texte d'un joueur ou d'un adversaire s'affiche **sous le rond** (le rond reste vide) et peut compter **24 caractères** (3 auparavant) ; il passe sur deux lignes si besoin. Les notes texte (300 caractères) sont inchangées. Les anciens schémas (numéros) s'affichent sous le rond, sans migration : le texte est déjà enregistré dans le schéma.
 - Test : `t_caption.py` (backend **simulé**). Non vérifié sur appareil.

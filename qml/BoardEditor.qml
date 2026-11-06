@@ -17,6 +17,10 @@ Item {
     // Terrain propre à un bloc de séance (ouvert depuis le plan) : pas de renommage ni de duplication (le titre est
     // celui de l'atelier, une copie ferait un schéma libre) ; « supprimer » devient « retirer du bloc ».
     property bool blockMode: false
+    // Terrain d'un match : null = joueurs libres (ronds numérotés) ; sinon liste des convoqués [{id, name, role}] (titulaires
+    // d'abord) : « Joueur » propose cette liste et la formation se remplit avec les titulaires.
+    property var squad: null
+    readonly property bool squadMode: squad !== null
     property string contextTitle: ""                 // titre affiché en en-tête à la place de celui du schéma
     // Plein écran du terrain : l'en-tête et la barre d'outils se masquent ; les outils restent accessibles par un bouton.
     property bool fullscreen: false
@@ -281,10 +285,51 @@ Item {
         }
     }
 
+    // Joueurs du match : nom affiché sous le rond (24 caractères au plus : prénom + initiale du nom si trop long).
+    function squadLabel(p) {
+        var n = p.name;
+        if (n.length > board.maxPlayerLabel && p.firstName)
+            n = p.firstName + (p.lastName ? " " + p.lastName.charAt(0) + "." : "");
+        return n.substring(0, board.maxPlayerLabel).trim();
+    }
+
+    function askSquadPlayer(nx, ny) {
+        if (squad.length === 0) {
+            toast.show("Aucun joueur convoqué : choisissez-les dans la fiche du match.");
+            return;
+        }
+        pending = Qt.point(nx, ny);
+        var m = [];
+        for (var i = 0; i < squad.length; ++i)
+            m.push({ id: String(i), text: squad[i].name + (squad[i].role === "starter" ? " · Titulaire" : " · Remplaçant") });
+        squadSheet.model = m;
+        squadSheet.open();
+    }
+
+    ActionSheet {
+        id: squadSheet
+        objectName: "squadSheet"
+        title: "Joueur à placer"
+        onChosen: (id) => board.addItem("player", editor.pending.x, editor.pending.y, editor.squadLabel(editor.squad[parseInt(id, 10)]))
+    }
+
     FormationSheet {
         id: formationSheet
         names: backend.formationNames()
-        onPicked: (name, withOpp) => board.applyFormation(backend.formationJson(name, withOpp), withOpp)
+        onPicked: (name, withOpp) => {
+            if (!editor.squadMode) {
+                board.applyFormation(backend.formationJson(name, withOpp), withOpp);
+                return;
+            }
+            var starters = [];
+            for (var i = 0; i < editor.squad.length; ++i)
+                if (editor.squad[i].role === "starter")
+                    starters.push(editor.squadLabel(editor.squad[i]));
+            if (starters.length === 0)
+                toast.show("Aucun titulaire convoqué : choisissez-les dans la fiche du match.");
+            else
+                board.applyFormation(backend.formationJson(name, withOpp), withOpp, starters);
+        }
     }
 
     ColorSheet {
@@ -389,7 +434,9 @@ Item {
             onSelectToolRequested: editor.tool = "select"
             onLabelEditRequested: (index) => editor.editLabel(index)
             onPlaceRequested: (nx, ny) => {
-                if (editor.tool === "player") {
+                if (editor.tool === "player" && editor.squadMode) {
+                    editor.askSquadPlayer(nx, ny);
+                } else if (editor.tool === "player") {
                     var n = board.nextPlayerNumber();
                     board.addItem("player", nx, ny, n > 0 ? String(n) : "");
                 } else if (editor.tool === "text") {

@@ -483,9 +483,12 @@ QtObject {
 
     // Remplace les joueurs (et les adversaires si demandé) par une formation ; terrain entier seulement.
     // formationJson : {"items": [...]} fourni par Backend.formationJson.
-    function applyFormation(formationJson, withOpponents) {
+    // names : null = formation libre (joueurs numérotés) ; sinon liste de noms (terrain d'un match) : les postes se remplissent
+    // dans l'ordre avec ces noms, les postes en trop restent vides.
+    function applyFormation(formationJson, withOpponents, names) {
         if (pitch !== "full")
             return false;
+        var squadNames = Array.isArray(names) ? names : null;
         var data;
         try {
             data = JSON.parse(formationJson);
@@ -499,8 +502,15 @@ QtObject {
                 items.remove(i);
         }
         var list = data.items || [];
+        var used = 0;
         for (var j = 0; j < list.length; ++j) {
-            items.append({ kind: list[j].kind, nx: list[j].x, ny: list[j].y, label: list[j].label || "",
+            var lab = list[j].label || "";
+            if (squadNames !== null && list[j].kind === "player") {
+                if (used >= squadNames.length)
+                    continue;
+                lab = squadNames[used++];
+            }
+            items.append({ kind: list[j].kind, nx: list[j].x, ny: list[j].y, label: lab,
                            rot: 0, scl: 1, color: "", sel: false });
         }
         commit();

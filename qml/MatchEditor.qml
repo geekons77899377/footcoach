@@ -23,6 +23,20 @@ Item {
     property int openBoardId: -1
     readonly property bool isNew: matchId <= 0
     readonly property bool dirty: formState() !== savedState
+    // Convoqués du match (état courant de la fiche), titulaires d'abord : seuls joueurs posables sur son terrain.
+    readonly property var convoked: {
+        var starters = [], subs = [];
+        for (var i = 0; i < roster.length; ++i) {
+            var r = roles[roster[i].id];
+            var e = { id: roster[i].id, name: roster[i].fullName, firstName: roster[i].firstName,
+                      lastName: roster[i].lastName, role: r };
+            if (r === "starter")
+                starters.push(e);
+            else if (r === "substitute")
+                subs.push(e);
+        }
+        return starters.concat(subs);
+    }
     readonly property int starters: countRole("starter")
     readonly property int substitutes: countRole("substitute")
 
@@ -578,6 +592,7 @@ Item {
             sourceComponent: BoardEditor {
                 blockMode: true
                 showBack: true
+                squad: root.convoked
                 contextTitle: "Match contre " + opponent.text
                 onCloseRequested: root.closeBoard()
                 onDeleteRequested: removeBoardConfirm.confirm("Retirer le schéma ?",
