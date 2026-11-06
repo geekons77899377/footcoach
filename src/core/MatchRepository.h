@@ -9,6 +9,10 @@
 
 // Matchs (table football_match) et joueurs convoqués (match_player). Un match est distinct d'une séance : aucune
 // de ses données n'est partagée avec training_session.
+// Un match occupe ses joueurs pendant ce créneau (minutes) à partir du coup d'envoi : un joueur ne peut pas être convoqué
+// à deux matchs dont les coups d'envoi sont plus proches que cela. Les matchs annulés ne comptent pas.
+constexpr int kMatchSlotMinutes = 120;
+
 class MatchRepository
 {
 public:
@@ -30,9 +34,13 @@ public:
     // Joueurs convoqués, titulaires d'abord.
     QList<MatchPlayer> players(int matchId, QString *error = nullptr) const;
     // Remplace la liste des convoqués, en une transaction. Refus (rien n'est modifié) si un joueur n'est pas de
-    // l'équipe du match, apparaît deux fois, ou si le rôle est inconnu.
+    // l'équipe du match, apparaît deux fois, si le rôle est inconnu, ou si un joueur est déjà convoqué à un autre match
+    // du même créneau (voir kMatchSlotMinutes).
     bool setPlayers(int matchId, const QList<MatchPlayer> &players, QString *error = nullptr);
 
 private:
+    // Message décrivant le premier conflit de créneau des joueurs avec un autre match, vide s'il n'y en a pas.
+    QString slotConflict(int matchId, const QDateTime &startAt, const QList<int> &playerIds, QString *dbError) const;
+
     QSqlDatabase m_db;
 };

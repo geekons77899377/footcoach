@@ -2,7 +2,7 @@ import QtQuick
 import "DateUtil.js" as DateUtil
 import "Status.js" as Status
 
-// Accueil : séance du jour, boîte à outils du coach et derniers schémas. À partir de 760 px de large (tablette
+// Accueil : séance du jour, accès aux sections et derniers schémas. À partir de 760 px de large (tablette
 // paysage, bureau), une colonne latérale ajoute les prochaines séances et la présence récente ; en dessous, tout
 // reste en une seule colonne, comme avant (téléphone inchangé : la colonne latérale n'y apparaît pas).
 Item {
@@ -99,64 +99,24 @@ Item {
                 onPlanSession: root.navigate("calendar", -1)
             }
 
-            // Boîte à outils.
-            Text {
-                text: "BOÎTE À OUTILS DU COACH"
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.letterSpacing: 1.4
-                color: Theme.text
-            }
-            Card {
+            // Accès aux sections qui ne sont pas dans la barre du bas (téléphone).
+            Row {
                 width: parent.width
-                height: 150
-                padding: 18
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: -18
-                    radius: Theme.radius
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0; color: "#143d2c" }
-                        GradientStop { position: 1; color: "#1a2433" }
-                    }
-                    border.width: 1
-                    border.color: Theme.border
+                spacing: 12
+                AppButton {
+                    objectName: "matchesButton"
+                    width: (parent.width - 12) / 2
+                    text: "Matchs"
+                    iconName: "board"
+                    onClicked: root.navigate("matches", -1)
                 }
-                Column {
-                    anchors.fill: parent
-                    spacing: 6
-                    Text {
-                        text: "TABLEAU TACTIQUE"
-                        font.pixelSize: 11
-                        font.weight: Font.Bold
-                        font.letterSpacing: 1.2
-                        color: Theme.accent
-                    }
-                    Text {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        text: "Préparez formations, circuits et consignes sur le terrain"
-                        font.pixelSize: 18
-                        font.weight: Font.Bold
-                        color: Theme.text
-                    }
-                    Item { width: 1; height: 6 }
-                    AppButton {
-                        kind: "primary"
-                        text: "Ouvrir"
-                        iconName: "board"
-                        onClicked: root.navigate("tactics", -1)
-                    }
+                AppButton {
+                    objectName: "tacticsButton"
+                    width: (parent.width - 12) / 2
+                    text: "Tactique"
+                    iconName: "board"
+                    onClicked: root.navigate("tactics", -1)
                 }
-            }
-
-            AppButton {
-                objectName: "matchesButton"
-                width: parent.width
-                text: "Matchs"
-                iconName: "board"
-                onClicked: root.navigate("matches", -1)
             }
 
             // Accès explicites aux données et aux paramètres (plus de feuille « Plus » sur téléphone).

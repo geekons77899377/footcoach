@@ -231,6 +231,46 @@ private slots:
         QCOMPARE(repo.players(m.id).size(), 0);
     }
 
+    // Un joueur ne peut être que sur un seul match à la même heure (créneau de kMatchSlotMinutes).
+    void aPlayerCannotBeOnTwoMatchesAtTheSameTime()
+    {
+        MatchRepository repo(m_db.handle());
+        Match a = makeMatch(QStringLiteral("A"), QDateTime(QDate(2026, 11, 8), QTime(15, 0)));
+        Match same = makeMatch(QStringLiteral("B"), QDateTime(QDate(2026, 11, 8), QTime(15, 0)));
+        Match close = makeMatch(QStringLiteral("C"), QDateTime(QDate(2026, 11, 8), QTime(16, 30)));
+        Match later = makeMatch(QStringLiteral("D"), QDateTime(QDate(2026, 11, 8), QTime(17, 0)));
+        QVERIFY(repo.insert(a) && repo.insert(same) && repo.insert(close) && repo.insert(later));
+        QVERIFY(repo.setPlayers(a.id, {{m_p1, QStringLiteral("starter")}}));
+
+        QString error;
+        QVERIFY(!repo.setPlayers(same.id, {{m_p1, QStringLiteral("starter")}}, &error));      // même heure
+        QVERIFY2(error.contains(QStringLiteral("déjà convoqué")), qPrintable(error));
+        QVERIFY(error.contains(QStringLiteral("contre A")));
+        QCOMPARE(repo.players(same.id).size(), 0);                                           // rien n'est écrit
+        QVERIFY(!repo.setPlayers(close.id, {{m_p1, QStringLiteral("substitute")}}, &error));  // 90 min d'écart : chevauche
+        QVERIFY(repo.setPlayers(later.id, {{m_p1, QStringLiteral("starter")}}));              // 120 min d'écart : libre
+        QVERIFY(repo.setPlayers(same.id, {{m_p2, QStringLiteral("starter")}}));               // un autre joueur : permis
+
+        // Réenregistrer le même match ne s'oppose pas à lui-même.
+        QVERIFY(repo.setPlayers(a.id, {{m_p1, QStringLiteral("starter")}, {m_p2, QStringLiteral("substitute")}}) == false);
+        QVERIFY(repo.setPlayers(a.id, {{m_p1, QStringLiteral("substitute")}}));
+
+        // Déplacer un match convoqué sur le créneau d'un autre est refusé, sans rien modifier.
+        Match moved = repo.get(later.id);
+        moved.startAt = QDateTime(QDate(2026, 11, 8), QTime(15, 30));
+        QVERIFY(!repo.update(moved, &error));
+        QCOMPARE(repo.get(later.id).startAt, QDateTime(QDate(2026, 11, 8), QTime(17, 0)));
+
+        // Un match annulé libère ses joueurs ; le rétablir est refusé si le créneau est repris.
+        Match cancelled = repo.get(a.id);
+        cancelled.status = QStringLiteral("cancelled");
+        QVERIFY(repo.update(cancelled));
+        QVERIFY(repo.setPlayers(same.id, {{m_p1, QStringLiteral("starter")}}));                // 15:00, comme le match annulé
+        cancelled.status = QStringLiteral("planned");
+        QVERIFY(!repo.update(cancelled, &error));
+        QCOMPARE(repo.get(a.id).status, QStringLiteral("cancelled"));
+    }
+
     void deletingAPlayerOrAMatchCleansConvocations()
     {
         MatchRepository repo(m_db.handle());

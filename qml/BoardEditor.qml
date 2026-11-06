@@ -227,28 +227,6 @@ Item {
         onChosen: (id) => editor.tool = id
     }
 
-    // Alignement de la sélection multiple (par rapport à l'écran, quelle que soit l'orientation du terrain).
-    ActionSheet {
-        id: alignSheet
-        title: "Aligner la sélection"
-        model: [
-            { id: "left", text: "À gauche", icon: "alignleft" },
-            { id: "hcenter", text: "Centrer horizontalement", icon: "alignhcenter" },
-            { id: "right", text: "À droite", icon: "alignright" },
-            { id: "top", text: "En haut", icon: "aligntop" },
-            { id: "vcenter", text: "Centrer verticalement", icon: "alignvcenter" },
-            { id: "bottom", text: "En bas", icon: "alignbottom" },
-            { id: "hdist", text: "Répartir horizontalement (3 minimum)", icon: "alignhdist" },
-            { id: "vdist", text: "Répartir verticalement (3 minimum)", icon: "alignvdist" }
-        ]
-        onChosen: (id) => {
-            if ((id === "hdist" || id === "vdist") && board.selItems < 3)
-                toast.show("Il faut au moins 3 éléments pour les répartir.");
-            else
-                board.alignSelected(id, view.vertical);
-        }
-    }
-
     // Rotation du groupe autour de son centre.
     ActionSheet {
         id: groupRotateSheet
@@ -618,11 +596,20 @@ Item {
                         accessibleName: "Modifier le texte"
                         onClicked: editor.editLabel(board.selLabelIndex)
                     }
+                    // Deux boutons, seulement quand plusieurs éléments sont sélectionnés (par rapport à l'écran).
                     IconButton {
+                        objectName: "alignHorizontal"
                         visible: board.selItems > 1
-                        iconName: "align"
-                        accessibleName: "Aligner la sélection"
-                        onClicked: alignSheet.open()
+                        iconName: "alignvcenter"
+                        accessibleName: "Aligner horizontalement"
+                        onClicked: board.alignSelected("vcenter", view.vertical)
+                    }
+                    IconButton {
+                        objectName: "alignVertical"
+                        visible: board.selItems > 1
+                        iconName: "alignhcenter"
+                        accessibleName: "Aligner verticalement"
+                        onClicked: board.alignSelected("hcenter", view.vertical)
                     }
                     IconButton {
                         visible: board.selCount > 1

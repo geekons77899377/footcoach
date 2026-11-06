@@ -73,6 +73,34 @@ bool validate(const Match &m, QString *error)
 
 } // namespace
 
+QString MatchRepository::slotConflict(int matchId, const QDateTime &startAt, const QList<int> &playerIds,
+                                      QString *dbError) const
+{
+    if (playerIds.isEmpty() || !startAt.isValid())
+        return QString();
+    for (int pid : playerIds) {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral(
+            "SELECT p.first_name, p.last_name, m.opponent, m.start_at FROM match_player mp "
+            "JOIN football_match m ON m.id = mp.match_id JOIN player p ON p.id = mp.player_id "
+            "WHERE mp.player_id = ? AND m.id != ? AND m.status != 'cancelled'"));
+        q.addBindValue(pid);
+        q.addBindValue(matchId);
+        if (!q.exec()) {
+            setError(dbError, q.lastError().text());
+            return QStringLiteral("erreur");
+        }
+        while (q.next()) {
+            const QDateTime other = QDateTime::fromString(q.value(3).toString(), kDateTimeFormat);
+            if (other.isValid() && qAbs(other.secsTo(startAt)) < kMatchSlotMinutes * 60)
+                return QStringLiteral("%1 %2 est déjà convoqué au match contre %3 (%4).")
+                    .arg(q.value(0).toString(), q.value(1).toString(), q.value(2).toString(),
+                         other.toString(QStringLiteral("dd/MM/yyyy HH:mm")));
+        }
+    }
+    return QString();
+}
+
 Match MatchRepository::get(int id, QString *error) const
 {
     QSqlQuery q(m_db);
@@ -149,6 +177,18 @@ bool MatchRepository::update(const Match &match, QString *error)
 {
     if (!validate(match, error))
         return false;
+    if (match.status != QLatin1String("cancelled")) {
+        // Déplacer le match ne doit pas mettre un joueur déjà convoqué en conflit avec un autre match.
+        QList<int> ids;
+        for (const MatchPlayer &p : players(match.id))
+            ids.append(p.playerId);
+        QString dbError;
+        const QString conflict = slotConflict(match.id, match.startAt, ids, &dbError);
+        if (!conflict.isEmpty()) {
+            setError(error, dbError.isEmpty() ? conflict : dbError);
+            return false;
+        }
+    }
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "UPDATE football_match SET start_at = ?, opponent = ?, location = ?, home_away = ?, status = ?, "
@@ -234,6 +274,14 @@ bool MatchRepository::setPlayers(int matchId, const QList<MatchPlayer> &players,
         c.addBindValue(match.teamId);
         if (!c.exec() || !c.next() || c.value(0).toInt() == 0) {
             setError(error, QStringLiteral("Ce joueur n'appartient pas à l'équipe du match."));
+            return false;
+        }
+    }
+    if (match.status != QLatin1String("cancelled")) {
+        QString dbError;
+        const QString conflict = slotConflict(matchId, match.startAt, QList<int>(seen.begin(), seen.end()), &dbError);
+        if (!conflict.isEmpty()) {
+            setError(error, dbError.isEmpty() ? conflict : dbError);
             return false;
         }
     }

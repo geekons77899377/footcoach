@@ -7,7 +7,7 @@ validation Qt 6.9.
 import sys, os, datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "t_live.py")).read().split("errs=[]")[0])
-from PySide6.QtCore import QMetaObject, Q_ARG, Q_RETURN_ARG, QObject, Qt
+from PySide6.QtCore import QMetaObject, Q_ARG, Q_RETURN_ARG, QObject, Qt, QPointF
 errs = []
 def check(c, msg):
     print(("OK  " if c else "KO  ") + msg)
@@ -180,6 +180,62 @@ field(h, "opponentField").setProperty("text", "Brouillon"); h.spin(100)
 b.dataReplaced.emit()
 h.spin(400)
 check(page.property("editing") is False, "données remplacées : la fiche est fermée sans confirmation (rien à enregistrer vers l'ancienne base)")
+
+# --- 8. Convocations : un joueur ne peut pas être sur deux matchs au même créneau (message du backend affiché) ------------------
+h, b = make()
+go(h, "matches"); page = cls(h, "MatchesPage"); ed = cls(h, "MatchEditor")
+call(page, "newMatch", D(3)); h.spin(300)
+field(h, "opponentField").setProperty("text", "Match 1"); call(ed, "setRole", 1, "starter"); call(ed, "save"); h.spin(300)
+orig_set = b.setMatchPlayers
+class Refuse(object): pass
+def refusing(mid, entries, _o=orig_set):
+    return {"ok": False, "id": mid, "error": "P1 N1 est déjà convoqué au match contre Match 1 (15:00)."}
+b.setMatchPlayers = refusing
+call(ed, "setRole", 2, "starter"); call(ed, "save"); h.spin(300)
+check("déjà convoqué" in ed.property("errorText"), f"conflit de créneau : le message du backend est affiché ({ed.property('errorText')})")
+check(ed.property("dirty") is True, "les convocations refusées restent en attente (non perdues en silence)")
+
+# --- 9. Alignement : deux boutons seulement, visibles uniquement avec plusieurs éléments sélectionnés -------------------------------
+h, b = make()
+go(h, "matches"); page = cls(h, "MatchesPage"); ed = cls(h, "MatchEditor")
+call(page, "newMatch", D(4)); h.spin(300)
+field(h, "opponentField").setProperty("text", "Alignement"); call(ed, "save"); h.spin(300)
+call(ed, "openBoard"); h.spin(700)
+be = find(h, lambda o: o.metaObject().className().startswith("BoardEditor"))
+bm = be.findChild(QObject, "board")
+def vis_btn(name): return [x for x in items(h, name) if x.isVisible()]
+check(not find(h, lambda o: o.metaObject().className().startswith("ActionSheet") and o.property("title") == "Aligner la sélection"), "plus de menu d'alignement à huit entrées")
+for x, y in ((0.2, 0.3), (0.5, 0.6), (0.8, 0.45)):
+    QMetaObject.invokeMethod(bm, "addItem", Q_ARG("QVariant", "player"), Q_ARG("QVariant", x), Q_ARG("QVariant", y), Q_ARG("QVariant", "7"))
+QMetaObject.invokeMethod(bm, "clearSelection"); h.spin(200)
+check(len(vis_btn("alignHorizontal")) == 0, "aucun élément sélectionné : boutons masqués")
+QMetaObject.invokeMethod(bm, "selectItem", Q_ARG("QVariant", 0), Q_ARG("QVariant", False)); h.spin(200)
+check(len(vis_btn("alignHorizontal")) == 0 and len(vis_btn("alignVertical")) == 0, "un seul élément sélectionné : boutons masqués")
+QMetaObject.invokeMethod(bm, "selectAll"); h.spin(300)
+check(len(vis_btn("alignHorizontal")) == 1 and len(vis_btn("alignVertical")) == 1, "plusieurs éléments sélectionnés : les deux boutons apparaissent")
+check(len(vis_btn("alignHorizontal")) + len(vis_btn("alignVertical")) == 2, "exactement deux boutons d'alignement visibles")
+def click_btn(name):
+    it = vis_btn(name)[0]; p = it.mapToScene(QPointF(it.width() / 2, it.height() / 2)); h.click(p.x(), p.y())
+def coords():
+    m = bm.property("items")
+    return [(m.property("count"),)]
+import re, json
+def pts():
+    d = json.loads(str(QMetaObject.invokeMethod(bm, "toJson", Qt.DirectConnection, Q_RETURN_ARG("QVariant"))))
+    k = [x for x in d["items"][0].keys() if x in ("x", "nx")][0]
+    return [(round(i[k], 4), round(i[k.replace("x", "y")], 4)) for i in d["items"]]
+def screen_vertical(): return bool(find(h, lambda o: o.objectName() == "boardView").property("vertical"))
+p0 = pts()
+click_btn("alignHorizontal"); h.spin(300)
+p1 = pts()
+# Terrain affiché à la verticale (téléphone) : une ligne horizontale à l'écran a un nx constant ; sinon un ny constant.
+vert = screen_vertical()
+col = 0 if vert else 1
+check(len(set(p[col] for p in p1)) == 1 and p1 != p0, f"« aligner horizontalement » : tous sur la même ligne de l'écran ({p0} -> {p1})")
+click_btn("alignVertical"); h.spin(300)
+p2 = pts()
+col2 = 1 if vert else 0
+check(len(set(p[col2] for p in p2)) == 1, f"« aligner verticalement » : tous sur la même colonne de l'écran ({p2})")
 
 print("\n%s" % ("ECHECS : %d" % len(errs) if errs else "TOUT PASSE"))
 for e in errs: print("   KO ", e)

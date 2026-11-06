@@ -38,6 +38,11 @@ def flickables(root, acc=None):
 def bring_into_view(h, item):
     """Fait défiler l'accueil jusqu'à rendre l'élément visible, puis renvoie son centre (coordonnées de fenêtre)."""
     for fl in flickables(h.win.contentItem()):
+        anc = item.parentItem()
+        while anc is not None and anc != fl and anc != fl.property("contentItem"):
+            anc = anc.parentItem()
+        if anc is None:
+            continue                       # ce défilement ne contient pas l'élément (autre page)
         p = item.mapToItem(fl, QPointF(0, 0))
         if 0 <= p.y() <= prop(fl, "contentHeight") + 400 and prop(fl, "contentHeight") > prop(fl, "height"):
             fl.setProperty("contentY", max(0, prop(fl, "contentY") + p.y() - 120)); h.spin(300)
@@ -105,8 +110,8 @@ for (w, hgt) in [(360, 740), (412, 892)]:
         else:
             check(False, f"{tag} bouton Paramètres hors écran (y={y:.0f}) : défilement requis")
     h.click(*centre(tabs[0]))
-    # Tactique : carte « Ouvrir » de l'accueil
-    open_btn = [o for o in h.win.findChildren(QObject) if prop(o, "text") == "Ouvrir" and prop(o, "iconName") == "board"]
+    # Tactique : bouton « Tactique » de l'accueil (la carte « boîte à outils » a été retirée)
+    open_btn = [o for o in h.win.findChildren(QObject) if prop(o, "objectName") == "tacticsButton"]
     if open_btn:
         h.click(*centre(tabs[0]))
         x, y = bring_into_view(h, open_btn[0])
