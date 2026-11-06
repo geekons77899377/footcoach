@@ -13,10 +13,10 @@ class B2(Backend):
     def exercises(self, a): return [{"id":i,"title":t,"category":"technical","categoryLabel":c,"objective":"","durationMin":d,"playersMin":0,"playersMax":0,"equipment":"","description":"","archived":False,"usage":1} for i,(t,c,d) in enumerate(EX, 10)]
     @Slot(int,str,str,result="QVariantList")
     def sessions(self, team, a, b):
-        day = now.strftime("%Y-%m-%d")
         if self.mode == "none": return []
-        if self.mode == "next": st = now + datetime.timedelta(hours=2)
-        else: st = now - datetime.timedelta(minutes=10)
+        # La date vient de l'horaire calculé (sinon, après minuit, la séance « prochaine » tombe dans le passé).
+        st = now + datetime.timedelta(hours=2) if self.mode == "next" else now - datetime.timedelta(minutes=10)
+        day = st.strftime("%Y-%m-%d")
         return [{"id":7,"teamId":1,"date":day,"time":hhmm(st),"endTime":hhmm(st+datetime.timedelta(minutes=90)),"durationMin":90,"location":"","theme":"Transitions défensives","notes":"","status":"planned","present":-1,"total":-1}]
     @Slot(int,result="QVariantMap")
     def plan(self, sid):
