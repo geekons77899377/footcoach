@@ -41,6 +41,7 @@ Item {
     }
 
     function openExercise(e) {
+        AppState.clearReturn();               // ouverture depuis la liste : « retour » revient à la liste
         currentId = e.id;
         form.openExercise(e);
         editing = true;
@@ -70,8 +71,14 @@ Item {
     function goBack() {
         if (!editing)
             return false;
-        closeForm();
+        backFromForm();
         return true;
+    }
+
+    // Retour volontaire (flèche ou geste) : ferme la fiche, puis revient à la page d'origine si l'on vient d'ailleurs.
+    function backFromForm() {
+        closeForm();
+        AppState.leaveItem("exercises");
     }
 
     function newExercise() {
@@ -483,7 +490,7 @@ Item {
         height: page.height
         visible: page.editing
         showBack: !page.split
-        onCloseRequested: page.closeForm()
+        onCloseRequested: page.backFromForm()
         onSaved: {
             page.currentId = form.exerciseId;
             page.refresh();

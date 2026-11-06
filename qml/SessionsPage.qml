@@ -45,17 +45,23 @@ Item {
 
     function openSession(s) {
         editor.guardLeave(function () {    // un terrain de bloc ouvert doit d'abord être enregistré
+            AppState.clearReturn();        // ouverture depuis la liste : « retour » revient à la liste
             currentId = s.id;
             editor.openSession(s, switcher.current ? switcher.current.name : "");
             editing = true;
         });
     }
 
-    function closeEditor() {
+    // Fermeture technique (équipe, période, données remplacées) : on ne revient pas à une page d'origine.
+    function closeEditor() { closeAndReturn(false); }
+
+    function closeAndReturn(back) {
         editor.guardLeave(function () {    // un terrain de bloc encore ouvert est enregistré
             editor.leave(false);
             editing = false;
             currentId = -1;
+            if (back)
+                AppState.leaveItem("sessions");
         });
     }
 
@@ -72,13 +78,18 @@ Item {
         editor.showSaveFailed(action);
     }
 
+    // Retour volontaire (flèche ou geste) : ferme le plan, puis revient à la page d'origine si l'on vient d'ailleurs.
+    function backFromEditor() {
+        closeAndReturn(true);
+    }
+
     // Bouton retour du téléphone : ferme le plan ouvert. Retourne true si la page a utilisé le geste.
     function goBack() {
         if (!editing)
             return false;
         if (editor.goBack())               // terrain d'un bloc ouvert : on revient d'abord au plan
             return true;
-        closeEditor();
+        backFromEditor();
         return true;
     }
 
@@ -263,7 +274,7 @@ Item {
         height: page.height
         visible: page.editing
         showBack: !page.split
-        onCloseRequested: page.closeEditor()
+        onCloseRequested: page.backFromEditor()
         onChanged: page.refreshRows()
     }
 

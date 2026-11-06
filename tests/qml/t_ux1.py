@@ -70,7 +70,7 @@ check(len(rows) == 1 and rows[0]["theme"] == "Jeu de possession", "la liste des 
 sw = [o for o in page(h).findChildren(QObject) if o.property("teams") is not None and o.property("current") is not None][0]
 check(jv(sw.property("current"))["id"] == 2, "l'équipe de la séance est sélectionnée")
 back(h)
-check(page(h).property("editing") is False and h.win.property("section") == "sessions", "retour : liste des séances")
+check(page(h).property("editing") is False and h.win.property("section") == "calendar", "retour : on revient au Calendrier, d'où l'on venait")
 
 # --- 5. Le menu « Modifier » d'une séance du Calendrier suit le même chemin ------------------------------------------------------
 h, b = runux()

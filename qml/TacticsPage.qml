@@ -19,6 +19,7 @@ Item {
     // (dialogue : réessayer ou quitter sans enregistrer).
     function openBoard(id) {
         editor.leaveGuarded(function () {
+            AppState.clearReturn();       // ouverture depuis la liste : « retour » revient à la liste
             refresh();
             currentId = id;
             editor.open(id);
@@ -41,10 +42,12 @@ Item {
         return sqlUtc.substring(8, 10) + "/" + sqlUtc.substring(5, 7) + "/" + sqlUtc.substring(0, 4);
     }
 
+    // Retour volontaire (flèche ou geste) : ferme le schéma, puis revient à la page d'origine si l'on vient d'ailleurs.
     function closeEditor() {
         editor.leaveGuarded(function () {
             currentId = -1;
             refresh();
+            AppState.leaveItem("tactics");
         });
     }
 

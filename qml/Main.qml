@@ -100,6 +100,8 @@ ApplicationWindow {
                       exercises: exercisesPage, sessions: sessionsPage, tactics: tactics, settings: settingsPage })[section];
         if (page && page.goBack())
             return true;
+        if (AppState.leaveItem(section))        // ouverte depuis une autre page : retour à cette page
+            return true;
         if (section !== "home") {
             go("home", -1);
             return true;
@@ -143,9 +145,33 @@ ApplicationWindow {
     // Ouvre une séance existante : informations et plan sur le même écran (section Séances, équipe de la séance).
     function openSessionPlan(s) {
         AppState.teamId = s.teamId;              // avant l'entrée dans la page : sa liste se charge pour la bonne équipe
+        var from = section;
         go("sessions", -1);
-        if (section === "sessions")
+        if (section === "sessions") {
             sessionsPage.openSession(s);
+            if (from !== "sessions") {
+                AppState.returnTo = from;            // retour : la page d'où l'on vient (Calendrier)
+                AppState.returnFor = "sessions";
+            }
+        }
+    }
+
+    // Navigation « en profondeur » (liens de l'accueil, de Paramètres, d'un exercice...) : l'origine est retenue pour que
+    // « retour » y revienne. Les onglets et la barre de navigation n'en retiennent aucune.
+    function goFrom(id, itemId) {
+        var from = section;
+        go(id, itemId);
+        if (section === id && from !== id) {
+            AppState.returnTo = from;
+            AppState.returnFor = id;
+        }
+    }
+
+    onSectionChanged: if (section !== AppState.returnFor) AppState.clearReturn()
+
+    Connections {
+        target: AppState
+        function onReturnRequested(target) { win.go(target, -1); }
     }
 
     function enter(id, boardId) {
@@ -317,7 +343,7 @@ ApplicationWindow {
             currentIndex: win.indexOf(win.section)
 
             HomePage {
-                onNavigate: (section, boardId) => win.go(section, boardId)
+                onNavigate: (section, boardId) => win.goFrom(section, boardId)
             }
             SquadPage { id: squadPage }
             CalendarPage { id: calendarPage; onPlanRequested: (s) => win.openSessionPlan(s) }
@@ -326,7 +352,7 @@ ApplicationWindow {
             SessionsPage { id: sessionsPage }
             TacticsPage { id: tactics }
             DataPage { onImported: win.go("home", -1) }
-            SettingsPage { id: settingsPage; onNavigate: (section) => win.go(section, -1) }
+            SettingsPage { id: settingsPage; onNavigate: (section) => win.goFrom(section, -1) }
         }
 
         // --- Barre du bas (téléphone en portrait) ------------------------------------------------
