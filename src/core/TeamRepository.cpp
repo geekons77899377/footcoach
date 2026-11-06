@@ -19,11 +19,15 @@ QVariant nullIfEmpty(const QString &s)
 
 } // namespace
 
-QList<Team> TeamRepository::all(QString *error) const
+QList<Team> TeamRepository::all(QString *error, int clubId) const
 {
     QList<Team> teams;
     QSqlQuery q(m_db);
-    if (!q.exec(QStringLiteral("SELECT id, name, category, season FROM team ORDER BY name COLLATE NOCASE"))) {
+    q.prepare(QStringLiteral("SELECT id, name, category, season, club_id FROM team %1 ORDER BY name COLLATE NOCASE")
+                  .arg(clubId > 0 ? QStringLiteral("WHERE club_id = ?") : QString()));
+    if (clubId > 0)
+        q.addBindValue(clubId);
+    if (!q.exec()) {
         setError(error, q.lastError().text());
         return teams;
     }
@@ -33,6 +37,7 @@ QList<Team> TeamRepository::all(QString *error) const
         t.name = q.value(1).toString();
         t.category = q.value(2).toString();
         t.season = q.value(3).toString();
+        t.clubId = q.value(4).isNull() ? -1 : q.value(4).toInt();
         teams.append(t);
     }
     return teams;
@@ -41,10 +46,26 @@ QList<Team> TeamRepository::all(QString *error) const
 bool TeamRepository::insert(Team &team, QString *error)
 {
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("INSERT INTO team(name, category, season) VALUES(?, ?, ?)"));
+    if (team.clubId <= 0) {
+        if (!q.exec(QStringLiteral("SELECT MIN(id) FROM club")) || !q.next() || q.value(0).isNull()) {
+            setError(error, QStringLiteral("Aucun club : créez d'abord un club."));
+            return false;
+        }
+        team.clubId = q.value(0).toInt();
+    } else {
+        q.prepare(QStringLiteral("SELECT COUNT(*) FROM club WHERE id = ?"));
+        q.addBindValue(team.clubId);
+        if (!q.exec() || !q.next() || q.value(0).toInt() == 0) {
+            setError(error, QStringLiteral("Club introuvable."));
+            return false;
+        }
+    }
+    q = QSqlQuery(m_db);
+    q.prepare(QStringLiteral("INSERT INTO team(name, category, season, club_id) VALUES(?, ?, ?, ?)"));
     q.addBindValue(team.name.trimmed());
     q.addBindValue(nullIfEmpty(team.category));
     q.addBindValue(nullIfEmpty(team.season));
+    q.addBindValue(team.clubId);
     if (!q.exec()) {
         setError(error, q.lastError().text());
         return false;
@@ -75,6 +96,10 @@ bool TeamRepository::remove(int id, QString *error)
     q.addBindValue(id);
     if (!q.exec()) {
         setError(error, q.lastError().text());
+        return false;
+    }
+    if (q.numRowsAffected() == 0) {
+        setError(error, QStringLiteral("Équipe introuvable."));
         return false;
     }
     return true;

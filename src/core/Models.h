@@ -4,9 +4,16 @@
 #include <QDateTime>
 #include <QString>
 
+struct Club
+{
+    int id = -1;
+    QString name;
+};
+
 struct Team
 {
     int id = -1;
+    int clubId = -1;    // club de l'équipe (obligatoire en base) ; -1 à l'insertion : le premier club
     QString name;
     QString category;   // ex. U15, Seniors
     QString season;     // ex. 2026-2027
@@ -68,4 +75,26 @@ struct PlanEntry
     QString notes;
     int boardId = -1;           // terrain tactique propre à ce bloc (table tactical_board), -1 : aucun
     Exercise exercise;          // copie des champs de l'exercice (même archivé)
+};
+
+// Un match : distinct d'une séance et d'un exercice (table football_match).
+struct Match
+{
+    int id = -1;
+    int teamId = -1;
+    QDateTime startAt;          // heure locale, stockée en "yyyy-MM-ddTHH:mm"
+    QString opponent;
+    QString location;
+    QString homeAway = QStringLiteral("home");        // "home", "away"
+    QString status = QStringLiteral("planned");       // "planned", "played", "cancelled"
+    int scoreFor = -1;          // -1 : score inconnu (les deux scores vont ensemble)
+    int scoreAgainst = -1;
+    QString notes;
+};
+
+// Un joueur convoqué pour un match.
+struct MatchPlayer
+{
+    int playerId = -1;
+    QString role = QStringLiteral("starter");         // "starter" (titulaire), "substitute" (remplaçant)
 };

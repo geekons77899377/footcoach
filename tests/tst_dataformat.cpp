@@ -22,10 +22,19 @@
 
 namespace {
 
-const QStringList kTables = {QStringLiteral("team"),           QStringLiteral("player"),
-                             QStringLiteral("training_session"), QStringLiteral("attendance"),
-                             QStringLiteral("exercise"),       QStringLiteral("session_exercise"),
-                             QStringLiteral("tactical_board"), QStringLiteral("injury")};
+const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("team"),
+                             QStringLiteral("player"),         QStringLiteral("training_session"),
+                             QStringLiteral("attendance"),     QStringLiteral("football_match"),
+                             QStringLiteral("match_player"),   QStringLiteral("exercise"),
+                             QStringLiteral("session_exercise"), QStringLiteral("tactical_board"),
+                             QStringLiteral("injury")};
+
+// Tables présentes dans un fichier du schéma donné (le schéma 6 a ajouté club, football_match et match_player).
+bool tableExistsInSchema(const QString &t, int schema)
+{
+    return schema >= 6 || !(t == QLatin1String("club") || t == QLatin1String("football_match")
+                            || t == QLatin1String("match_player"));
+}
 
 QString fixturePath(int schema)
 {
@@ -99,6 +108,18 @@ const QStringList kSampleDataSchema5 = {
     "(SELECT id FROM session_exercise WHERE session_id=1 AND position=1))",
 };
 
+// Ajouts propres au schéma 6 : les équipes appartiennent au club créé par la migration, un match avec deux convoqués
+// et son schéma tactique.
+const QStringList kSampleDataSchema6 = {
+    "UPDATE team SET club_id = 1",
+    "INSERT INTO football_match(id,team_id,start_at,opponent,location,home_away,status,score_for,score_against,notes) "
+    "VALUES(1,1,'2026-11-08T15:00','FC Rivière','Stade d''Été','away','planned',NULL,NULL,'Match de championnat')",
+    "INSERT INTO match_player(match_id,player_id,role) VALUES(1,1,'starter')",
+    "INSERT INTO match_player(match_id,player_id,role) VALUES(1,2,'substitute')",
+    "INSERT INTO tactical_board(id,title,formation,scene_json,match_id) "
+    "VALUES(3,'Match contre FC Rivière','4-4-2','{\"items\":[{\"t\":\"player\",\"x\":0.75}]}',1)",
+};
+
 // Prépare un fichier de base au schéma « schema » (migrations 001 à 00N, user_version, données d'exemple), sans passer par Database.
 bool buildDatabaseAtSchema(const QString &dbFile, const QString &conn, int schema, QString *error)
 {
@@ -126,6 +147,10 @@ bool buildDatabaseAtSchema(const QString &dbFile, const QString &conn, int schem
         for (const QString &st : kSampleDataSchema5)
             if (ok && !(ok = q.exec(st)))
                 *error = q.lastError().text() + " / " + st;
+    if (ok && schema >= 6)
+        for (const QString &st : kSampleDataSchema6)
+            if (ok && !(ok = q.exec(st)))
+                *error = q.lastError().text() + " / " + st;
     return ok;
 }
 
@@ -149,6 +174,21 @@ private:
         return readJson(p).value("tables").toObject();
     }
 
+    // Le club par défaut d'un ancien fichier est créé à l'import : son horodatage n'est pas comparable d'un import à l'autre.
+    static QJsonObject stable(QJsonObject tables)
+    {
+        QJsonObject club = tables.value("club").toObject();
+        QJsonArray rows;
+        for (const QJsonValue &r : club.value("rows").toArray()) {
+            QJsonArray row = r.toArray();
+            row[row.size() - 1] = QString();
+            rows.append(row);
+        }
+        club["rows"] = rows;
+        tables["club"] = club;
+        return tables;
+    }
+
     QString tmpFile(const QJsonObject &o)
     {
         const QString p = m_dir.filePath(QStringLiteral("t%1.footcoach").arg(++m_counter));
@@ -162,6 +202,8 @@ private:
     void verifyContains(const QJsonObject &fileTables, const QJsonObject &dbTables)
     {
         for (const QString &t : kTables) {
+            if (!fileTables.contains(t))                 // fichier d'un schéma antérieur à la table : rien à comparer
+                continue;
             const QJsonArray fcols = fileTables.value(t).toObject().value("columns").toArray();
             const QJsonArray frows = fileTables.value(t).toObject().value("rows").toArray();
             const QJsonArray dcols = dbTables.value(t).toObject().value("columns").toArray();
@@ -198,7 +240,9 @@ private slots:
         if (out.isEmpty())
             QSKIP("Définir FOOTCOACH_WRITE_FIXTURES=<dossier> pour recréer les fichiers de référence");
         QVERIFY(QDir().mkpath(out));
-        for (int schema = 1; schema <= 5; ++schema) {
+        // Les fichiers 1 à 5 sont figés (créés par les versions d'époque) : seul le schéma courant se recrée, car l'export
+        // du code actuel ne sait plus lire une base d'un schéma sans club.
+        for (int schema = 6; schema <= 6; ++schema) {
             const QString conn = QStringLiteral("fixture-%1").arg(schema);
             const QString dbFile = m_dir.filePath(QStringLiteral("fx%1.db").arg(schema));
             {
@@ -207,6 +251,7 @@ private slots:
                 QSqlDatabase db = QSqlDatabase::database(conn);
                 QCoreApplication::setApplicationVersion(schema == 4 ? QStringLiteral("0.8.0")
                                                         : schema == 5 ? QStringLiteral("0.10.0")
+                                                        : schema == 6 ? QStringLiteral("0.11.0")
                                                                       : QStringLiteral("reconstitue-schema-%1").arg(schema));
                 Backend b(db);
                 QVERIFY(b.exportDataFile(QDir(out).filePath(QStringLiteral("schema%1.footcoach").arg(schema))).value("ok").toBool());
@@ -219,15 +264,17 @@ private slots:
     void referenceFilesHaveTheV1Structure()
     {
         const QStringList keys = {"app", "exportedAt", "format", "schema", "tables", "version"};
-        for (int schema = 1; schema <= 5; ++schema) {
+        for (int schema = 1; schema <= 6; ++schema) {
             const QJsonObject o = readJson(fixturePath(schema));
             QVERIFY2(!o.isEmpty(), qPrintable(fixturePath(schema)));
             QCOMPARE(o.keys(), keys);
             QCOMPARE(o.value("format").toString(), QStringLiteral("footcoach-data"));
             QCOMPARE(o.value("version").toInt(), 1);
             QCOMPARE(o.value("schema").toInt(), schema);
-            QCOMPARE(o.value("tables").toObject().keys().size(), kTables.size());
+            QCOMPARE(o.value("tables").toObject().keys().size(), schema >= 6 ? kTables.size() : kTables.size() - 3);
             for (const QString &t : kTables) {
+                if (!tableExistsInSchema(t, schema))
+                    continue;
                 const QJsonObject tb = o.value("tables").toObject().value(t).toObject();
                 QVERIFY(tb.value("columns").isArray());
                 QVERIFY(tb.value("rows").isArray());
@@ -237,19 +284,31 @@ private slots:
         QCOMPARE(readJson(fixturePath(5)).value("app").toString(), QStringLiteral("0.10.0"));
     }
 
-    // Un export fait aujourd'hui doit garder exactement la structure du fichier de référence du schéma courant (5),
+    // Le fichier du schéma 6 contient bien les nouvelles données : club, match, convoqués, schéma tactique de match.
+    void schema6ReferenceFileHasClubsAndMatches()
+    {
+        const QJsonObject t = readJson(fixturePath(6)).value("tables").toObject();
+        auto rows = [&](const char *name) { return t.value(QLatin1String(name)).toObject().value("rows").toArray().size(); };
+        QCOMPARE(rows("club"), 1);
+        QCOMPARE(rows("team"), 2);
+        QCOMPARE(rows("football_match"), 1);
+        QCOMPARE(rows("match_player"), 2);
+        QCOMPARE(rows("tactical_board"), 3);
+    }
+
+    // Un export fait aujourd'hui doit garder exactement la structure du fichier de référence du schéma courant (6),
     // et ne retirer aucune colonne du fichier de référence de la 0.8.0 (schéma 4) : le format v1 évolue par ajout de colonnes.
     void currentExportKeepsTheV1Structure()
     {
         Backend b(m_db.handle());
         const QString p = m_dir.filePath(QStringLiteral("now.footcoach"));
         QVERIFY(b.exportDataFile(p).value("ok").toBool());
-        const QJsonObject now = readJson(p), ref = readJson(fixturePath(5)), old = readJson(fixturePath(4));
+        const QJsonObject now = readJson(p), ref = readJson(fixturePath(6)), old = readJson(fixturePath(4));
         QCOMPARE(now.keys(), ref.keys());
         QCOMPARE(now.value("format"), ref.value("format"));
         QCOMPARE(now.value("version"), ref.value("version"));
         QCOMPARE(now.value("schema"), ref.value("schema"));
-        QCOMPARE(now.value("schema").toInt(), 5);
+        QCOMPARE(now.value("schema").toInt(), 6);
         for (const QString &t : kTables) {
             const QJsonArray cols = now.value("tables").toObject().value(t).toObject().value("columns").toArray();
             QCOMPARE(cols, ref.value("tables").toObject().value(t).toObject().value("columns").toArray());
@@ -259,14 +318,14 @@ private slots:
                 QCOMPARE(cols.at(i), oldCols.at(i));
         }
         QCOMPARE(now.value("tables").toObject().value("tactical_board").toObject().value("columns").toArray().size(),
-                 old.value("tables").toObject().value("tactical_board").toObject().value("columns").toArray().size() + 1);
+                 old.value("tables").toObject().value("tactical_board").toObject().value("columns").toArray().size() + 2);
     }
 
     // ----- Rétrocompatibilité : chaque fichier de référence s'importe sur le schéma courant -----
     void importReferenceFiles_data()
     {
         QTest::addColumn<int>("schema");
-        for (int s = 1; s <= 5; ++s)
+        for (int s = 1; s <= 6; ++s)
             QTest::newRow(qPrintable(QStringLiteral("schema %1").arg(s))) << s;
     }
 
@@ -282,7 +341,9 @@ private slots:
         QCOMPARE(info.value("counts").toMap().value("teams").toInt(), 2);
         QCOMPARE(info.value("counts").toMap().value("players").toInt(), 3);
         QCOMPARE(info.value("counts").toMap().value("sessions").toInt(), 2);
-        QCOMPARE(info.value("counts").toMap().value("boards").toInt(), schema >= 5 ? 2 : 1);
+        QCOMPARE(info.value("counts").toMap().value("boards").toInt(), schema >= 6 ? 3 : (schema >= 5 ? 2 : 1));
+        QCOMPARE(info.value("counts").toMap().value("clubs").toInt(), schema >= 6 ? 1 : 0);
+        QCOMPARE(info.value("counts").toMap().value("matches").toInt(), schema >= 6 ? 1 : 0);
 
         const QVariantMap r = b.importDataFile(url(file));
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
@@ -294,6 +355,19 @@ private slots:
         QCOMPARE(b.teams().size(), 2);
         const int team = b.teams().at(0).toMap().value("id").toInt();
         QCOMPARE(team, 1);
+        // Club : un fichier d'avant le schéma 6 n'en a pas, ses équipes rejoignent un club par défaut (aucune sans club).
+        QCOMPARE(b.clubs().size(), 1);
+        for (const QVariant &t : b.teams())
+            QCOMPARE(t.toMap().value("clubId").toInt(), b.clubs().at(0).toMap().value("id").toInt());
+        if (schema >= 6) {
+            const QVariantMap m = b.match(1);
+            QVERIFY(m.value("ok").toBool());
+            QCOMPARE(m.value("match").toMap().value("opponent").toString(), QStringLiteral("FC Rivière"));
+            QCOMPARE(m.value("players").toList().size(), 2);
+            QVERIFY(m.value("boardId").toInt() > 0);
+        } else {
+            QCOMPARE(b.matches(1, QStringLiteral("2000-01-01"), QStringLiteral("2100-01-01")).size(), 0);
+        }
         QCOMPARE(b.players(1, true).size(), 2);
         QCOMPARE(b.players(1, false).size(), 1);                 // un joueur inactif
         QStringList lastNames;
@@ -322,9 +396,9 @@ private slots:
         QCOMPARE(all.size(), exercisesInFile);
 
         // Réexporter puis réimporter ne change rien (idempotence).
-        const QJsonObject first = snapshot(b);
+        const QJsonObject first = stable(snapshot(b));
         QVERIFY(b.importDataFile(url(file)).value("ok").toBool());
-        QCOMPARE(snapshot(b), first);
+        QCOMPARE(stable(snapshot(b)), first);
 
         // Étape 2 : le terrain d'un bloc fonctionne sur les données issues de chaque schéma de fichier (1 à 5).
         const QVariantMap block = b.plan(1).value("entries").toList().first().toMap();
@@ -342,7 +416,8 @@ private slots:
                  schema < 5);
         QCOMPARE(b.boards().size(), 1);                                          // la bibliothèque ne montre pas les terrains de bloc
         // 2 terrains au total : le schéma de référence du fichier et le terrain du bloc (créé ici, ou celui du fichier 5)
-        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
+        // (+ le schéma tactique du match dans le fichier 6)
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), schema >= 6 ? 3 : 2);
     }
 
     // ----- Migration 005 : base réelle au schéma 4 ouverte par le code courant -----
@@ -358,7 +433,7 @@ private slots:
         Database db;
         QString error;
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 5);
+        QCOMPARE(db.schemaVersion(), 6);
         QSqlQuery q(db.handle());
         auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
         QCOMPARE(count("SELECT COUNT(*) FROM team"), 2);
@@ -376,6 +451,12 @@ private slots:
         QCOMPARE(q.value(3).toInt(), 8);
         QVERIFY(!q.value(4).isNull());
         QCOMPARE(q.value(5).toInt(), 1);
+        // Schéma 6 : un club par défaut reçoit toutes les équipes existantes ; aucune donnée de match.
+        QCOMPARE(count("SELECT COUNT(*) FROM club"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM team WHERE club_id = (SELECT id FROM club)"), 2);
+        QCOMPARE(count("SELECT COUNT(*) FROM team WHERE club_id IS NULL"), 0);
+        QCOMPARE(count("SELECT COUNT(*) FROM football_match"), 0);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE match_id IS NOT NULL"), 0);
         QCOMPARE(count("PRAGMA foreign_keys"), 1);                               // actives sur la connexion de l'application
         QCOMPARE(count("SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
         QCOMPARE(count("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_board_session_exercise'"), 1);
@@ -383,7 +464,7 @@ private slots:
         // Rouvrir ne rejoue rien.
         db.close();
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 5);
+        QCOMPARE(db.schemaVersion(), 6);
         QSqlQuery q2(db.handle());
         QVERIFY(q2.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board")) && q2.next());
         QCOMPARE(q2.value(0).toInt(), 1);
@@ -408,12 +489,12 @@ private slots:
     void fileNewerThanCurrentSchemaIsRefusedWithAClearMessage()
     {
         Backend b(m_db.handle());
-        QJsonObject root = readJson(fixturePath(5));
-        root["schema"] = 6;
+        QJsonObject root = readJson(fixturePath(6));
+        root["schema"] = 7;
         const QVariantMap r = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r.value("ok").toBool());
         QVERIFY2(r.value("error").toString().contains(QStringLiteral("plus récente")), qPrintable(r.value("error").toString()));
-        root = readJson(fixturePath(5));
+        root = readJson(fixturePath(6));
         root["version"] = 2;
         const QVariantMap r2 = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r2.value("ok").toBool());
@@ -434,7 +515,7 @@ private slots:
     {
         QTest::addColumn<QByteArray>("mutation");
         QTest::addColumn<QString>("messagePart");
-        QTest::newRow("schema plus récent") << QByteArray("schema=6") << QString("plus récente");
+        QTest::newRow("schema plus récent") << QByteArray("schema=7") << QString("plus récente");
         QTest::newRow("schema très grand") << QByteArray("schema=999") << QString("plus récente");
         QTest::newRow("schema absent") << QByteArray("schema=remove") << QString("");
         QTest::newRow("schema nul") << QByteArray("schema=0") << QString("");

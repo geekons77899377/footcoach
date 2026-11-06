@@ -24,10 +24,18 @@ constexpr qint64 kMaxBytes = 64LL * 1024 * 1024;
 constexpr int kMaxRows = 500000;
 
 // Ordre d'insertion (parents avant enfants) ; la suppression se fait dans l'ordre inverse.
-const QStringList kTables = {QStringLiteral("team"),           QStringLiteral("player"),
-                             QStringLiteral("training_session"), QStringLiteral("attendance"),
-                             QStringLiteral("exercise"),       QStringLiteral("session_exercise"),
-                             QStringLiteral("tactical_board"), QStringLiteral("injury")};
+const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("team"),
+                             QStringLiteral("player"),         QStringLiteral("training_session"),
+                             QStringLiteral("attendance"),     QStringLiteral("football_match"),
+                             QStringLiteral("match_player"),   QStringLiteral("exercise"),
+                             QStringLiteral("session_exercise"), QStringLiteral("tactical_board"),
+                             QStringLiteral("injury")};
+
+// Tables ajoutées par le schéma 6 : absentes des fichiers plus anciens, ce qui est normal.
+bool isSchema6Table(const QString &t)
+{
+    return t == QLatin1String("club") || t == QLatin1String("football_match") || t == QLatin1String("match_player");
+}
 
 QVariantMap done(bool ok, const QString &error = QString())
 {
@@ -114,6 +122,8 @@ QVariantMap countsOf(const QJsonObject &tables)
     c.insert(QStringLiteral("sessions"), n("training_session"));
     c.insert(QStringLiteral("exercises"), n("exercise"));
     c.insert(QStringLiteral("boards"), n("tactical_board"));
+    c.insert(QStringLiteral("clubs"), n("club"));
+    c.insert(QStringLiteral("matches"), n("football_match"));
     return c;
 }
 
@@ -239,6 +249,8 @@ bool Backend::parseDataFile(const QString &url, QJsonObject *root, QString *erro
     int total = 0;
     for (const QString &t : kTables) {
         const QJsonObject o = tables.value(t).toObject();
+        if (fileSchema < 6 && isSchema6Table(t))
+            continue;
         if (!o.value(QStringLiteral("columns")).isArray() || !o.value(QStringLiteral("rows")).isArray()) {
             *error = tr("Fichier incomplet (table « %1 » absente).").arg(t);
             return false;
@@ -354,6 +366,26 @@ QVariantMap Backend::importDataFile(const QString &url)
                 ok = false;
                 break;
             }
+        }
+    }
+
+    // Clubs (schéma 6) : un fichier plus ancien n'en a pas, ses équipes rejoignent un club par défaut. Un fichier récent
+    // doit lier chaque équipe à un club existant (clé étrangère) : sinon refus total.
+    if (ok) {
+        QSqlQuery c(m_db);
+        if (root.value(QStringLiteral("schema")).toInt(-1) < 6) {
+            ok = c.exec(QStringLiteral("INSERT INTO club(id, name) VALUES(1, 'Mon club')"))
+                && c.exec(QStringLiteral("UPDATE team SET club_id = (SELECT MIN(id) FROM club)"));
+            if (!ok)
+                failure = c.lastError().text();
+        } else if (c.exec(QStringLiteral("SELECT COUNT(*) FROM team WHERE club_id IS NULL")) && c.next()
+                   && c.value(0).toInt() > 0) {
+            ok = false;
+            failure = tr("équipe sans club");
+        } else if (c.exec(QStringLiteral("SELECT COUNT(*) FROM club")) && c.next() && c.value(0).toInt() == 0) {
+            ok = c.exec(QStringLiteral("INSERT INTO club(id, name) VALUES(1, 'Mon club')"));
+            if (!ok)
+                failure = c.lastError().text();
         }
     }
 

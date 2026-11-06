@@ -12,7 +12,7 @@
 #include <QJsonObject>
 
 Backend::Backend(const QSqlDatabase &db, QObject *parent)
-    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_players(db), m_sessions(db), m_attendance(db), m_exercises(db), m_plan(db)
+    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_clubs(db), m_matches(db), m_players(db), m_sessions(db), m_attendance(db), m_exercises(db), m_plan(db)
 {
 }
 
@@ -49,6 +49,7 @@ QVariantList Backend::boards()
         m.insert(QStringLiteral("exerciseId"), r.exerciseId);
         m.insert(QStringLiteral("sessionId"), r.sessionId);
         m.insert(QStringLiteral("sessionExerciseId"), r.sessionExerciseId);
+        m.insert(QStringLiteral("matchId"), r.matchId);
         const bool readable = Tactics::fromJson(r.sceneJson, &parsed);
         m.insert(QStringLiteral("readable"), readable);
         m.insert(QStringLiteral("itemCount"), readable ? int(parsed.items.size()) : 0);
@@ -246,15 +247,55 @@ QVariantMap toMap(const Player &p)
 
 } // namespace
 
-QVariantList Backend::teams()
+QVariantList Backend::clubs()
 {
     QVariantList list;
     QString error;
-    const QList<Team> all = m_teams.all(&error);
+    const QList<Club> all = m_clubs.all(&error);
+    setError(error);
+    for (const Club &c : all) {
+        QVariantMap m;
+        m.insert(QStringLiteral("id"), c.id);
+        m.insert(QStringLiteral("name"), c.name);
+        m.insert(QStringLiteral("teamCount"), m_clubs.teamCount(c.id));
+        list.append(m);
+    }
+    return list;
+}
+
+QVariantMap Backend::saveClub(const QVariantMap &club)
+{
+    Club c;
+    c.id = club.value(QStringLiteral("id"), -1).toInt();
+    c.name = club.value(QStringLiteral("name")).toString().trimmed();
+    if (c.name.isEmpty()) {
+        setError(tr("Le nom du club est obligatoire."));
+        return result(false, -1, m_lastError);
+    }
+    QString error;
+    const bool ok = c.id > 0 ? m_clubs.update(c, &error) : m_clubs.insert(c, &error);
+    setError(error);
+    return ok ? result(true, c.id) : result(false, -1, error);
+}
+
+QVariantMap Backend::deleteClub(int id)
+{
+    QString error;
+    const bool ok = m_clubs.remove(id, &error);
+    setError(error);
+    return result(ok, id, error);
+}
+
+QVariantList Backend::teams(int clubId)
+{
+    QVariantList list;
+    QString error;
+    const QList<Team> all = m_teams.all(&error, clubId);
     setError(error);
     for (const Team &t : all) {
         QVariantMap m;
         m.insert(QStringLiteral("id"), t.id);
+        m.insert(QStringLiteral("clubId"), t.clubId);
         m.insert(QStringLiteral("name"), t.name);
         m.insert(QStringLiteral("category"), t.category);
         m.insert(QStringLiteral("season"), t.season);
@@ -268,6 +309,7 @@ QVariantMap Backend::saveTeam(const QVariantMap &team)
 {
     Team t;
     t.id = team.value(QStringLiteral("id"), -1).toInt();
+    t.clubId = team.value(QStringLiteral("clubId"), -1).toInt();
     t.name = team.value(QStringLiteral("name")).toString().trimmed();
     t.category = team.value(QStringLiteral("category")).toString().trimmed();
     t.season = team.value(QStringLiteral("season")).toString().trimmed();

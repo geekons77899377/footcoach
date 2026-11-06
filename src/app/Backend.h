@@ -2,6 +2,8 @@
 
 #include "core/BoardRepository.h"
 #include "core/AttendanceRepository.h"
+#include "core/ClubRepository.h"
+#include "core/MatchRepository.h"
 #include "core/ExerciseRepository.h"
 #include "core/PlanRepository.h"
 #include "core/PlayerRepository.h"
@@ -54,9 +56,17 @@ public:
     Q_INVOKABLE QVariantList palette() const;
 
     // --- Équipes et joueurs ---------------------------------------------------------------------
-    // Équipes : [{id, name, category, season, playerCount}], triées comme dans la base.
-    Q_INVOKABLE QVariantList teams();
-    // Crée (id absent ou <= 0) ou modifie une équipe : {id, name, category, season}. Résultat {ok, id, error}.
+    // Clubs : [{id, name, teamCount}], triés par nom. Un club regroupe des équipes ; toute équipe appartient à un club.
+    Q_INVOKABLE QVariantList clubs();
+    // Crée (id absent ou <= 0) ou renomme un club : {id, name}. Résultat {ok, id, error}.
+    Q_INVOKABLE QVariantMap saveClub(const QVariantMap &club);
+    // Supprime le club et, en cascade, ses équipes, joueurs, séances et matchs. Refusé pour le dernier club.
+    Q_INVOKABLE QVariantMap deleteClub(int id);
+    // Équipes : [{id, clubId, name, category, season, playerCount}], triées comme dans la base ; clubId > 0 : celles de
+    // ce club seulement.
+    Q_INVOKABLE QVariantList teams(int clubId = -1);
+    // Crée (id absent ou <= 0) ou modifie une équipe : {id, clubId (création : premier club si absent), name, category,
+    // season}. Le club d'une équipe existante ne change pas. Résultat {ok, id, error}.
     Q_INVOKABLE QVariantMap saveTeam(const QVariantMap &team);
     Q_INVOKABLE QVariantMap deleteTeam(int id);         // supprime aussi joueurs, séances et présences (cascade)
     // Joueurs d'une équipe : [{id, teamId, firstName, lastName, fullName, birthDate (yyyy-MM-dd ou vide),
@@ -86,6 +96,26 @@ public:
     // chevauchent d'autres et que force est faux.
     Q_INVOKABLE QVariantMap previewRecurrence(const QVariantMap &rule);
     Q_INVOKABLE QVariantMap createRecurring(const QVariantMap &rule, bool force);
+
+    // --- Matchs ----------------------------------------------------------------------------------------
+    // Matchs de l'équipe dont le jour est entre from et to (AAAA-MM-JJ, inclus), par date : [{id, teamId, date, time,
+    // opponent, location, homeAway (home|away), status (planned|played|cancelled), scoreFor, scoreAgainst (-1 si
+    // inconnu), notes, convoked (nombre de joueurs convoqués), hasBoard}].
+    Q_INVOKABLE QVariantList matches(int teamId, const QString &from, const QString &to);
+    Q_INVOKABLE QStringList matchDates(int teamId, const QString &from, const QString &to);
+    // Un match avec ses convoqués : {ok, error, match: {...}, players: [{playerId, name, jerseyNumber, role}], boardId}.
+    Q_INVOKABLE QVariantMap match(int id);
+    // Crée (id absent ou <= 0) ou modifie un match : {id, teamId, date, time (HH:mm), opponent, location, homeAway,
+    // status, scoreFor, scoreAgainst, notes}. Résultat {ok, id, error}.
+    Q_INVOKABLE QVariantMap saveMatch(const QVariantMap &match);
+    Q_INVOKABLE QVariantMap deleteMatch(int id);         // supprime aussi convocations et schéma tactique
+    // Remplace les convoqués : entries [{playerId, role (starter|substitute)}]. Refus (rien n'est modifié) si un
+    // joueur n'est pas de l'équipe du match.
+    Q_INVOKABLE QVariantMap setMatchPlayers(int matchId, const QVariantList &entries);
+    // Schéma tactique du match, créé à la demande (terrain vide, titre « Match contre … »). Idempotent :
+    // {ok, error, id, boardId, created}. L'ouverture, l'enregistrement et le retrait se font avec board(), saveBoard()
+    // et deleteBoard().
+    Q_INVOKABLE QVariantMap createMatchBoard(int matchId);
 
     // --- Appel et statistiques de présence ----------------------------------------------------------
     // Feuille d'appel : {ok, error, session: {...}, players: [{playerId, name, jerseyNumber, active, status, note}]}
@@ -158,6 +188,8 @@ private:
     QSqlDatabase m_db;
     BoardRepository m_repo;
     TeamRepository m_teams;
+    ClubRepository m_clubs;
+    MatchRepository m_matches;
     PlayerRepository m_players;
     SessionRepository m_sessions;
     AttendanceRepository m_attendance;

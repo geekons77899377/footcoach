@@ -22,7 +22,7 @@ QVariant nullIfEmpty(const QString &s)
     return s.trimmed().isEmpty() ? QVariant() : QVariant(s.trimmed());
 }
 
-const char *kColumns = "id, title, formation, scene_json, exercise_id, session_id, session_exercise_id, updated_at";
+const char *kColumns = "id, title, formation, scene_json, exercise_id, session_id, session_exercise_id, match_id, updated_at";
 
 BoardRecord readRecord(const QSqlQuery &q)
 {
@@ -34,7 +34,8 @@ BoardRecord readRecord(const QSqlQuery &q)
     b.exerciseId = q.value(4).isNull() ? -1 : q.value(4).toInt();
     b.sessionId = q.value(5).isNull() ? -1 : q.value(5).toInt();
     b.sessionExerciseId = q.value(6).isNull() ? -1 : q.value(6).toInt();
-    b.updatedAt = q.value(7).toString();
+    b.matchId = q.value(7).isNull() ? -1 : q.value(7).toInt();
+    b.updatedAt = q.value(8).toString();
     return b;
 }
 
@@ -46,7 +47,7 @@ QList<BoardRecord> BoardRepository::list(QString *error, bool includeBlockBoards
     QSqlQuery q(m_db);
     if (!q.exec(QStringLiteral("SELECT %1 FROM tactical_board %2 ORDER BY title COLLATE NOCASE, id")
                     .arg(QLatin1String(kColumns),
-                         includeBlockBoards ? QString() : QStringLiteral("WHERE session_exercise_id IS NULL")))) {
+                         includeBlockBoards ? QString() : QStringLiteral("WHERE session_exercise_id IS NULL AND match_id IS NULL")))) {
         setError(error, q.lastError().text());
         return result;
     }
@@ -68,6 +69,23 @@ bool BoardRepository::get(int id, BoardRecord *out, QString *error) const
         setError(error, QStringLiteral("Schéma introuvable."));
         return false;
     }
+    *out = readRecord(q);
+    return true;
+}
+
+bool BoardRepository::forMatch(int matchId, BoardRecord *out, QString *error) const
+{
+    setError(error, QString());
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT %1 FROM tactical_board WHERE match_id = ? ORDER BY id LIMIT 1")
+                  .arg(QLatin1String(kColumns)));
+    q.addBindValue(matchId);
+    if (!q.exec()) {
+        setError(error, q.lastError().text());
+        return false;
+    }
+    if (!q.next())
+        return false;
     *out = readRecord(q);
     return true;
 }
@@ -151,8 +169,27 @@ QList<BoardRecord> BoardRepository::forSession(int sessionId, QString *error) co
 }
 
 bool BoardRepository::checkLinks(const BoardRecord &board, int previousExerciseId, int previousBlockId,
-                                 QString *error) const
+                                 int previousMatchId, QString *error) const
 {
+    if (board.matchId > 0 && (board.exerciseId > 0 || board.sessionId > 0 || board.sessionExerciseId > 0)) {
+        setError(error, QStringLiteral("Le schéma d'un match ne peut pas être lié à un exercice, une séance "
+                                       "ou un bloc."));
+        return false;
+    }
+    if (board.matchId > 0 && board.matchId != previousMatchId) {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral("SELECT COUNT(*) FROM tactical_board WHERE match_id = ? AND id != ?"));
+        q.addBindValue(board.matchId);
+        q.addBindValue(board.id);
+        if (!q.exec() || !q.next()) {
+            setError(error, q.lastError().text());
+            return false;
+        }
+        if (q.value(0).toInt() > 0) {
+            setError(error, QStringLiteral("Ce match a déjà un schéma tactique."));
+            return false;
+        }
+    }
     if (board.sessionExerciseId > 0 && (board.exerciseId > 0 || board.sessionId > 0)) {
         setError(error, QStringLiteral("Le terrain d'un bloc ne peut pas être aussi un schéma de référence "
                                        "ni être lié à une séance."));
@@ -203,7 +240,7 @@ bool BoardRepository::validateAllLinks(bool referenceUniqueness, QStringList *pr
     for (const BoardRecord &b : all) {
         QString why;
         // Sans unicité de référence, l'exercice lié est traité comme « déjà lié » : seul le lien d'un bloc est contrôlé.
-        if (!checkLinks(b, referenceUniqueness ? -1 : b.exerciseId, -1, &why)) {
+        if (!checkLinks(b, referenceUniqueness ? -1 : b.exerciseId, -1, -1, &why)) {
             valid = false;
             if (problems)
                 problems->append(QStringLiteral("terrain n° %1 « %2 » : %3").arg(b.id).arg(b.title, why));
@@ -214,18 +251,19 @@ bool BoardRepository::validateAllLinks(bool referenceUniqueness, QStringList *pr
 
 bool BoardRepository::insert(BoardRecord &board, QString *error)
 {
-    if (!checkLinks(board, -1, -1, error))
+    if (!checkLinks(board, -1, -1, -1, error))
         return false;
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "INSERT INTO tactical_board(title, formation, scene_json, exercise_id, session_id, session_exercise_id) "
-        "VALUES(?, ?, ?, ?, ?, ?)"));
+        "INSERT INTO tactical_board(title, formation, scene_json, exercise_id, session_id, session_exercise_id, "
+        "match_id) VALUES(?, ?, ?, ?, ?, ?, ?)"));
     q.addBindValue(board.title.trimmed());
     q.addBindValue(nullIfEmpty(board.formation));
     q.addBindValue(board.sceneJson.isEmpty() ? QStringLiteral("{}") : board.sceneJson);
     q.addBindValue(nullIfNotPositive(board.exerciseId));
     q.addBindValue(nullIfNotPositive(board.sessionId));
     q.addBindValue(nullIfNotPositive(board.sessionExerciseId));
+    q.addBindValue(nullIfNotPositive(board.matchId));
     if (!q.exec()) {
         setError(error, q.lastError().text());
         return false;
@@ -242,18 +280,19 @@ bool BoardRepository::update(const BoardRecord &board, QString *error)
         setError(error, lookupError);
         return false;
     }
-    if (!checkLinks(board, previous.exerciseId, previous.sessionExerciseId, error))
+    if (!checkLinks(board, previous.exerciseId, previous.sessionExerciseId, previous.matchId, error))
         return false;
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "UPDATE tactical_board SET title = ?, formation = ?, scene_json = ?, exercise_id = ?, session_id = ?, "
-        "session_exercise_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"));
+        "session_exercise_id = ?, match_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"));
     q.addBindValue(board.title.trimmed());
     q.addBindValue(nullIfEmpty(board.formation));
     q.addBindValue(board.sceneJson.isEmpty() ? QStringLiteral("{}") : board.sceneJson);
     q.addBindValue(nullIfNotPositive(board.exerciseId));
     q.addBindValue(nullIfNotPositive(board.sessionId));
     q.addBindValue(nullIfNotPositive(board.sessionExerciseId));
+    q.addBindValue(nullIfNotPositive(board.matchId));
     q.addBindValue(board.id);
     if (!q.exec()) {
         setError(error, q.lastError().text());
@@ -269,6 +308,10 @@ bool BoardRepository::remove(int id, QString *error)
     q.addBindValue(id);
     if (!q.exec()) {
         setError(error, q.lastError().text());
+        return false;
+    }
+    if (q.numRowsAffected() == 0) {
+        setError(error, QStringLiteral("Schéma introuvable."));
         return false;
     }
     return true;

@@ -11,6 +11,7 @@
 //  - schéma de référence d'un exercice : exerciseId renseigné (au plus un par exercice) ;
 //  - terrain d'un bloc de séance (une ligne du plan) : sessionExerciseId renseigné, exerciseId et sessionId vides ;
 //    c'est une copie indépendante : le modifier ne touche jamais le schéma de référence ;
+//  - schéma tactique d'un match : matchId renseigné (au plus un par match), tous les autres liens vides ;
 //  - schéma libre ou lié à une séance : sessionId éventuel.
 struct BoardRecord
 {
@@ -21,6 +22,7 @@ struct BoardRecord
     int exerciseId = -1;    // -1 : non lié
     int sessionId = -1;     // -1 : non lié
     int sessionExerciseId = -1;   // bloc de séance (session_exercise.id) dont c'est le terrain, -1 : aucun
+    int matchId = -1;             // match (football_match.id) dont c'est le schéma tactique, -1 : aucun
     QString updatedAt;      // renseigné par la base (UTC, "yyyy-MM-dd HH:mm:ss")
 };
 
@@ -29,14 +31,16 @@ class BoardRepository
 public:
     explicit BoardRepository(const QSqlDatabase &db) : m_db(db) {}
 
-    // Tous les schémas, triés par titre. Les terrains de blocs n'en font pas partie si includeBlockBoards est faux
-    // (c'est la liste de la bibliothèque de schémas).
+    // Tous les schémas, triés par titre. Les terrains de blocs et les schémas de match n'en font pas partie si
+    // includeBlockBoards est faux (c'est la liste de la bibliothèque de schémas).
     QList<BoardRecord> list(QString *error = nullptr, bool includeBlockBoards = true) const;
     // Un schéma par son id. false (et message dans *error) s'il n'existe pas ou en cas d'erreur de la base.
     bool get(int id, BoardRecord *out, QString *error = nullptr) const;
     // Terrain d'un bloc. true s'il existe. false sans message : le bloc n'a pas de terrain ; false avec message :
     // erreur de la base.
     bool forBlock(int sessionExerciseId, BoardRecord *out, QString *error = nullptr) const;
+    // Schéma tactique d'un match. true s'il existe. false sans message : le match n'en a pas ; avec message : erreur.
+    bool forMatch(int matchId, BoardRecord *out, QString *error = nullptr) const;
     // Terrains de tous les blocs d'une séance, triés par id.
     QList<BoardRecord> forBlocksOfSession(int sessionId, QString *error = nullptr) const;
     // Schéma de référence d'un exercice. true s'il existe. Si d'anciennes données en comptent plusieurs (possible
@@ -53,6 +57,7 @@ public:
     // Mêmes refus que insert(), mais seulement quand le lien (bloc ou exercice) change : on peut toujours enregistrer
     // le contenu d'un schéma ancien déjà lié.
     bool update(const BoardRecord &board, QString *error = nullptr);
+    // false (avec message) si le schéma n'existe pas : une suppression qui ne touche aucune ligne n'est pas un succès.
     bool remove(int id, QString *error = nullptr);
 
     // Contrôle tous les terrains présents avec les règles de insert() (import de données). Un message par anomalie
@@ -62,7 +67,8 @@ public:
     bool validateAllLinks(bool referenceUniqueness, QStringList *problems, QString *error = nullptr) const;
 
 private:
-    bool checkLinks(const BoardRecord &board, int previousExerciseId, int previousBlockId, QString *error) const;
+    bool checkLinks(const BoardRecord &board, int previousExerciseId, int previousBlockId, int previousMatchId,
+                    QString *error) const;
 
     QSqlDatabase m_db;
 };

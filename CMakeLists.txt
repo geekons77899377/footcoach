@@ -42,6 +42,10 @@ set(CORE_SOURCES
     src/core/Database.cpp
     src/core/TeamRepository.h
     src/core/TeamRepository.cpp
+    src/core/ClubRepository.h
+    src/core/ClubRepository.cpp
+    src/core/MatchRepository.h
+    src/core/MatchRepository.cpp
     src/core/PlayerRepository.h
     src/core/PlayerRepository.cpp
     src/core/Recurrence.h
@@ -73,6 +77,7 @@ set(SQL_MIGRATIONS
     sql/003_exercise_archived.sql
     sql/004_seed_exercises.sql
     sql/005_block_board.sql
+    sql/006_club_match.sql
 )
 
 qt_add_executable(FootCoachWidgets WIN32
@@ -148,6 +153,7 @@ if(FOOTCOACH_HAVE_QML)
         src/app/Backend.h
         src/app/Backend.cpp
         src/app/BackendSessions.cpp
+        src/app/BackendMatches.cpp
         src/app/BackendPlan.cpp
         src/app/BackendData.cpp
     )
@@ -216,8 +222,8 @@ if(FOOTCOACH_BUILD_TESTS)
     enable_testing()
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
-    foreach(test_name repositories sessions attendance plan board backend dataformat)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp)
+    foreach(test_name repositories sessions attendance plan board backend dataformat matches)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"
