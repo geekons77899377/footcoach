@@ -9,6 +9,7 @@ Column {
     property alias text: field.text
     property string placeholder: ""
     property bool multiline: false
+    property int multilineHeight: 104
     property int maxLength: 100
     property int inputHints: Qt.ImhNone
     property bool required: false
@@ -29,7 +30,7 @@ Column {
     }
     Rectangle {
         width: parent.width
-        height: root.multiline ? 104 : 50
+        height: root.multiline ? root.multilineHeight : 50
         radius: Theme.radiusSm
         color: Theme.bg
         border.width: 1

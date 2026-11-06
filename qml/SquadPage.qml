@@ -211,6 +211,15 @@ Item {
         }
     }
 
+    PlayersImportDialog {
+        id: importDialog
+        objectName: "importDialog"
+        onImported: (n) => {
+            page.refreshTeams();
+            toast.show(n + (n > 1 ? " joueurs ajoutés." : " joueur ajouté."));
+        }
+    }
+
     ActionSheet {
         id: teamSheet
         title: "Équipe"
@@ -286,6 +295,14 @@ Item {
                     teamSheet.rebuild();
                     teamSheet.open();
                 }
+            }
+            IconButton {
+                objectName: "importButton"
+                visible: page.team !== null
+                iconName: "text"
+                fillColor: Theme.surface
+                accessibleName: "Importer une liste de joueurs"
+                onClicked: importDialog.openFor(page.teamId)
             }
             IconButton {
                 visible: page.team !== null
@@ -593,6 +610,13 @@ Item {
                             iconName: "plus"
                             text: page.team === null ? "Créer une équipe" : "Ajouter un joueur"
                             onClicked: page.team === null ? teamDialog.openFor(null) : page.newPlayer()
+                        }
+                        AppButton {
+                            objectName: "importEmptyButton"
+                            visible: page.team !== null && page.players.length === 0
+                            iconName: "text"
+                            text: "Importer une liste"
+                            onClicked: importDialog.openFor(page.teamId)
                         }
                     }
                 }

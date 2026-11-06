@@ -17,6 +17,12 @@ public:
     // Suppression définitive : efface aussi présences et blessures (cascade).
     bool remove(int id, QString *error = nullptr);
 
+    // Clé d'unicité d'un joueur dans son équipe : prénom + nom, sans accents ni majuscules, espaces simplifiés.
+    static QString fold(const QString &s);   // sans accents ni majuscules, espaces simplifiés
+    static QString nameKey(const QString &firstName, const QString &lastName);
+    // Vrai si un autre joueur de l'équipe (actif ou non) a la même clé prénom + nom (excludeId = joueur en cours d'édition).
+    bool nameTaken(int teamId, const QString &firstName, const QString &lastName, int excludeId = -1) const;
+
     // Vrai si un autre joueur ACTIF de l'équipe porte déjà ce numéro (excludeId = joueur en cours d'édition).
     bool jerseyTaken(int teamId, int number, int excludeId = -1) const;
 

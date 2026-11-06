@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## Non publié — import de joueurs dans « Effectif »
+- **Import d'une liste collée** (bouton dans l'en-tête de l'Effectif et dans l'état vide) : un joueur par ligne, **prénom seul obligatoire** ; le reste est facultatif, séparé par « ; » ou une tabulation (collage depuis un tableur) : Prénom ; Nom ; Numéro ; Poste ; Naissance (JJ/MM/AAAA). Ligne d'en-tête « Prénom ; Nom … » ignorée, 300 joueurs au plus.
+- **Unicité** : prénom + nom unique dans l'équipe, sans tenir compte des accents ni des majuscules, joueurs inactifs compris ; numéro unique parmi les joueurs actifs. Règle appliquée aussi à la fiche joueur. Hypothèse retenue (à confirmer) : deux joueurs de même prénom sont permis si leurs noms diffèrent.
+- **Tout ou rien** : à la moindre ligne refusée, rien n'est créé ; les lignes à corriger sont listées avec leur numéro (8 au plus, puis un résumé).
+- **Le nom devient facultatif** dans la fiche joueur et en base (chaîne vide ; aucune migration : la colonne l'acceptait déjà).
+- `Backend::importPlayers`, `PlayerRepository::nameTaken`. Tests : `tst_backend::playerNameOptionalAndUnique`, `importPlayersList` ; `t_import.py` (backend **simulé**) ; `t_fields.py` couvre le champ de saisie au-dessus du clavier. **Non vérifié sur appareil.**
+
 ## Non publié — signalements sans navigateur, confidentialité dans l'application
 - **Confidentialité** : la politique s'affiche dans l'application (`PrivacyPage`, texte généré depuis `docs/confidentialite.md` par `tools/gen_privacy_text.py`, contrôlé par `t_privacy.py`) ; plus aucune redirection vers GitHub.
 - **Signalements** : « Envoyer le signalement » crée le ticket « SUP - … » directement par l'API GitHub (`IssueReporter`, QtNetwork), sans navigateur ni compte GitHub. Jeton « Issues : écriture » seul, injecté à la compilation (`FOOTCOACH_BUG_TOKEN`), jamais dans le dépôt ; sans jeton, seul l'e-mail est proposé. États : envoi en cours (bouton bloqué), confirmation, échec avec saisie conservée.

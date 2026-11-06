@@ -4,6 +4,9 @@
 
 #include <QDate>
 #include <QHash>
+#include <QRegularExpression>
+#include <QSet>
+#include <QSqlError>
 #ifdef Q_OS_ANDROID
 #include <QCoreApplication>
 #include <QJniObject>
@@ -374,8 +377,10 @@ QVariantMap Backend::savePlayer(const QVariantMap &in)
     QString problem;
     if (p.teamId <= 0)
         problem = tr("Aucune équipe sélectionnée.");
-    else if (p.firstName.isEmpty() || p.lastName.isEmpty())
-        problem = tr("Le nom et le prénom sont obligatoires.");
+    else if (p.firstName.isEmpty())
+        problem = tr("Le prénom est obligatoire.");
+    else if (m_players.nameTaken(p.teamId, p.firstName, p.lastName, p.id))
+        problem = tr("%1 est déjà dans l'effectif de cette équipe.").arg(p.fullName());
     else if (p.jerseyNumber < 0 || p.jerseyNumber > 99)
         problem = tr("Le numéro de maillot doit être compris entre 1 et 99.");
     else if (!p.position.isEmpty() && p.position != QLatin1String("GK") && p.position != QLatin1String("DEF")
@@ -424,6 +429,157 @@ QVariantMap Backend::deletePlayer(int id)
     const bool ok = m_players.remove(id, &error);
     setError(error);
     return result(ok, id, error);
+}
+
+QVariantMap Backend::importPlayers(int teamId, const QString &text)
+{
+    constexpr int kMaxPlayers = 300;
+    QVariantMap out;
+    out.insert(QStringLiteral("created"), 0);
+    out.insert(QStringLiteral("errors"), QVariantList());
+    auto fail = [&](const QString &message) {
+        setError(message);
+        out.insert(QStringLiteral("ok"), false);
+        out.insert(QStringLiteral("error"), message);
+        return out;
+    };
+
+    QString error;
+    bool teamFound = false;
+    for (const Team &t : m_teams.all(&error))
+        teamFound = teamFound || t.id == teamId;
+    if (!teamFound)
+        return fail(tr("Aucune équipe sélectionnée."));
+
+    QSet<QString> keys;                     // clés prénom + nom : joueurs existants (actifs ou non) puis ceux de la liste
+    QHash<int, QString> jerseys;            // numéro -> joueur actif qui le porte
+    for (const Player &p : m_players.list(teamId, true, &error)) {
+        keys.insert(PlayerRepository::nameKey(p.firstName, p.lastName));
+        if (p.active && p.jerseyNumber > 0)
+            jerseys.insert(p.jerseyNumber, p.fullName());
+    }
+
+    static const QHash<QString, QString> positions = {
+        {QStringLiteral("gk"), QStringLiteral("GK")}, {QStringLiteral("g"), QStringLiteral("GK")},
+        {QStringLiteral("gardien"), QStringLiteral("GK")},
+        {QStringLiteral("def"), QStringLiteral("DEF")}, {QStringLiteral("d"), QStringLiteral("DEF")},
+        {QStringLiteral("defenseur"), QStringLiteral("DEF")},
+        {QStringLiteral("mid"), QStringLiteral("MID")}, {QStringLiteral("m"), QStringLiteral("MID")},
+        {QStringLiteral("milieu"), QStringLiteral("MID")},
+        {QStringLiteral("fwd"), QStringLiteral("FWD")}, {QStringLiteral("a"), QStringLiteral("FWD")},
+        {QStringLiteral("attaquant"), QStringLiteral("FWD")}};
+
+    QList<Player> toCreate;
+    QVariantList errors;
+    QHash<QString, int> keyLine;            // clé -> ligne de la liste, pour signaler les doublons internes
+    auto addError = [&](int line, const QString &message) {
+        errors.append(QVariantMap{{QStringLiteral("line"), line}, {QStringLiteral("message"), message}});
+    };
+
+    const QStringList lines = text.split(QLatin1Char('\n'));
+    bool first = true;
+    for (int i = 0; i < lines.size(); ++i) {
+        const QString raw = lines.at(i).trimmed();
+        if (raw.isEmpty())
+            continue;
+        QStringList cells = raw.split(QRegularExpression(QStringLiteral("[;\t]")));
+        for (QString &c : cells)
+            c = c.trimmed();
+        const int lineNo = i + 1;
+        if (first) {
+            first = false;
+            if (PlayerRepository::fold(cells.at(0)) == QLatin1String("prenom"))
+                continue;                   // ligne d'en-tête d'un tableur
+        }
+        if (toCreate.size() >= kMaxPlayers) {
+            addError(lineNo, tr("Trop de joueurs : %1 au maximum par import.").arg(kMaxPlayers));
+            break;
+        }
+        if (cells.size() > 5) {
+            addError(lineNo, tr("Trop de colonnes (Prénom ; Nom ; Numéro ; Poste ; Naissance)."));
+            continue;
+        }
+        Player p;
+        p.teamId = teamId;
+        p.firstName = cells.value(0);
+        p.lastName = cells.value(1);
+        if (p.firstName.isEmpty()) {
+            addError(lineNo, tr("Le prénom est obligatoire."));
+            continue;
+        }
+        const QString num = cells.value(2);
+        if (!num.isEmpty()) {
+            bool okNum = false;
+            const int n = num.toInt(&okNum);
+            if (!okNum || n < 1 || n > 99) {
+                addError(lineNo, tr("Numéro « %1 » invalide (1 à 99).").arg(num));
+                continue;
+            }
+            p.jerseyNumber = n;
+        }
+        const QString pos = cells.value(3);
+        if (!pos.isEmpty()) {
+            p.position = positions.value(PlayerRepository::fold(pos));
+            if (p.position.isEmpty()) {
+                addError(lineNo, tr("Poste « %1 » inconnu (gardien, défenseur, milieu, attaquant).").arg(pos));
+                continue;
+            }
+        }
+        const QString birth = cells.value(4);
+        if (!birth.isEmpty()) {
+            QDate d = QDate::fromString(birth, QStringLiteral("d/M/yyyy"));
+            if (!d.isValid())
+                d = QDate::fromString(birth, Qt::ISODate);
+            if (!d.isValid() || d > QDate::currentDate()) {
+                addError(lineNo, tr("Date de naissance « %1 » invalide (JJ/MM/AAAA).").arg(birth));
+                continue;
+            }
+            p.birthDate = d;
+        }
+        const QString key = PlayerRepository::nameKey(p.firstName, p.lastName);
+        if (keyLine.contains(key)) {
+            addError(lineNo, tr("%1 figure déjà à la ligne %2 de la liste.").arg(p.fullName()).arg(keyLine.value(key)));
+            continue;
+        }
+        if (keys.contains(key)) {
+            addError(lineNo, tr("%1 est déjà dans l'effectif de cette équipe.").arg(p.fullName()));
+            continue;
+        }
+        if (p.jerseyNumber > 0 && jerseys.contains(p.jerseyNumber)) {
+            addError(lineNo, tr("Le numéro %1 est déjà porté par %2.").arg(p.jerseyNumber).arg(jerseys.value(p.jerseyNumber)));
+            continue;
+        }
+        keyLine.insert(key, lineNo);
+        if (p.jerseyNumber > 0)
+            jerseys.insert(p.jerseyNumber, p.fullName());
+        toCreate.append(p);
+    }
+
+    if (!errors.isEmpty()) {
+        out.insert(QStringLiteral("errors"), errors);
+        return fail(tr("%n ligne(s) à corriger. Rien n'a été importé.", nullptr, errors.size()));
+    }
+    if (toCreate.isEmpty())
+        return fail(tr("Aucun joueur à importer."));
+
+    if (!m_db.transaction())
+        return fail(m_db.lastError().text());
+    for (Player &p : toCreate) {
+        if (!m_players.insert(p, &error)) {
+            m_db.rollback();
+            return fail(error);
+        }
+    }
+    if (!m_db.commit()) {
+        const QString e = m_db.lastError().text();
+        m_db.rollback();
+        return fail(e);
+    }
+    setError(QString());
+    out.insert(QStringLiteral("ok"), true);
+    out.insert(QStringLiteral("created"), int(toCreate.size()));
+    out.insert(QStringLiteral("error"), QString());
+    return out;
 }
 
 void Backend::setKeepScreenOn(bool on)

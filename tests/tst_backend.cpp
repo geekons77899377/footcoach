@@ -375,6 +375,96 @@ private slots:
         }
     }
 
+    void playerNameOptionalAndUnique()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        const int other = b.saveTeam({{"name", "U17"}}).value("id").toInt();
+        auto save = [&](int t, const QString &first, const QString &last, int id = -1) {
+            return b.savePlayer({{"id", id}, {"teamId", t}, {"firstName", first}, {"lastName", last}});
+        };
+        // Le prénom seul suffit ; le prénom reste obligatoire.
+        const QVariantMap lucas = save(team, "Lucas", "");
+        QVERIFY2(lucas.value("ok").toBool(), qPrintable(lucas.value("error").toString()));
+        QVERIFY(!save(team, "", "Martin").value("ok").toBool());
+        // Doublon : mêmes prénom et nom sans tenir compte des majuscules, accents ni espaces superflus.
+        QVERIFY(!save(team, "  LUCAS ", "").value("ok").toBool());
+        QVERIFY(save(team, "Lucas", "Martin").value("ok").toBool());       // un nom le distingue
+        QVERIFY(!save(team, "lucas", "MARTIN").value("ok").toBool());
+        const int leo = save(team, "Léo", "").value("id").toInt();
+        QVERIFY(!save(team, "Leo", "").value("ok").toBool());               // accent ignoré
+        QVERIFY(save(other, "Lucas", "").value("ok").toBool());             // autre équipe : permis
+        // Modifier un joueur sans changer son nom reste possible ; lui donner le nom d'un autre est refusé.
+        QVERIFY(save(team, "Léo", "", leo).value("ok").toBool());
+        QVERIFY(!save(team, "Lucas", "", leo).value("ok").toBool());
+        // Un joueur inactif compte aussi (réactivation sans doublon).
+        QVERIFY(b.setPlayerActive(leo, false).value("ok").toBool());
+        QVERIFY(!save(team, "Léo", "").value("ok").toBool());
+    }
+
+    void importPlayersList()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        const int other = b.saveTeam({{"name", "U17"}}).value("id").toInt();
+        QVERIFY(b.savePlayer({{"teamId", team}, {"firstName", "Ali"}, {"lastName", "Alpha"}, {"jerseyNumber", 9}})
+                    .value("ok").toBool());
+
+        // Liste de prénoms seuls (lignes vides et fins de ligne Windows tolérées).
+        QVariantMap r = b.importPlayers(team, QStringLiteral("Lucas\r\n\r\n  Théo  \nHugo\n"));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(r.value("created").toInt(), 3);
+        QCOMPARE(b.players(team, true).size(), 4);
+        const QVariantList all = b.players(team, true);
+        bool theo = false;
+        for (const QVariant &v : all)
+            theo = theo || v.toMap().value("firstName").toString() == QStringLiteral("Théo");
+        QVERIFY(theo);
+
+        // Champs facultatifs, en-tête de tableur, séparateurs « ; » et tabulation, poste et date de plusieurs formes.
+        r = b.importPlayers(team, QStringLiteral("Prénom;Nom;Numéro;Poste;Naissance\n"
+                                                 "Noah;Durand;7;Milieu;04/05/2012\n"
+                                                 "Eli\tBlanc\t11\tgk\t2011-02-03\n"
+                                                 "Sam;;;Attaquant\n"));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(r.value("created").toInt(), 3);
+        QVariantMap noah;
+        for (const QVariant &v : b.players(team, true))
+            if (v.toMap().value("firstName").toString() == QLatin1String("Noah"))
+                noah = v.toMap();
+        QCOMPARE(noah.value("lastName").toString(), QStringLiteral("Durand"));
+        QCOMPARE(noah.value("jerseyNumber").toInt(), 7);
+        QCOMPARE(noah.value("position").toString(), QStringLiteral("MID"));
+        QCOMPARE(noah.value("birthDate").toString(), QStringLiteral("2012-05-04"));
+
+        // Tout ou rien : une ligne refusée, rien n'est créé ; chaque erreur porte son numéro de ligne.
+        const int before = b.players(team, true).size();
+        r = b.importPlayers(team, QStringLiteral("Zoé\n"            // 1 : valide
+                                                 "lucas\n"          // 2 : déjà dans l'effectif (casse ignorée)
+                                                 "Max;;9\n"         // 3 : numéro 9 pris par Ali
+                                                 "Zoé\n"            // 4 : doublon dans la liste
+                                                 ";Nom\n"           // 5 : prénom manquant
+                                                 "Tom;;100\n"       // 6 : numéro invalide
+                                                 "Ian;;;Libero\n"   // 7 : poste inconnu
+                                                 "Eva;;;;31/02/2012\n"   // 8 : date invalide
+                                                 "A;B;1;GK;;x\n"));      // 9 : trop de colonnes
+        QVERIFY(!r.value("ok").toBool());
+        QCOMPARE(r.value("created").toInt(), 0);
+        QCOMPARE(b.players(team, true).size(), before);
+        QList<int> lines;
+        for (const QVariant &e : r.value("errors").toList())
+            lines << e.toMap().value("line").toInt();
+        QCOMPARE(lines, (QList<int>{2, 3, 4, 5, 6, 7, 8, 9}));
+        QVERIFY(r.value("error").toString().contains(QStringLiteral("Rien n'a été importé")));
+
+        // Numéro répété dans la liste ; même prénom permis dans une autre équipe ; équipe inconnue ; liste vide.
+        QVERIFY(!b.importPlayers(team, QStringLiteral("P1;;20\nP2;;20")).value("ok").toBool());
+        QVERIFY(b.importPlayers(other, QStringLiteral("Lucas;;9")).value("ok").toBool());
+        QVERIFY(!b.importPlayers(9999, QStringLiteral("X")).value("ok").toBool());
+        QVERIFY(!b.importPlayers(team, QStringLiteral("  \n \n")).value("ok").toBool());
+        QVERIFY(!b.importPlayers(team, QStringLiteral("Prénom;Nom")).value("ok").toBool());   // en-tête seul
+    }
+
     void exportImportRoundTrip()
     {
         // Appareil A : une équipe, des joueurs, une séance avec plan et appel, un schéma.

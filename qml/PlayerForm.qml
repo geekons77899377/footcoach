@@ -197,7 +197,7 @@ Item {
                 width: parent.width
                 spacing: 12
                 FormField { id: firstName; width: (parent.width - 12) / 2; label: "Prénom"; required: true; maxLength: 60 }
-                FormField { id: lastName; width: (parent.width - 12) / 2; label: "Nom"; required: true; maxLength: 60 }
+                FormField { id: lastName; width: (parent.width - 12) / 2; label: "Nom"; maxLength: 60 }
             }
             Row {
                 width: parent.width

@@ -72,9 +72,15 @@ public:
     // Joueurs d'une équipe : [{id, teamId, firstName, lastName, fullName, birthDate (yyyy-MM-dd ou vide),
     // age (-1 si inconnu), jerseyNumber (0 = aucun), position, preferredFoot, phone, email, notes, active}].
     Q_INVOKABLE QVariantList players(int teamId, bool includeInactive);
-    // Crée (id absent ou <= 0) ou modifie un joueur. Refus : nom ou prénom vide, date invalide, numéro hors 0..99
+    // Crée (id absent ou <= 0) ou modifie un joueur. Refus : prénom vide (le nom est facultatif), prénom + nom déjà dans l'équipe, date invalide, numéro hors 0..99
     // ou déjà porté par un autre joueur actif de l'équipe, poste ou pied inconnu. Résultat {ok, id, error}.
     Q_INVOKABLE QVariantMap savePlayer(const QVariantMap &player);
+    // Import d'une liste collée : un joueur par ligne, champs séparés par « ; » ou une tabulation, dans l'ordre
+    // Prénom ; Nom ; Numéro ; Poste ; Naissance (JJ/MM/AAAA ou AAAA-MM-JJ). Seul le prénom est obligatoire ; une première ligne
+    // « Prénom ; Nom … » est ignorée. Prénom + nom unique dans l'équipe (accents et majuscules ignorés), numéro unique parmi
+    // les joueurs actifs. TOUT OU RIEN : à la moindre ligne refusée rien n'est créé. Résultat {ok, error, created,
+    // errors: [{line, message}]}.
+    Q_INVOKABLE QVariantMap importPlayers(int teamId, const QString &text);
     Q_INVOKABLE QVariantMap setPlayerActive(int id, bool active);   // la réactivation vérifie le numéro
     Q_INVOKABLE QVariantMap deletePlayer(int id);                   // définitif (présences et blessures aussi)
 

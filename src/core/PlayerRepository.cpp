@@ -21,7 +21,8 @@ void bindPlayer(QSqlQuery &q, const Player &p)
 {
     q.addBindValue(p.teamId);
     q.addBindValue(p.firstName.trimmed());
-    q.addBindValue(p.lastName.trimmed());
+    // Nom facultatif : chaîne vide (et non NULL, la colonne est NOT NULL) ; Qt lie une QString nulle comme NULL.
+    q.addBindValue(QString(p.lastName.trimmed() + QLatin1String("")));
     q.addBindValue(p.birthDate.isValid() ? QVariant(p.birthDate.toString(Qt::ISODate)) : QVariant());
     q.addBindValue(p.jerseyNumber > 0 ? QVariant(p.jerseyNumber) : QVariant());
     q.addBindValue(nullIfEmpty(p.position));
@@ -33,6 +34,32 @@ void bindPlayer(QSqlQuery &q, const Player &p)
 }
 
 } // namespace
+
+QString PlayerRepository::fold(const QString &s)
+{
+    QString out;
+    for (const QChar c : s.simplified().normalized(QString::NormalizationForm_D)) {
+        if (c.category() == QChar::Mark_NonSpacing)
+            continue;                                   // accent séparé par la décomposition
+        out += c.toLower();
+    }
+    return out;
+}
+
+QString PlayerRepository::nameKey(const QString &firstName, const QString &lastName)
+{
+    return fold(firstName) + QLatin1Char('\x1f') + fold(lastName);
+}
+
+bool PlayerRepository::nameTaken(int teamId, const QString &firstName, const QString &lastName, int excludeId) const
+{
+    const QString key = nameKey(firstName, lastName);
+    for (const Player &p : list(teamId, true)) {
+        if (p.id != excludeId && nameKey(p.firstName, p.lastName) == key)
+            return true;
+    }
+    return false;
+}
 
 QList<Player> PlayerRepository::list(int teamId, bool includeInactive, QString *error) const
 {
