@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## Non publié — texte sous le joueur (schéma tactique)
+- Le texte d'un joueur ou d'un adversaire s'affiche **sous le rond** (le rond reste vide) et peut compter **24 caractères** (3 auparavant) ; il passe sur deux lignes si besoin. Les notes texte (300 caractères) sont inchangées. Les anciens schémas (numéros) s'affichent sous le rond, sans migration : le texte est déjà enregistré dans le schéma.
+- Test : `t_caption.py` (backend **simulé**). Non vérifié sur appareil.
+
 ## Non publié — import de joueurs dans « Effectif »
 - **Import d'une liste collée** (bouton dans l'en-tête de l'Effectif et dans l'état vide) : un joueur par ligne, **prénom seul obligatoire** ; le reste est facultatif, séparé par « ; » ou une tabulation (collage depuis un tableur) : Prénom ; Nom ; Numéro ; Poste ; Naissance (JJ/MM/AAAA). Ligne d'en-tête « Prénom ; Nom … » ignorée, 300 joueurs au plus.
 - **Unicité** : prénom + nom unique dans l'équipe, sans tenir compte des accents ni des majuscules, joueurs inactifs compris ; numéro unique parmi les joueurs actifs. Règle appliquée aussi à la fiche joueur. Hypothèse retenue (à confirmer) : deux joueurs de même prénom sont permis si leurs noms diffèrent.

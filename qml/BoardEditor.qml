@@ -203,7 +203,7 @@ Item {
         if (it.kind === "text")
             prompt.ask("Note", it.label, true, 300);
         else
-            prompt.ask("Étiquette (3 caractères maximum)", it.label, false, 3);
+            prompt.ask("Texte sous le joueur (" + board.maxPlayerLabel + " caractères maximum)", it.label, false, board.maxPlayerLabel);
     }
 
     function currentToolIcon() {

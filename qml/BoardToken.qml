@@ -67,12 +67,29 @@ Item {
         color: tok.fill
         border.width: 2.5
         border.color: "#ffffff"
+    }
+
+    // Texte du joueur ou de l'adversaire : sous le rond (le rond reste vide), toujours à l'horizontale.
+    Rectangle {
+        objectName: "tokenCaption"
+        visible: tok.isCircle && tok.label !== ""
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height / 2 + 21
+        width: captionText.width + 10
+        height: captionText.height + 4
+        radius: 5
+        color: "#b3000000"
+        rotation: -tok.rotation
         Text {
+            id: captionText
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, 112)
             text: tok.label
+            wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
             font.bold: true
-            font.pixelSize: tok.label.length <= 2 ? 16 : 11
-            color: tok.lightFill ? "#212121" : "#ffffff"
+            font.pixelSize: 13
+            color: "#ffffff"
         }
     }
 

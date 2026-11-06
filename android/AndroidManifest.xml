@@ -31,6 +31,7 @@
         android:roundIcon="@drawable/icon"
         android:label="-- %%INSERT_APP_NAME%% --"
         android:allowBackup="false"
+        android:resizeableActivity="true"
         android:enableOnBackInvokedCallback="false">
         <activity
             android:name="org.qtproject.qt.android.bindings.QtActivity"

@@ -39,6 +39,7 @@ QtObject {
 
     function isRotatable(kind) { return kind === "goal" || kind === "cone" || kind === "text"; }
     function isColorable(kind) { return kind === "player" || kind === "opponent" || kind === "cone" || kind === "text"; }
+    readonly property int maxPlayerLabel: 24   // texte affiché sous un joueur ou un adversaire
     function hasLabel(kind) { return kind === "player" || kind === "opponent" || kind === "text"; }
 
     // --- Sérialisation ------------------------------------------------------------------------
@@ -460,7 +461,7 @@ QtObject {
             if (t === "")
                 return;
         } else {
-            t = t.substring(0, 3);
+            t = t.substring(0, maxPlayerLabel).trim();
         }
         items.setProperty(index, "label", t);
         commit();
