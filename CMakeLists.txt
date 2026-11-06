@@ -22,7 +22,7 @@ set(CMAKE_AUTOMOC ON)
 
 # Application QML (cible principale) : Qt 6.9 minimum (SafeArea). Les tests et l'ancienne version Widgets
 # restent compilables avec Qt 6.4 si Qt Quick n'est pas installé.
-set(QT_COMPONENTS Widgets Sql)
+set(QT_COMPONENTS Widgets Sql Network)
 if(FOOTCOACH_BUILD_TESTS)
     list(APPEND QT_COMPONENTS Test)
 endif()
@@ -156,6 +156,8 @@ if(FOOTCOACH_HAVE_QML)
         src/app/BackendMatches.cpp
         src/app/BackendPlan.cpp
         src/app/BackendData.cpp
+        src/app/IssueReporter.h
+        src/app/IssueReporter.cpp
     )
     if(WIN32)
         target_sources(FootCoach PRIVATE windows/footcoach.rc)
@@ -171,7 +173,7 @@ if(FOOTCOACH_HAVE_QML)
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
         CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
-        ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
+        ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml PrivacyPage.qml PrivacyText.js Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
         BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
     )
     set(QML_FILES_PATHS)
@@ -197,7 +199,14 @@ if(FOOTCOACH_HAVE_QML)
 
     target_include_directories(FootCoach PRIVATE src)
     target_compile_definitions(FootCoach PRIVATE FOOTCOACH_VERSION=\"${PROJECT_VERSION}\")
-    target_link_libraries(FootCoach PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Sql)
+    target_link_libraries(FootCoach PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Sql Qt6::Network)
+    # Signalements d'assistance : jeton GitHub (permission « Issues : écriture » seule) fourni au moment de compiler, jamais
+    # dans le dépôt : cmake -DFOOTCOACH_BUG_TOKEN=github_pat_... (ou variable d'environnement du même nom). Vide : l'envoi
+    # est désactivé et l'application propose l'e-mail.
+    set(FOOTCOACH_BUG_TOKEN "$ENV{FOOTCOACH_BUG_TOKEN}" CACHE STRING "Jeton GitHub (Issues: write) pour les signalements")
+    if(FOOTCOACH_BUG_TOKEN)
+        target_compile_definitions(FootCoach PRIVATE FOOTCOACH_BUG_TOKEN=\"${FOOTCOACH_BUG_TOKEN}\")
+    endif()
     if(MSVC)
         target_compile_options(FootCoach PRIVATE /W4 /permissive-)
     endif()
@@ -222,15 +231,15 @@ if(FOOTCOACH_BUILD_TESTS)
     enable_testing()
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
-    foreach(test_name repositories sessions attendance plan board backend dataformat matches)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp)
+    foreach(test_name repositories sessions attendance plan board backend dataformat matches issuereporter)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"
             FILES ${SQL_MIGRATIONS}
         )
         target_include_directories(tst_${test_name} PRIVATE src)
-        target_link_libraries(tst_${test_name} PRIVATE Qt6::Sql Qt6::Test)
+        target_link_libraries(tst_${test_name} PRIVATE Qt6::Sql Qt6::Network Qt6::Test)
         target_compile_definitions(tst_${test_name} PRIVATE FOOTCOACH_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
         add_test(NAME ${test_name} COMMAND tst_${test_name})
     endforeach()

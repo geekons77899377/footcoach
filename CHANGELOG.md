@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## Non publié — signalements sans navigateur, confidentialité dans l'application
+- **Confidentialité** : la politique s'affiche dans l'application (`PrivacyPage`, texte généré depuis `docs/confidentialite.md` par `tools/gen_privacy_text.py`, contrôlé par `t_privacy.py`) ; plus aucune redirection vers GitHub.
+- **Signalements** : « Envoyer le signalement » crée le ticket « SUP - … » directement par l'API GitHub (`IssueReporter`, QtNetwork), sans navigateur ni compte GitHub. Jeton « Issues : écriture » seul, injecté à la compilation (`FOOTCOACH_BUG_TOKEN`), jamais dans le dépôt ; sans jeton, seul l'e-mail est proposé. États : envoi en cours (bouton bloqué), confirmation, échec avec saisie conservée.
+- **Android** : permission `INTERNET` ajoutée au manifeste (seule permission). `docs/confidentialite.md` et `docs/publication.md` mis à jour (données déclarées, Play Console).
+- Tests : `tst_issuereporter` (faux serveur HTTP local : succès 201, en-têtes et corps, erreurs 401/422/500 sans fuite du jeton, serveur injoignable, double envoi, sans jeton) ; `t_support.py` adapté (reporter **simulé**). **Non vérifié** : envoi réel vers GitHub, Qt 6.9, Android.
+- Risque accepté : le jeton est extractible de l'APK ; portée limitée aux tickets, révocable.
+
 ## 0.10.0 — 2026-11-03 (branche v1, non publiée) — schéma 5 : un terrain par bloc de séance
 **Étape 2 : le terrain dans le plan de séance**
 - Chaque bloc du plan affiche la miniature de son terrain, ou un état vide « Pas encore de terrain pour cet atelier » avec le bouton **Ajouter un terrain**. « Ouvrir le terrain » ouvre l'éditeur tactique existant par-dessus le plan ; le retour (bouton de l'en-tête ou retour d'Android) enregistre, remet à jour la miniature et **conserve la position de défilement**. Le terrain n'est créé que sur demande (terrain vide, au nom de l'exercice).

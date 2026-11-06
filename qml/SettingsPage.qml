@@ -5,7 +5,7 @@ import "SupportLink.js" as Link
 Item {
     id: page
 
-    property string mode: "browse"            // browse, support
+    property string mode: "browse"            // browse, support, privacy
     property bool dryRun: false               // tests : ne pas ouvrir le navigateur
     readonly property bool wide: width >= 760
     signal navigate(string section)
@@ -27,9 +27,9 @@ Item {
             toast.show("Impossible d'ouvrir l'application de messagerie sur cet appareil.");
     }
 
+    // La politique de confidentialité se lit dans l'application (aucun navigateur à ouvrir).
     function openPrivacy() {
-        if (!dryRun && !Qt.openUrlExternally(Link.PRIVACY_URL))
-            toast.show("Impossible d'ouvrir le navigateur sur cet appareil.");
+        mode = "privacy";
     }
 
     onVisibleChanged: if (!visible) mode = "browse"
@@ -218,6 +218,15 @@ Item {
         }
     }
 
+    PrivacyPage {
+        id: privacy
+        objectName: "privacyPage"
+        anchors.fill: parent
+        visible: page.mode === "privacy"
+        showBack: true
+        onCloseRequested: page.mode = "browse"
+    }
+
     SupportForm {
         id: form
         objectName: "supportForm"
@@ -228,7 +237,7 @@ Item {
         onOpened: (kind) => {
             page.mode = "browse";
             toast.show(kind === "mail" ? "Votre messagerie s'ouvre : relisez puis envoyez le message."
-                                       : "GitHub s'ouvre dans votre navigateur : relisez puis validez le ticket.");
+                                       : "Signalement envoyé, merci !");
         }
     }
 

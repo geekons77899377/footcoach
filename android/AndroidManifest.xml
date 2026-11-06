@@ -6,9 +6,10 @@
 
   Différences avec le modèle de Qt :
   - icône de l'application (android:icon / android:roundIcon) ;
-  - aucune permission : le marqueur INSERT_PERMISSIONS est volontairement absent (Qt y ajoutait INTERNET,
-    ACCESS_NETWORK_STATE et WRITE_EXTERNAL_STORAGE, dont l'application n'a pas besoin : pas de réseau, et
-    l'export/import de fichiers passe par le sélecteur de fichiers du système) ;
+  - une seule permission, INTERNET, déclarée explicitement ci-dessous : l'envoi d'un signalement d'assistance
+    (IssueReporter), uniquement sur action de l'utilisateur. Le marqueur INSERT_PERMISSIONS est volontairement absent
+    (Qt y ajoutait aussi ACCESS_NETWORK_STATE et WRITE_EXTERNAL_STORAGE, inutiles : l'export/import de fichiers passe par
+    le sélecteur de fichiers du système) ;
   - sauvegarde automatique Android désactivée : les données (joueurs, dont des mineurs) restent sur l'appareil.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -16,6 +17,7 @@
     android:installLocation="auto"
     android:versionCode="-- %%INSERT_VERSION_CODE%% --"
     android:versionName="-- %%INSERT_VERSION_NAME%% --">
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- %%INSERT_FEATURES -->
     <supports-screens
         android:anyDensity="true"

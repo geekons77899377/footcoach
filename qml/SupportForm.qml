@@ -2,25 +2,32 @@ import QtQuick
 import QtQuick.Controls
 import "SupportLink.js" as Link
 
-// Formulaire d'assistance : ouvre le navigateur sur un ticket GitHub « SUP - … » pré-rempli (ou un e-mail). L'application
-// n'envoie rien elle-même et ne contient aucun jeton : l'utilisateur relit et valide dans GitHub.
+// Formulaire d'assistance : crée un ticket GitHub « SUP - … » directement depuis l'application (IssueReporter, sans
+// navigateur ni compte GitHub), ou ouvre un e-mail pré-rempli. Rien n'est envoyé avant le toucher sur « Envoyer ».
 Item {
     id: root
 
     property string category: "bug"
     property bool showBack: true
     property string errorText: ""
-    property bool dryRun: false             // tests : ne pas ouvrir le navigateur
-    property string lastUrl: ""             // dernier lien produit
+    property bool dryRun: false             // tests : ne pas ouvrir la messagerie
+    property string lastUrl: ""             // dernier lien e-mail produit
+    property string sentUrl: ""             // lien du ticket créé
+    property bool sent: false               // dernier envoi réussi : écran de confirmation
+    readonly property var reporter: typeof issueReporter !== "undefined" ? issueReporter : null
+    readonly property bool canSend: reporter !== null && reporter.available
+    readonly property bool busy: reporter !== null && reporter.busy
     readonly property string version: Qt.application.version
     readonly property string os: Qt.platform.os
 
     signal closeRequested()
-    signal opened(string kind)              // "github" ou "mail"
+    signal opened(string kind)              // "mail" (messagerie ouverte)
 
     function openNew(cat) {
         category = cat;
         errorText = "";
+        sent = false;
+        sentUrl = "";
         titleField.text = "";
         descField.text = "";
         stepsField.text = "";
@@ -46,12 +53,38 @@ Item {
         if (errorText !== "")
             return;
         var p = payload();
-        lastUrl = kind === "mail" ? Link.mailUrl(p) : Link.issueUrl(p);
-        if (!dryRun && !Qt.openUrlExternally(lastUrl)) {
-            errorText = "Impossible d'ouvrir le navigateur ou l'application de messagerie sur cet appareil.";
+        if (kind === "mail") {
+            lastUrl = Link.mailUrl(p);
+            if (!dryRun && !Qt.openUrlExternally(lastUrl)) {
+                errorText = "Impossible d'ouvrir l'application de messagerie sur cet appareil.";
+                return;
+            }
+            opened("mail");
             return;
         }
-        opened(kind);
+        if (!canSend) {
+            errorText = "L'envoi direct n'est pas disponible dans cette version : utilisez l'e-mail.";
+            return;
+        }
+        if (busy)
+            return;
+        reporter.send(Link.issueTitle(p.title), Link.issueBody(p), [Link.category(p.category).label]);
+    }
+
+    Connections {
+        target: root.reporter
+        ignoreUnknownSignals: true
+        function onFinished(ok, message, url) {
+            if (!root.visible)
+                return;
+            if (ok) {
+                root.sentUrl = url;
+                root.sent = true;
+                root.errorText = "";
+            } else {
+                root.errorText = message;
+            }
+        }
     }
 
     PageHeader {
@@ -59,7 +92,7 @@ Item {
         width: parent.width
         leftInset: root.showBack ? 44 : 0
         title: Link.category(root.category).title
-        subtitle: "Ticket d'assistance GitHub"
+        subtitle: "Envoyé à l'équipe FootCoach"
     }
     IconButton {
         visible: root.showBack
@@ -87,7 +120,41 @@ Item {
         interactive: contentHeight > height
 
         Column {
+            id: done
+            objectName: "supportDone"
+            visible: root.sent
+            x: Theme.gutter + 4
+            y: 8
+            width: form.width
+            spacing: 16
+            Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                font.pixelSize: 16
+                font.weight: Font.DemiBold
+                color: Theme.text
+                text: "Merci, votre signalement a bien été envoyé."
+            }
+            Text {
+                visible: root.sentUrl !== ""
+                width: parent.width
+                wrapMode: Text.WrapAnywhere
+                font.pixelSize: 13
+                color: Theme.textMuted
+                text: "Il est visible publiquement : " + root.sentUrl
+            }
+            AppButton {
+                objectName: "supportDoneClose"
+                width: parent.width
+                kind: "primary"
+                text: "Fermer"
+                onClicked: root.opened("sent")
+            }
+        }
+
+        Column {
             id: form
+            visible: !root.sent
             x: Theme.gutter + 4
             y: 8
             width: Math.min(scroll.width - 2 * (Theme.gutter + 4), 640)
@@ -152,24 +219,27 @@ Item {
                     wrapMode: Text.Wrap
                     font.pixelSize: 13
                     color: Theme.text
-                    text: "Le ticket sera visible publiquement sur GitHub. N'y mettez aucune donnée personnelle (nom ou numéro "
-                          + "de joueur, téléphone, e-mail). Vous relirez le ticket dans votre navigateur avant de l'envoyer ; "
-                          + "un compte GitHub est nécessaire."
+                    text: "Le signalement sera visible publiquement sur GitHub. N'y mettez aucune donnée personnelle (nom ou "
+                          + "numéro de joueur, téléphone, e-mail). Internet n'est utilisé qu'au moment où vous touchez « Envoyer » ; "
+                          + "aucun compte GitHub n'est nécessaire."
                 }
             }
 
             AppButton {
-                objectName: "supportGithub"
+                objectName: "supportSend"
+                visible: root.canSend
+                enabled: !root.busy
                 width: parent.width
                 kind: "primary"
-                text: "Créer le ticket sur GitHub"
+                text: root.busy ? "Envoi en cours…" : "Envoyer le signalement"
                 iconName: "check"
-                onClicked: root.submit("github")
+                onClicked: root.submit("send")
             }
             AppButton {
                 objectName: "supportMail"
                 width: parent.width
-                text: "Envoyer par e-mail à la place"
+                kind: root.canSend ? "outline" : "primary"
+                text: root.canSend ? "Envoyer par e-mail à la place" : "Envoyer par e-mail"
                 iconName: "mail"
                 onClicked: root.submit("mail")
             }

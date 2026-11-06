@@ -189,11 +189,35 @@ class Backend(QObject):
     @Slot(result="QVariantList")
     def palette(self): return FORM["_palette"]
 
+class IssueReporter(QObject):
+    """Simule IssueReporter (C++) : le vrai envoi réseau est testé par tst_issuereporter (faux serveur HTTP)."""
+    busyChanged = Signal()
+    finished = Signal(bool, str, str)
+    def __init__(self, available=True):
+        super().__init__(); self._available = available; self._busy = False; self.sent = []; self.outcome = ("ok", "")
+    @Property(bool, constant=True)
+    def available(self): return self._available
+    @Property(bool, notify=busyChanged)
+    def busy(self): return self._busy
+    @Slot(str, str, "QStringList")
+    def send(self, title, body, labels):
+        self.sent.append((title, body, list(labels)))
+        self._busy = True; self.busyChanged.emit()
+        if self.outcome[0] == "hold":
+            return                      # le test appelle release()
+        self.release()
+    def release(self, ok=None, msg=None):
+        kind, text = self.outcome
+        ok = (kind == "ok") if ok is None else ok
+        self._busy = False; self.busyChanged.emit()
+        self.finished.emit(ok, msg or ("Signalement envoyé, merci !" if ok else (text or "Erreur simulée.")),
+                           "https://github.com/geekons77899377/footcoach/issues/42" if ok else "")
+
 from PySide6.QtCore import QCoreApplication, QSettings
 QCoreApplication.setOrganizationName("FootCoachTest"); QCoreApplication.setApplicationName("FootCoachTest")
 QSettings.setPath(QSettings.NativeFormat, QSettings.UserScope, os.path.join(WORK, "settings")); QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, os.path.join(WORK, "settings"))
 class Harness:
-    def __init__(self, width=412, height=892, backend=None):
+    def __init__(self, width=412, height=892, backend=None, reporter=None):
         prepare()
         self.app = QGuiApplication.instance() or QGuiApplication(sys.argv)
         self.backend = backend or Backend()
@@ -202,6 +226,8 @@ class Harness:
         self.engine.warnings.connect(lambda ws: self.warnings.extend(w.toString() for w in ws))
         ctx = self.engine.rootContext()
         ctx.setContextProperty("backend", self.backend)
+        self.reporter = reporter or IssueReporter()
+        ctx.setContextProperty("issueReporter", self.reporter)
         ctx.setContextProperty("startupError", "")
         self.engine.addImportPath(RUN)
         self.engine.load(QUrl.fromLocalFile(os.path.join(RUN, "Main.qml")))

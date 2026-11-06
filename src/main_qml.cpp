@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 
 #include "app/Backend.h"
+#include "app/IssueReporter.h"
 #include "core/Database.h"
 
 int main(int argc, char *argv[])
@@ -36,7 +37,9 @@ int main(int argc, char *argv[])
     } else {
         qWarning().noquote() << "Base de données :" << error;
     }
+    IssueReporter issueReporter;   // avant le moteur : détruit après lui
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty(QStringLiteral("issueReporter"), &issueReporter);
     engine.rootContext()->setContextProperty(QStringLiteral("backend"), backend.data());
     engine.rootContext()->setContextProperty(QStringLiteral("startupError"),
                                              opened ? QString() : QObject::tr("Impossible d'ouvrir la base de données :\n%1").arg(error));

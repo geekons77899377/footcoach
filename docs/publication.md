@@ -19,9 +19,17 @@ Sources : [niveau d'API cible](https://developer.android.com/google/play/require
 ```
 aapt2 dump badging app.apk | findstr "package sdkVersion targetSdkVersion uses-permission"
 ```
-Attendu : `targetSdkVersion:'36'` et **aucune** `uses-permission`. Le manifeste est `android/AndroidManifest.xml` (le marqueur
-`INSERT_PERMISSIONS` y est volontairement absent : sans lui, Qt n'ajoute pas INTERNET, ACCESS_NETWORK_STATE ni
-WRITE_EXTERNAL_STORAGE). Vérifier aussi `android:icon` et `allowBackup="false"` dans le manifeste généré.
+Attendu : `targetSdkVersion:'36'` et **une seule** `uses-permission` : `android.permission.INTERNET` (envoi des signalements). Le
+manifeste est `android/AndroidManifest.xml` (le marqueur `INSERT_PERMISSIONS` y est volontairement absent : sans lui, Qt
+n'ajoute pas ACCESS_NETWORK_STATE ni WRITE_EXTERNAL_STORAGE).
+
+**Jeton des signalements.** L'envoi crée des tickets GitHub avec un jeton « fine-grained » limité au dépôt footcoach, permission
+**Issues : lecture et écriture** (Metadata en lecture seule, rien d'autre), fourni **au moment de compiler** et jamais commité :
+`cmake -DFOOTCOACH_BUG_TOKEN=github_pat_... ` ou variable d'environnement `FOOTCOACH_BUG_TOKEN` avant la configuration. Sans jeton,
+l'application n'affiche que l'envoi par e-mail. Le jeton est récupérable par quelqu'un qui décompile l'application : sa portée
+limitée est la seule protection (au pire, des tickets indésirables) ; en cas d'abus, le révoquer sur GitHub et publier une
+version avec un nouveau jeton. **Play Console, section « Sécurité des données » :** déclarer l'envoi de « Informations sur
+l'application » (texte du signalement saisi par l'utilisateur) à GitHub, facultatif, déclenché par l'utilisateur. Vérifier aussi `android:icon` et `allowBackup="false"` dans le manifeste généré.
 
 ## 2. Clé d'upload (une seule fois, hors dépôt)
 ```
