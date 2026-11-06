@@ -5,6 +5,7 @@
 - **Signalements** : « Envoyer le signalement » crée le ticket « SUP - … » directement par l'API GitHub (`IssueReporter`, QtNetwork), sans navigateur ni compte GitHub. Jeton « Issues : écriture » seul, injecté à la compilation (`FOOTCOACH_BUG_TOKEN`), jamais dans le dépôt ; sans jeton, seul l'e-mail est proposé. États : envoi en cours (bouton bloqué), confirmation, échec avec saisie conservée.
 - **Android** : permission `INTERNET` ajoutée au manifeste (seule permission). `docs/confidentialite.md` et `docs/publication.md` mis à jour (données déclarées, Play Console).
 - Tests : `tst_issuereporter` (faux serveur HTTP local : succès 201, en-têtes et corps, erreurs 401/422/500 sans fuite du jeton, serveur injoignable, double envoi, sans jeton) ; `t_support.py` adapté (reporter **simulé**). **Non vérifié** : envoi réel vers GitHub, Qt 6.9, Android.
+- **Android, HTTPS** : constaté sur appareil (logcat) « No functional TLS backend was found » : Qt n'embarque pas OpenSSL. Ajout de `libssl_3.so` / `libcrypto_3.so` (arm64-v8a, KDAB android_openssl, Apache 2.0, segments alignés 16 Ko) dans `android/openssl/`, déclarées via `QT_ANDROID_EXTRA_LIBS`. Le message d'échec indique maintenant le code d'erreur et l'absence de TLS. **Non vérifié** : compilation Android et envoi réel après correction.
 - Risque accepté : le jeton est extractible de l'APK ; portée limitée aux tickets, révocable.
 
 ## 0.10.0 — 2026-11-03 (branche v1, non publiée) — schéma 5 : un terrain par bloc de séance

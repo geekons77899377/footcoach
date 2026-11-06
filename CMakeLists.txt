@@ -224,6 +224,14 @@ if(FOOTCOACH_HAVE_QML)
             # Icône de l'application (adaptative + repli) : voir tools/make_icons.py.
             QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"
         )
+        # OpenSSL (HTTPS des signalements) : Qt ne le fournit pas sur Android. Voir android/openssl/NOTICE.md.
+        set(FOOTCOACH_SSL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/${ANDROID_ABI}")
+        if(EXISTS "${FOOTCOACH_SSL_DIR}/libssl_3.so" AND EXISTS "${FOOTCOACH_SSL_DIR}/libcrypto_3.so")
+            set_property(TARGET FootCoach APPEND PROPERTY QT_ANDROID_EXTRA_LIBS
+                "${FOOTCOACH_SSL_DIR}/libcrypto_3.so" "${FOOTCOACH_SSL_DIR}/libssl_3.so")
+        else()
+            message(WARNING "OpenSSL absent pour ${ANDROID_ABI} (android/openssl) : l'envoi de signalements ne fonctionnera pas sur cet ABI.")
+        endif()
     endif()
 endif()
 

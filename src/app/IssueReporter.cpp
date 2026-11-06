@@ -6,6 +6,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSslSocket>
+#include <QDebug>
 #include <QTimer>
 
 #ifndef FOOTCOACH_BUG_TOKEN
@@ -93,6 +95,10 @@ void IssueReporter::onReplyFinished()
         emit finished(true, tr("Signalement envoyé, merci !"), o.value(QStringLiteral("html_url")).toString());
         return;
     }
+    // Diagnostic (journal et message) : code d'erreur réseau Qt et disponibilité de TLS, jamais le jeton ni la réponse.
+    const bool tls = QSslSocket::supportsSsl();
+    qWarning().noquote() << "IssueReporter : échec, HTTP" << status << "erreur Qt" << int(reply->error())
+                         << reply->errorString() << "TLS disponible :" << tls;
     // Messages sans détail technique ni contenu de la réponse (qui pourrait citer le jeton ou des en-têtes).
     QString message;
     if (status == 401 || status == 403 || status == 404)
@@ -103,8 +109,10 @@ void IssueReporter::onReplyFinished()
         message = tr("Trop d'envois : réessayez plus tard.");
     else if (reply->error() == QNetworkReply::OperationCanceledError || reply->error() == QNetworkReply::TimeoutError)
         message = tr("Le service n'a pas répondu à temps. Vérifiez votre connexion et réessayez.");
+    else if (status == 0 && !tls && m_endpoint.scheme() == QLatin1String("https"))
+        message = tr("Connexion sécurisée (TLS) indisponible sur cet appareil. Utilisez l'envoi par e-mail. (code %1)").arg(int(reply->error()));
     else if (status == 0)
-        message = tr("Impossible de joindre le service. Vérifiez votre connexion et réessayez.");
+        message = tr("Impossible de joindre le service. Vérifiez votre connexion et réessayez. (code %1)").arg(int(reply->error()));
     else
         message = tr("Le service a répondu par une erreur (%1). Réessayez plus tard.").arg(status);
     fail(message);
