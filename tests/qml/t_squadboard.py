@@ -108,6 +108,18 @@ QMetaObject.invokeMethod(fs, "picked", Q_ARG("QString", "4-4-2"), Q_ARG("bool", 
 pl = [i["label"] for i in board_items() if i["kind"] == "player"]
 check(pl == ["P1 N1", "P3 N3"], f"formation : les 2 titulaires seulement, dans l'ordre, postes en trop vides : {pl}")
 
+# Pas de texte libre pour un joueur : modifier un rond propose les convoqués (remplacement) ; adversaire et note restent libres.
+def prompts(): return [o for o in h.win.findChildren(QObject) if o.metaObject().className().startswith("PromptDialog") and o.property("opened")]
+QMetaObject.invokeMethod(be, "editLabel", Q_ARG("QVariant", 0)); h.spin(300)
+ss = sheet("squadSheet")
+check(ss.property("opened") is True and ss.property("title") == "Remplacer par" and not prompts(), "modifier un joueur : liste des convoqués, pas de saisie libre")
+QMetaObject.invokeMethod(ss, "chosen", Q_ARG("QString", "0")); h.spin(300)
+check(board_items()[0]["label"] == "P1 N1" and board_items()[0]["kind"] == "player", f"remplacement : le rond porte un autre convoqué : {board_items()[0]}")
+n0 = len(board_items())
+QMetaObject.invokeMethod(bm, "addItem", Q_ARG("QVariant", "opponent"), Q_ARG("QVariant", 0.5), Q_ARG("QVariant", 0.2), Q_ARG("QVariant", "")); h.spin(200)
+QMetaObject.invokeMethod(be, "editLabel", Q_ARG("QVariant", n0)); h.spin(300)
+check(len(prompts()) == 1, "adversaire : texte libre toujours permis")
+
 # Un joueur retiré des convoqués n'est plus proposé (la liste suit la fiche du match, même avant enregistrement).
 call(ed, "setRole", 2, ""); h.spin(200)
 check([s_["name"] for s_ in be.property("squad").toVariant()] == ["P1 N1", "P3 N3"], "joueur retiré des convoqués : plus proposé")

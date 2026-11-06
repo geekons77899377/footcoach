@@ -204,6 +204,10 @@ Item {
         var it = board.items.get(index);
         purpose = "label";
         pending = index;
+        if (squadMode && it.kind === "player") {
+            askSquadPlayer(-1, -1, index);          // terrain de match : pas de texte libre, on choisit un autre convoqué
+            return;
+        }
         if (it.kind === "text")
             prompt.ask("Note", it.label, true, 300);
         else
@@ -293,11 +297,14 @@ Item {
         return n.substring(0, board.maxPlayerLabel).trim();
     }
 
-    function askSquadPlayer(nx, ny) {
+    // replaceIndex >= 0 : remplace le joueur de ce rond par un autre convoqué (aucun texte libre pour un joueur de match).
+    property int squadReplace: -1
+    function askSquadPlayer(nx, ny, replaceIndex) {
         if (squad.length === 0) {
             toast.show("Aucun joueur convoqué : choisissez-les dans la fiche du match.");
             return;
         }
+        squadReplace = replaceIndex === undefined ? -1 : replaceIndex;
         pending = Qt.point(nx, ny);
         var m = [];
         for (var i = 0; i < squad.length; ++i)
@@ -309,8 +316,14 @@ Item {
     ActionSheet {
         id: squadSheet
         objectName: "squadSheet"
-        title: "Joueur à placer"
-        onChosen: (id) => board.addItem("player", editor.pending.x, editor.pending.y, editor.squadLabel(editor.squad[parseInt(id, 10)]))
+        title: editor.squadReplace >= 0 ? "Remplacer par" : "Joueur à placer"
+        onChosen: (id) => {
+            var label = editor.squadLabel(editor.squad[parseInt(id, 10)]);
+            if (editor.squadReplace >= 0)
+                board.setLabel(editor.squadReplace, label);
+            else
+                board.addItem("player", editor.pending.x, editor.pending.y, label);
+        }
     }
 
     FormationSheet {
@@ -464,7 +477,13 @@ Item {
         }
         Connections {
             target: editor
-            function onToolChanged() { if (editor.tool !== "select") prefs.hintSeen = true; }
+            function onToolChanged() {
+                if (editor.tool !== "select")
+                    prefs.hintSeen = true;
+                // Un outil de dessin n'agit pas sur une sélection : elle est levée (sinon elle resterait surlignée sur le terrain).
+                if (editor.tool !== "select" && editor.tool !== "multi")
+                    board.clearSelection();
+            }
         }
         Rectangle {
             id: hintBox
@@ -615,20 +634,75 @@ Item {
         // Actions sur la sélection.
         Rectangle {
             id: contextBar
-            visible: editor.editable && board.selCount > 0
+            objectName: "contextBar"
+            // Seulement avec l'outil de sélection : un outil de dessin (joueur, flèche…) ne montre pas supprimer, couleur, etc.
+            visible: editor.editable && board.selCount > 0 && (editor.tool === "select" || editor.tool === "multi")
+            // Déplaçable (poignée à gauche) pour dégager la zone de travail, par exemple autour du gardien.
+            property real dx: 0
+            property real dy: 0
+            readonly property real maxDx: Math.max(0, (view.width - width) / 2 - 4)
+            readonly property real maxDy: Math.max(0, view.height - height - 12)
             anchors.horizontalCenter: view.horizontalCenter
+            anchors.horizontalCenterOffset: Math.max(-maxDx, Math.min(maxDx, dx))
             anchors.bottom: view.bottom
-            anchors.bottomMargin: 12
-            width: Math.min(ctxRow.implicitWidth + 20, view.width - 24)
+            anchors.bottomMargin: 12 - Math.max(-maxDy, Math.min(12, dy))
+            width: Math.min(ctxRow.implicitWidth + 20 + handleW, view.width - 24)
+            readonly property real handleW: 26
             height: 60
             radius: 30
             color: "#f20f172a"
             border.width: 1
             border.color: Theme.border
 
+            // Poignée de déplacement.
+            Item {
+                id: grip
+                objectName: "contextGrip"
+                x: 8
+                width: contextBar.handleW
+                height: parent.height
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Repeater {
+                        model: 3
+                        Row {
+                            spacing: 4
+                            Rectangle { width: 4; height: 4; radius: 2; color: Theme.textMuted }
+                            Rectangle { width: 4; height: 4; radius: 2; color: Theme.textMuted }
+                        }
+                    }
+                }
+                MouseArea {
+                    id: gripDrag
+                    objectName: "gripDrag"
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    property real pressX: 0
+                    property real pressY: 0
+                    property real baseX: 0
+                    property real baseY: 0
+                    preventStealing: true
+                    onPressed: (m) => {
+                        var p = mapToItem(contextBar.parent, m.x, m.y);
+                        pressX = p.x;
+                        pressY = p.y;
+                        baseX = contextBar.anchors.horizontalCenterOffset;
+                        baseY = -(contextBar.anchors.bottomMargin - 12);
+                    }
+                    onPositionChanged: (m) => {
+                        if (!pressed)
+                            return;
+                        var p = mapToItem(contextBar.parent, m.x, m.y);
+                        contextBar.dx = baseX + (p.x - pressX);
+                        contextBar.dy = baseY + (p.y - pressY);
+                    }
+                }
+            }
+
             Flickable {
                 anchors.fill: parent
-                anchors.leftMargin: 10
+                anchors.leftMargin: 10 + contextBar.handleW
                 anchors.rightMargin: 10
                 contentWidth: ctxRow.implicitWidth
                 clip: true

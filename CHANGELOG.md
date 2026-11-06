@@ -1,9 +1,15 @@
 # Journal des modifications
 
+## Non publié — barre d'actions du terrain
+- La barre d'actions de la sélection (modifier, couleur, supprimer, pivoter…) **disparaît dès qu'on choisit un outil de dessin** (joueur, adversaire, ballon, flèche, note…) ; la sélection est levée. Elle reste avec « Sélection » et « Multi ».
+- Elle est **déplaçable** par une poignée (trois paires de points, à gauche) et ne sort jamais de la vue ; elle revient en bas au centre à la réouverture du terrain.
+- Test : `t_ctxbar.py` (glissé simulé par souris ; le geste tactile réel n'est pas vérifié sur appareil).
+
 ## Non publié — terrain d'un match : joueurs de la convocation
 - Sur le terrain tactique d'un match, **« Joueur » ouvre la liste des convoqués** (titulaires d'abord, avec leur rôle) au lieu d'ajouter un rond anonyme ; le joueur choisi est posé avec son nom sous le rond (24 caractères : prénom + initiale du nom si trop long). Un même joueur peut être posé plusieurs fois. Aucun convoqué : message, rien n'est posé.
 - **Formation** sur un match : les postes se remplissent avec les titulaires convoqués, dans l'ordre de la liste ; les postes sans titulaire restent vides.
 - La liste suit l'état courant de la fiche (convocations modifiées, même non enregistrées). Les schémas libres et les blocs de séance sont inchangés. Le texte posé est un libellé : renommer un joueur plus tard ne met pas le schéma à jour.
+- **Plus de texte libre pour un joueur de match** : modifier un rond (double-toucher ou crayon) ouvre la liste « Remplacer par » (convoqués) au lieu d'une saisie. Les adversaires et les notes restent libres. Limites : un schéma créé avant ce changement garde ses ronds numérotés ; retirer un joueur des convocations ne le retire pas du schéma.
 - Test : `t_squadboard.py` (backend **simulé**). Non vérifié sur appareil.
 
 ## Non publié — texte sous le joueur (schéma tactique)
