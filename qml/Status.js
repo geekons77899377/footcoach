@@ -15,6 +15,15 @@ var SESSION = {
     cancelled: { label: "Annulée", color: "#f26456" }
 };
 
+// Matchs : prévu, joué, annulé. La couleur d'un match dans le calendrier (MATCH_COLOR) diffère de celle des séances.
+var MATCH = {
+    planned: { label: "Prévu", color: "#60a5fa" },
+    played: { label: "Joué", color: "#2ecc71" },
+    cancelled: { label: "Annulé", color: "#f26456" }
+};
+var MATCH_COLOR = "#f59e0b";
+
+function match(code) { return MATCH[code] || { label: code, color: "#8190a5" }; }
 function attendance(code) { return ATTENDANCE[code] || { label: "", letter: "·", color: "#8190a5" }; }
 function session(code) { return SESSION[code] || { label: code, color: "#8190a5" }; }
 

@@ -37,9 +37,11 @@ Item {
         fillColor: Theme.surface
         onClicked: {
             var m = [];
+            var several = backend.clubs().length > 1;       // le club n'est rappelé que s'il y en a plusieurs
             for (var i = 0; i < root.teams.length; ++i)
                 m.push({ id: "t" + root.teams[i].id,
-                         text: root.teams[i].name + (root.teams[i].category ? " · " + root.teams[i].category : ""),
+                         text: root.teams[i].name + (root.teams[i].category ? " · " + root.teams[i].category : "")
+                               + (several ? " — " + root.teams[i].clubName : ""),
                          icon: "users", checked: root.teams[i].id === AppState.teamId });
             sheet.model = m;
             sheet.open();

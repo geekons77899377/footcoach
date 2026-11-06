@@ -3,6 +3,7 @@
 #include "core/TacticalBoard.h"
 
 #include <QDate>
+#include <QHash>
 #ifdef Q_OS_ANDROID
 #include <QCoreApplication>
 #include <QJniObject>
@@ -292,10 +293,14 @@ QVariantList Backend::teams(int clubId)
     QString error;
     const QList<Team> all = m_teams.all(&error, clubId);
     setError(error);
+    QHash<int, QString> clubNames;
+    for (const Club &c : m_clubs.all())
+        clubNames.insert(c.id, c.name);
     for (const Team &t : all) {
         QVariantMap m;
         m.insert(QStringLiteral("id"), t.id);
         m.insert(QStringLiteral("clubId"), t.clubId);
+        m.insert(QStringLiteral("clubName"), clubNames.value(t.clubId));
         m.insert(QStringLiteral("name"), t.name);
         m.insert(QStringLiteral("category"), t.category);
         m.insert(QStringLiteral("season"), t.season);

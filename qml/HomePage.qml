@@ -151,6 +151,14 @@ Item {
                 }
             }
 
+            AppButton {
+                objectName: "matchesButton"
+                width: parent.width
+                text: "Matchs"
+                iconName: "board"
+                onClicked: root.navigate("matches", -1)
+            }
+
             // Accès explicites aux données et aux paramètres (plus de feuille « Plus » sur téléphone).
             Row {
                 width: parent.width

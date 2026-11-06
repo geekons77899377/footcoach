@@ -7,10 +7,14 @@ Popup {
     id: root
 
     property int teamId: -1
+    property int clubId: -1                // club de la nouvelle équipe (celui d'une équipe existante ne change pas)
+    property var clubs: []
     property string errorText: ""
     signal saved(int id)
 
-    function openFor(team) {
+    function openFor(team, defaultClubId) {
+        clubs = backend.clubs();
+        clubId = team ? team.clubId : (defaultClubId > 0 ? defaultClubId : (clubs.length > 0 ? clubs[0].id : -1));
         teamId = team ? team.id : -1;
         nameField.text = team ? team.name : "";
         categoryField.text = team ? team.category : "";
@@ -49,6 +53,22 @@ Popup {
             color: Theme.text
         }
         FormField { id: nameField; width: parent.width; label: "Nom"; required: true; placeholder: "Ex. FC Exemple" }
+        ChipRow {
+            id: clubChips
+            objectName: "clubChips"
+            visible: root.teamId <= 0 && root.clubs.length > 1
+            width: parent.width
+            label: "Club"
+            allowClear: false
+            options: {
+                var o = [];
+                for (var i = 0; i < root.clubs.length; ++i)
+                    o.push({ id: String(root.clubs[i].id), text: root.clubs[i].name });
+                return o;
+            }
+            onPicked: (id) => root.clubId = parseInt(id, 10)
+            Binding { target: clubChips; property: "value"; value: String(root.clubId) }
+        }
         FormField { id: categoryField; width: parent.width; label: "Catégorie"; placeholder: "Ex. U15, Seniors" }
         FormField { id: seasonField; width: parent.width; label: "Saison"; placeholder: "Ex. 2026-2027" }
         ChipRow {
@@ -76,7 +96,7 @@ Popup {
                 kind: "primary"
                 text: "Enregistrer"
                 onClicked: {
-                    var r = backend.saveTeam({ id: root.teamId, name: nameField.text,
+                    var r = backend.saveTeam({ id: root.teamId, clubId: root.clubId, name: nameField.text,
                                                category: categoryField.text, season: seasonField.text });
                     if (r.ok) {
                         root.close();

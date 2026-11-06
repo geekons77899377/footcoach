@@ -67,6 +67,7 @@ def opener(sectionid, cls, prop, method):
     return f
 test_form("Séance", opener("calendar","CalendarPage","month","newSession"))
 test_form("Récurrence", opener("calendar","CalendarPage","month","newRecurrence"))
+test_form("Match", lambda: (sec("matches"), QMetaObject.invokeMethod(target("MatchesPage","scope"),"newMatch",Q_ARG("QVariant",""))))
 test_form("Exercice", opener("exercises","ExercisesPage","categoryFilter","newExercise"))
 test_form("Joueur", opener("squad","SquadPage","currentId","newPlayer"))
 test_form("Ticket d'assistance", lambda: (sec("settings"), QMetaObject.invokeMethod(target("SettingsPage","mode"),"openSupport",Q_ARG("QVariant","bug"))))
@@ -95,7 +96,7 @@ def test_popup(name, cls, call, which=0):
         if not ok: fails.append(f"{name}/{lab}")
     kb(False); QMetaObject.invokeMethod(p,"close"); h.spin(300)
 sec("squad")
-test_popup("Équipe (nouvelle)","TeamDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",None)))
+test_popup("Équipe (nouvelle)","TeamDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",None),Q_ARG("QVariant",-1)))
 sec("sessions")
 test_popup("Plan : durée et notes d'un exercice","PlanItemDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",{"itemId":1,"title":"Rondo","durationMin":15,"notes":""})))
 sec("exercises")

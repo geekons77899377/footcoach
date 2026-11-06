@@ -78,6 +78,7 @@ ApplicationWindow {
         { id: "attendance", text: "Présences", short: "Suivi", icon: "check" },
         { id: "exercises", text: "Exercices", icon: "dumbbell" },
         { id: "sessions", text: "Séances", icon: "clipboard" },
+        { id: "matches", text: "Matchs", icon: "board" },
         { id: "tactics", text: "Tactique", icon: "board" },
         { id: "data", text: "Données", icon: "copy" },
         { id: "settings", text: "Paramètres", icon: "gear" }
@@ -97,7 +98,8 @@ ApplicationWindow {
     // Retourne true si le geste a été utilisé ; sinon (accueil, rien à fermer) l'application peut se fermer.
     function handleBack() {
         var page = ({ squad: squadPage, calendar: calendarPage, attendance: attendancePage,
-                      exercises: exercisesPage, sessions: sessionsPage, tactics: tactics, settings: settingsPage })[section];
+                      exercises: exercisesPage, sessions: sessionsPage, matches: matchesPage, tactics: tactics,
+                      settings: settingsPage })[section];
         if (page && page.goBack())
             return true;
         if (AppState.leaveItem(section))        // ouverte depuis une autre page : retour à cette page
@@ -120,7 +122,16 @@ ApplicationWindow {
         }
         if (forceClose)
             return;
-        var pages = [tactics, sessionsPage];
+        // Fiche de match avec des modifications non enregistrées : la fenêtre ne se ferme pas en silence.
+        if (matchesPage.hasUnsaved()) {
+            close.accepted = false;
+            matchesPage.guardLeave(function () {
+                win.forceClose = true;
+                win.close();
+            });
+            return;
+        }
+        var pages = [tactics, sessionsPage, matchesPage];
         for (var i = 0; i < pages.length; ++i) {
             if (!pages[i].flushBoard()) {
                 close.accepted = false;
@@ -135,7 +146,7 @@ ApplicationWindow {
 
     // Quitter la section courante : un terrain dont l'enregistrement échoue garde l'utilisateur sur son écran.
     function go(id, boardId) {
-        var page = ({ sessions: sessionsPage, tactics: tactics })[section];
+        var page = ({ sessions: sessionsPage, matches: matchesPage, tactics: tactics })[section];
         if (id !== section && page)
             page.guardLeave(function () { enter(id, boardId); });
         else
@@ -152,6 +163,20 @@ ApplicationWindow {
             if (from !== "sessions") {
                 AppState.returnTo = from;            // retour : la page d'où l'on vient (Calendrier)
                 AppState.returnFor = "sessions";
+            }
+        }
+    }
+
+    // Ouvre un match existant (depuis le calendrier) : section Matchs, équipe du match.
+    function openMatch(m) {
+        AppState.teamId = m.teamId;
+        var from = section;
+        go("matches", -1);
+        if (section === "matches") {
+            matchesPage.showMatch(m);
+            if (from !== "matches") {
+                AppState.returnTo = from;
+                AppState.returnFor = "matches";
             }
         }
     }
@@ -346,10 +371,11 @@ ApplicationWindow {
                 onNavigate: (section, boardId) => win.goFrom(section, boardId)
             }
             SquadPage { id: squadPage }
-            CalendarPage { id: calendarPage; onPlanRequested: (s) => win.openSessionPlan(s) }
+            CalendarPage { id: calendarPage; onPlanRequested: (s) => win.openSessionPlan(s); onMatchRequested: (m) => win.openMatch(m) }
             AttendancePage { id: attendancePage }
             ExercisesPage { id: exercisesPage }
             SessionsPage { id: sessionsPage }
+            MatchesPage { id: matchesPage }
             TacticsPage { id: tactics }
             DataPage { onImported: win.go("home", -1) }
             SettingsPage { id: settingsPage; onNavigate: (section) => win.goFrom(section, -1) }

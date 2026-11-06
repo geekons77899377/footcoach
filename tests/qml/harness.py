@@ -32,6 +32,7 @@ def prepare():
 
 class Backend(QObject):
     lastErrorChanged = Signal()
+    dataReplaced = Signal()
     def __init__(self):
         super().__init__()
         self._boards = {}
@@ -85,6 +86,101 @@ class Backend(QObject):
         except Exception:
             self._err = "json"; self.lastErrorChanged.emit(); return False
         self._boards[i]["json"] = js; self.saves += 1; return True
+
+    @Slot(int, bool, result="QVariantList")
+    def players(self, team, inactive):
+        return []      # les tests qui ont besoin d'un effectif redéfinissent cette méthode
+    # --- Clubs et matchs (simulés : mêmes clés que src/app/BackendMatches.cpp et Backend.cpp) -----------------
+    # Les tests qui définissent leurs propres équipes (teams) n'ont rien à changer : un club « Mon club » existe d'office.
+    def _club_init(self):
+        if not hasattr(self, "_clubs"):
+            self._clubs = [{"id": 1, "name": "Mon club"}]
+            self._matches = {}
+            self._match_players = {}
+            self._match_board = {}
+            self._next_match = 1
+            self._next_club = 2
+    @Slot(result="QVariantList")
+    def clubs(self):
+        self._club_init()
+        return [dict(c, teamCount=1) for c in self._clubs]
+    @Slot("QVariantMap", result="QVariantMap")
+    def saveClub(self, c):
+        self._club_init()
+        name = str(c.get("name", "")).strip()
+        if not name: return {"ok": False, "id": -1, "error": "Le nom du club est obligatoire."}
+        cid = int(c.get("id", -1))
+        if cid > 0:
+            for x in self._clubs:
+                if x["id"] == cid: x["name"] = name; return {"ok": True, "id": cid, "error": ""}
+            return {"ok": False, "id": -1, "error": "Club introuvable."}
+        cid = self._next_club; self._next_club += 1
+        self._clubs.append({"id": cid, "name": name})
+        return {"ok": True, "id": cid, "error": ""}
+    @Slot(int, result="QVariantMap")
+    def deleteClub(self, cid):
+        self._club_init()
+        if len(self._clubs) <= 1: return {"ok": False, "id": cid, "error": "Impossible de supprimer le dernier club."}
+        self._clubs = [c for c in self._clubs if c["id"] != cid]
+        return {"ok": True, "id": cid, "error": ""}
+    def _match_map(self, m):
+        mid = m["id"]
+        return dict(m, convoked=len(self._match_players.get(mid, [])), hasBoard=mid in self._match_board)
+    @Slot(int, str, str, result="QVariantList")
+    def matches(self, team, a, b):
+        self._club_init()
+        return [self._match_map(m) for m in sorted(self._matches.values(), key=lambda m: (m["date"], m["time"]))
+                if m["teamId"] == team and a <= m["date"] <= b]
+    @Slot(int, str, str, result="QStringList")
+    def matchDates(self, team, a, b):
+        self._club_init()
+        return sorted(set(m["date"] for m in self._matches.values() if m["teamId"] == team and a <= m["date"] <= b))
+    @Slot(int, result="QVariantMap")
+    def match(self, mid):
+        self._club_init()
+        m = self._matches.get(mid)
+        if not m: return {"ok": False, "id": mid, "error": "Match introuvable."}
+        return {"ok": True, "id": mid, "error": "", "match": self._match_map(m),
+                "players": [{"playerId": p, "name": "Joueur %d" % p, "jerseyNumber": p, "role": r}
+                            for p, r in self._match_players.get(mid, [])],
+                "boardId": self._match_board.get(mid, -1)}
+    @Slot("QVariantMap", result="QVariantMap")
+    def saveMatch(self, m):
+        self._club_init()
+        self.match_saves = getattr(self, "match_saves", 0) + 1
+        if not str(m.get("opponent", "")).strip(): return {"ok": False, "id": -1, "error": "L'adversaire est obligatoire."}
+        if not m.get("date") or not m.get("time"): return {"ok": False, "id": -1, "error": "La date et l'heure du match sont invalides."}
+        sf, sa = int(m.get("scoreFor", -1)), int(m.get("scoreAgainst", -1))
+        if (sf >= 0) != (sa >= 0): return {"ok": False, "id": -1, "error": "Le score est incomplet : renseignez les deux scores ou aucun."}
+        mid = int(m.get("id", -1))
+        if mid <= 0:
+            mid = self._next_match; self._next_match += 1
+        self._matches[mid] = {"id": mid, "teamId": int(m["teamId"]), "date": m["date"], "time": m["time"],
+                              "opponent": m["opponent"].strip(), "location": m.get("location", ""), "homeAway": m.get("homeAway", "home"),
+                              "status": m.get("status", "planned"), "scoreFor": sf, "scoreAgainst": sa, "notes": m.get("notes", "")}
+        return {"ok": True, "id": mid, "error": ""}
+    @Slot(int, result="QVariantMap")
+    def deleteMatch(self, mid):
+        self._club_init()
+        if mid not in self._matches: return {"ok": False, "id": mid, "error": "Match introuvable."}
+        del self._matches[mid]; self._match_players.pop(mid, None)
+        b = self._match_board.pop(mid, None)
+        if b: self._boards.pop(b, None)
+        return {"ok": True, "id": mid, "error": ""}
+    @Slot(int, "QVariantList", result="QVariantMap")
+    def setMatchPlayers(self, mid, entries):
+        self._club_init()
+        if mid not in self._matches: return {"ok": False, "id": mid, "error": "Match introuvable."}
+        self.last_convoked = [(int(e["playerId"]), e["role"]) for e in entries]
+        self._match_players[mid] = list(self.last_convoked)
+        return {"ok": True, "id": mid, "error": ""}
+    @Slot(int, result="QVariantMap")
+    def createMatchBoard(self, mid):
+        self._club_init()
+        if mid not in self._matches: return {"ok": False, "id": mid, "error": "Match introuvable."}
+        created = mid not in self._match_board
+        if created: self._match_board[mid] = self.add("Match contre " + self._matches[mid]["opponent"])
+        return {"ok": True, "id": mid, "error": "", "boardId": self._match_board[mid], "created": created}
     @Slot(result="QStringList")
     def formationNames(self): return FORM["_names"]
     @Slot(str, bool, result=str)

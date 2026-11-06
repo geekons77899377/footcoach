@@ -1,5 +1,6 @@
 import QtQuick
 import "DateUtil.js" as DateUtil
+import "Status.js" as Status
 
 // Mois affiché en grille (semaines du lundi au dimanche) : jours avec séances marqués d'un point, jour choisi en vert.
 Item {
@@ -8,6 +9,7 @@ Item {
     property string month: DateUtil.todayIso().substring(0, 7) + "-01"     // premier jour du mois affiché
     property string selected: DateUtil.todayIso()
     property var marks: []                                                   // jours (AAAA-MM-JJ) avec séance
+    property var matchMarks: []                                              // jours avec match (pastille d'une autre couleur)
     readonly property string today: DateUtil.todayIso()
     readonly property int cell: Math.max(34, Math.min(52, Math.floor(width / 7)))
     readonly property int offset: DateUtil.weekday(month) - 1               // cases vides avant le 1er
@@ -110,14 +112,32 @@ Item {
                         color: slot.isSelected ? Theme.textOnAccent : Theme.text
                     }
                     Rectangle {
+                        objectName: "sessionDot"
+                        readonly property bool both: root.matchMarks.indexOf(slot.day) >= 0
                         visible: root.marks.indexOf(slot.day) >= 0
                         anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.horizontalCenterOffset: both ? -5 : 0
                         anchors.bottom: parent.bottom
                         anchors.bottomMargin: 5
                         width: 5
                         height: 5
                         radius: 2.5
                         color: slot.isSelected ? Theme.textOnAccent : Theme.accent
+                    }
+                    Rectangle {
+                        objectName: "matchDot"
+                        readonly property bool both: root.marks.indexOf(slot.day) >= 0
+                        visible: root.matchMarks.indexOf(slot.day) >= 0
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.horizontalCenterOffset: both ? 5 : 0
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 5
+                        width: 6
+                        height: 6
+                        radius: 3
+                        color: Status.MATCH_COLOR
+                        border.width: slot.isSelected ? 1 : 0
+                        border.color: Theme.textOnAccent
                     }
                 }
                 MouseArea {

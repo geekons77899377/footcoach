@@ -161,6 +161,22 @@ Item {
         }
     }
 
+    // Saisie du nom d'un club (création ou renommage).
+    PromptDialog {
+        id: clubPrompt
+        objectName: "clubPrompt"
+        property int clubId: -1                       // -1 : nouveau club
+        onAccepted: (text) => {
+            var r = backend.saveClub({ id: clubId, name: text });
+            if (r.ok) {
+                page.refreshTeams();
+                toast.show(clubId > 0 ? "Club renommé" : "Club créé");
+            } else {
+                toast.show(r.error);
+            }
+        }
+    }
+
     PromptDialog {
         id: confirm
         property string action: ""
@@ -172,6 +188,15 @@ Item {
                     page.refreshTeams();
                 } else {
                     toast.show(r.error);
+                }
+            } else if (action === "deleteClub") {
+                var c = backend.deleteClub(page.team.clubId);
+                if (c.ok) {
+                    page.closeForm();
+                    page.teamId = -1;
+                    page.refreshTeams();
+                } else {
+                    toast.show(c.error);
                 }
             } else if (action === "deleteTeam") {
                 var t = backend.deleteTeam(page.teamId);
@@ -191,20 +216,39 @@ Item {
         title: "Équipe"
         function rebuild() {
             var m = [];
+            var several = backend.clubs().length > 1;
             for (var i = 0; i < page.teams.length; ++i)
                 m.push({ id: "t" + page.teams[i].id, text: page.teams[i].name
-                         + (page.teams[i].category ? " · " + page.teams[i].category : ""),
+                         + (page.teams[i].category ? " · " + page.teams[i].category : "")
+                         + (several ? " — " + page.teams[i].clubName : ""),
                          icon: "users", checked: page.teams[i].id === page.teamId });
             m.push({ id: "new", text: "Nouvelle équipe", icon: "plus" });
             if (page.team) {
                 m.push({ id: "edit", text: "Modifier l'équipe", icon: "edit" });
                 m.push({ id: "delete", text: "Supprimer l'équipe", icon: "trash", danger: true });
             }
+            m.push({ id: "newClub", text: "Nouveau club", icon: "plus" });
+            if (page.team) {
+                m.push({ id: "renameClub", text: "Renommer le club « " + page.team.clubName + " »", icon: "edit" });
+                if (several)
+                    m.push({ id: "deleteClub", text: "Supprimer le club « " + page.team.clubName + " »", icon: "trash", danger: true });
+            }
             model = m;
         }
         onChosen: (id) => {
             if (id === "new") {
-                teamDialog.openFor(null);
+                teamDialog.openFor(null, page.team ? page.team.clubId : -1);
+            } else if (id === "newClub") {
+                clubPrompt.clubId = -1;
+                clubPrompt.ask("Nouveau club", "", false, 60);
+            } else if (id === "renameClub") {
+                clubPrompt.clubId = page.team.clubId;
+                clubPrompt.ask("Renommer le club", page.team.clubName, false, 60);
+            } else if (id === "deleteClub") {
+                confirm.action = "deleteClub";
+                confirm.confirm("Supprimer le club ?",
+                                "Le club « " + page.team.clubName + " » sera supprimé avec toutes ses équipes, leurs joueurs, "
+                                + "séances, matchs et présences. Cette action est définitive.", "Supprimer", true);
             } else if (id === "edit") {
                 teamDialog.openFor(page.team);
             } else if (id === "delete") {

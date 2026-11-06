@@ -13,6 +13,8 @@ Item {
     property string scope: "day"                 // day, week, month
     property var sessions: []
     property var marks: []
+    property var matches: []                     // matchs de la période (distincts des séances)
+    property var matchMarks: []
     property string mode: "browse"               // browse, session, recurrence, attendance
     readonly property bool split: width >= 640
     readonly property int teamId: AppState.teamId
@@ -44,10 +46,14 @@ Item {
         if (teamId <= 0) {
             sessions = [];
             marks = [];
+            matches = [];
+            matchMarks = [];
             return;
         }
         marks = backend.sessionDates(teamId, month, monthEnd(month));
         sessions = backend.sessions(teamId, rangeFrom(), rangeTo());
+        matchMarks = backend.matchDates(teamId, month, monthEnd(month));
+        matches = backend.matches(teamId, rangeFrom(), rangeTo());
     }
 
     // Libellé de la période affichée (jour, semaine ou mois) et pas d'une période à l'autre.
@@ -77,9 +83,13 @@ Item {
             if (sessions[i].status === "planned") planned++;
             else if (sessions[i].status === "done") done++;
         }
-        if (n === 0)
+        var nm = matches.length;
+        var matchText = nm + (nm > 1 ? " matchs" : " match");
+        if (n === 0 && nm === 0)
             return "Aucune séance";
-        return n + (n > 1 ? " séances" : " séance") + (planned > 0 ? " · " + planned + " prévue" + (planned > 1 ? "s" : "") : "")
+        if (n === 0)
+            return matchText;
+        return (nm > 0 ? matchText + " · " : "") + n + (n > 1 ? " séances" : " séance") + (planned > 0 ? " · " + planned + " prévue" + (planned > 1 ? "s" : "") : "")
                + (done > 0 ? " · " + done + " réalisée" + (done > 1 ? "s" : "") : "");
     }
 
@@ -105,6 +115,7 @@ Item {
     }
 
     // « Modifier » une séance existante : informations et plan d'exercices sur le même écran (section Séances).
+    signal matchRequested(var match)
     signal planRequested(var session)
     function editSession(s) { planRequested(s); }
 
@@ -217,6 +228,74 @@ Item {
     component SessionList: Column {
         id: sl
         spacing: 10
+        Repeater {
+            model: page.matches
+            delegate: Card {
+                id: mcard
+                required property var modelData
+                objectName: "matchCard"
+                readonly property var st: Status.match(modelData.status)
+                width: sl.width
+                height: 84
+                padding: 12
+                radius: Theme.radiusLg
+                opacity: modelData.status === "cancelled" ? 0.6 : 1
+                Rectangle {
+                    id: mdot
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 12
+                    height: 12
+                    radius: 6
+                    color: Status.MATCH_COLOR
+                }
+                Column {
+                    anchors.left: mdot.right
+                    anchors.leftMargin: 12
+                    anchors.right: mchevron.left
+                    anchors.rightMargin: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+                    Text {
+                        width: parent.width
+                        elide: Text.ElideRight
+                        font.family: Theme.fontHeading
+                        font.pixelSize: 17
+                        font.weight: Font.Bold
+                        color: Theme.text
+                        text: "Match · " + mcard.modelData.opponent
+                    }
+                    Text {
+                        width: parent.width
+                        elide: Text.ElideRight
+                        font.pixelSize: 12
+                        color: Theme.textMuted
+                        text: (page.scope !== "day" ? DateUtil.longLabel(mcard.modelData.date) + " · " : "")
+                              + mcard.modelData.time + " · " + (mcard.modelData.homeAway === "home" ? "Domicile" : "Extérieur")
+                    }
+                    Text {
+                        text: mcard.st.label.toUpperCase()
+                              + (mcard.modelData.scoreFor >= 0 ? "  " + mcard.modelData.scoreFor + " – " + mcard.modelData.scoreAgainst : "")
+                        font.pixelSize: 11
+                        font.weight: Font.Bold
+                        font.letterSpacing: 0.8
+                        color: mcard.st.color
+                    }
+                }
+                Icon {
+                    id: mchevron
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "chevron"
+                    color: Theme.textDim
+                    size: 20
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: page.matchRequested(mcard.modelData)
+                }
+            }
+        }
         Repeater {
             model: page.sessions
             delegate: Column {
@@ -455,7 +534,7 @@ Item {
         }
         Card {
             objectName: "calendarEmpty"
-            visible: page.sessions.length === 0
+            visible: page.sessions.length === 0 && page.matches.length === 0
             width: sl.width
             padding: 20
             radius: Theme.radiusLg
@@ -563,6 +642,7 @@ Item {
                     month: page.month
                     selected: page.selected
                     marks: page.marks
+                    matchMarks: page.matchMarks
                     onPicked: (d) => page.select(d)
                     onMonthRequested: (m) => page.showMonth(m)
                 }
@@ -610,6 +690,7 @@ Item {
                             month: page.month
                             selected: page.selected
                             marks: page.marks
+                            matchMarks: page.matchMarks
                             onPicked: (d) => page.select(d)
                             onMonthRequested: (m) => page.showMonth(m)
                         }
