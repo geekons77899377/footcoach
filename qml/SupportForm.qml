@@ -92,7 +92,6 @@ Item {
         width: parent.width
         leftInset: root.showBack ? 44 : 0
         title: Link.category(root.category).title
-        subtitle: "Envoyé à l'équipe FootCoach"
     }
     IconButton {
         visible: root.showBack
@@ -133,15 +132,7 @@ Item {
                 font.pixelSize: 16
                 font.weight: Font.DemiBold
                 color: Theme.text
-                text: "Merci, votre signalement a bien été envoyé."
-            }
-            Text {
-                visible: root.sentUrl !== ""
-                width: parent.width
-                wrapMode: Text.WrapAnywhere
-                font.pixelSize: 13
-                color: Theme.textMuted
-                text: "Il est visible publiquement : " + root.sentUrl
+                text: "Merci, votre message a bien été envoyé."
             }
             AppButton {
                 objectName: "supportDoneClose"
@@ -174,7 +165,7 @@ Item {
                 id: cats
                 objectName: "supportCategory"
                 width: parent.width
-                label: "Type de ticket"
+                label: "Type"
                 allowClear: false
                 value: root.category
                 options: Link.CATEGORIES
@@ -219,9 +210,8 @@ Item {
                     wrapMode: Text.Wrap
                     font.pixelSize: 13
                     color: Theme.text
-                    text: "Le signalement sera visible publiquement sur GitHub. N'y mettez aucune donnée personnelle (nom ou "
-                          + "numéro de joueur, téléphone, e-mail). Internet n'est utilisé qu'au moment où vous touchez « Envoyer » ; "
-                          + "aucun compte GitHub n'est nécessaire."
+                    text: "Votre message sera visible publiquement. N'y mettez aucune donnée personnelle (nom ou numéro de "
+                          + "joueur, téléphone, e-mail)."
                 }
             }
 

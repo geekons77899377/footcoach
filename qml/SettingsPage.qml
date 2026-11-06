@@ -158,7 +158,7 @@ Item {
                         SettingRow {
                             objectName: "rowBug"
                             icon: "flag"; title: "Signaler un problème"
-                            subtitle: "Crée un ticket « SUP - … » sur GitHub"
+                            subtitle: "Un message à l'équipe FootCoach"
                             onActivated: page.openSupport("bug")
                         }
                         Rectangle { width: parent.width; height: 1; color: Theme.borderSubtle }

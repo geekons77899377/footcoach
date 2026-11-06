@@ -27,12 +27,12 @@ les noms, dates de naissance, téléphones et adresses e-mail saisis : traitez-l
 
 ## Assistance (signalement, e-mail)
 Le menu « Paramètres » permet de signaler un problème, de proposer une amélioration ou de contacter le support. Si vous
-touchez « Envoyer le signalement », l'application crée un ticket sur le dépôt public de FootCoach sur GitHub (titre « SUP - … »,
-description, et la version de l'application et le système si vous le choisissez). Aucun compte GitHub n'est nécessaire et
-rien n'est envoyé avant ce toucher. Ce ticket est **public** : n'y indiquez aucune donnée personnelle (joueurs,
-téléphones, adresses e-mail). GitHub traite ces informations selon sa propre politique de confidentialité. L'adresse IP de
-votre appareil est vue par GitHub lors de l'envoi, comme pour toute connexion Internet. Vous pouvez aussi choisir l'envoi par
-e-mail, qui ouvre votre application de messagerie : c'est vous qui relisez puis envoyez.
+touchez « Envoyer le signalement », l'application publie votre message (titre, description, et la version de
+l'application et le système si vous le choisissez) sur l'espace public de suivi des signalements de FootCoach, hébergé
+par un prestataire tiers. Aucun compte n'est nécessaire et rien n'est envoyé avant ce toucher. Ce message est **public** :
+n'y indiquez aucune donnée personnelle (joueurs, téléphones, adresses e-mail). Le prestataire traite ces informations selon sa propre
+politique de confidentialité et voit l'adresse IP de votre appareil lors de l'envoi, comme pour toute connexion Internet. Vous
+pouvez aussi choisir l'envoi par e-mail, qui ouvre votre application de messagerie : c'est vous qui relisez puis envoyez.
 
 ## Durée de conservation et suppression
 Les données restent sur l'appareil jusqu'à leur suppression dans l'application ou jusqu'à la désinstallation

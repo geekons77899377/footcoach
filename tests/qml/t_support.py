@@ -79,7 +79,7 @@ check("### Description" in body and "100% faux" in body and "&" in body and "Deu
 check("### Étapes pour reproduire" in body and "2. Verrouiller" in body, "corps : étapes pour reproduire")
 check("### Environnement" in body and "FootCoach" in body and "Système :" in body, "corps : environnement joint (consentement activé)")
 check(form.property("sent") is True and F(h, "supportDone").isVisible() and not F(h, "supportSend").isVisible(), "succès : écran de confirmation affiché")
-check("issues/42" in "".join(texts(F(h, "supportDone"), [])), "succès : lien du ticket indiqué")
+check("github" not in "".join(texts(h.win.contentItem(), [])).lower(), "aucune mention de GitHub dans l'interface")
 click_item(h, F(h, "supportDoneClose")); h.spin(400)
 check(pg.property("mode") == "browse", "après envoi : retour à la page Paramètres")
 
