@@ -29,7 +29,8 @@ Item {
         for (var i = 0; i < roster.length; ++i) {
             var r = roles[roster[i].id];
             var e = { id: roster[i].id, name: roster[i].fullName, firstName: roster[i].firstName,
-                      lastName: roster[i].lastName, role: r };
+                      lastName: roster[i].lastName, position: roster[i].position || "",
+                      foot: roster[i].preferredFoot || "", role: r };
             if (r === "starter")
                 starters.push(e);
             else if (r === "substitute")

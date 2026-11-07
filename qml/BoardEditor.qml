@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtCore
+import "SquadFormation.js" as SquadFormation
 
 // Éditeur d'un schéma tactique : en-tête, terrain, barre d'outils (en bas en portrait, à gauche en paysage)
 // et barre d'actions sur la sélection. Enregistrement automatique après chaque modification.
@@ -337,11 +338,24 @@ Item {
             var starters = [];
             for (var i = 0; i < editor.squad.length; ++i)
                 if (editor.squad[i].role === "starter")
-                    starters.push(editor.squadLabel(editor.squad[i]));
-            if (starters.length === 0)
+                    starters.push({ label: editor.squadLabel(editor.squad[i]), position: editor.squad[i].position || "",
+                                    foot: editor.squad[i].foot || "", firstName: editor.squad[i].firstName || "",
+                                    lastName: editor.squad[i].lastName || "" });
+            if (starters.length === 0) {
                 toast.show("Aucun titulaire convoqué : choisissez-les dans la fiche du match.");
-            else
-                board.applyFormation(backend.formationJson(name, withOpp), withOpp, starters);
+                return;
+            }
+            // Chaque titulaire va à un poste de la formation correspondant à son poste (gardien, défenseur, milieu, attaquant).
+            var json = backend.formationJson(name, withOpp);
+            var slotYs = [];
+            var parsed = JSON.parse(json).items;
+            for (var s = 0; s < parsed.length; ++s)
+                if (parsed[s].kind === "player")
+                    slotYs.push(parsed[s].y);
+            var plan = SquadFormation.assign(name, starters, slotYs);
+            board.applyFormation(json, withOpp, plan.labels);
+            if (plan.unplaced > 0)
+                toast.show(plan.unplaced + " titulaire(s) sans place dans cette formation.");
         }
     }
 

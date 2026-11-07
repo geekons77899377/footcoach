@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## Non publié — formation d'un match placée selon les postes
+- Choisir une formation sur le terrain d'un match place les **titulaires** selon leur **poste** (gardien, défenseur, milieu, attaquant) : lignes d'après le nom de la formation (4-2-3-1 = 4 défenseurs, 5 milieux, 1 attaquant). **Les remplaçants ne sont jamais placés.**
+- **Plusieurs titulaires au même poste** : choix d'après le **pied fort** (droitier à droite, gaucher à gauche, « les deux » partout mais après le pied adapté, pied inconnu ensuite ; l'axe compte comme un côté à partir de 0,44/0,56 de largeur), puis à égalité par **prénom alphabétique** (accents et casse ignorés), puis nom. Couloirs remplis avant l'axe.
+- Titulaire sans poste ou en surnombre : il prend une case restante hors du but ; jamais un gardien dans le champ ni un joueur de champ au but (case vide). Message si des titulaires restent sans place.
+- `SquadFormation.js`. Test : `t_squadboard.py` (backend **simulé**). Non vérifié sur appareil.
+
 ## Non publié — barre d'actions du terrain
 - La barre d'actions de la sélection (modifier, couleur, supprimer, pivoter…) **disparaît dès qu'on choisit un outil de dessin** (joueur, adversaire, ballon, flèche, note…) ; la sélection est levée. Elle reste avec « Sélection » et « Multi ».
 - Elle est **déplaçable** par une poignée (trois paires de points, à gauche) et ne sort jamais de la vue ; elle revient en bas au centre à la réouverture du terrain.

@@ -102,12 +102,6 @@ long = {"id": 9, "name": "Jean-Baptiste Montmorency-Delacroix", "firstName": "Je
 lab = be.metaObject() and QMetaObject.invokeMethod(be, "squadLabel", Qt.DirectConnection, Q_RETURN_ARG("QVariant"), Q_ARG("QVariant", long))
 check(str(lab) == "Jean-Baptiste M.", f"nom long : prénom + initiale : {lab}")
 
-# Formation : remplie avec les titulaires convoqués seulement.
-fs = find(h, lambda o: o.metaObject().className().startswith("FormationSheet"))
-QMetaObject.invokeMethod(fs, "picked", Q_ARG("QString", "4-4-2"), Q_ARG("bool", False)); h.spin(400)
-pl = [i["label"] for i in board_items() if i["kind"] == "player"]
-check(pl == ["P1 N1", "P3 N3"], f"formation : les 2 titulaires seulement, dans l'ordre, postes en trop vides : {pl}")
-
 # Pas de texte libre pour un joueur : modifier un rond propose les convoqués (remplacement) ; adversaire et note restent libres.
 def prompts(): return [o for o in h.win.findChildren(QObject) if o.metaObject().className().startswith("PromptDialog") and o.property("opened")]
 QMetaObject.invokeMethod(be, "editLabel", Q_ARG("QVariant", 0)); h.spin(300)
@@ -123,6 +117,61 @@ check(len(prompts()) == 1, "adversaire : texte libre toujours permis")
 # Un joueur retiré des convoqués n'est plus proposé (la liste suit la fiche du match, même avant enregistrement).
 call(ed, "setRole", 2, ""); h.spin(200)
 check([s_["name"] for s_ in be.property("squad").toVariant()] == ["P1 N1", "P3 N3"], "joueur retiré des convoqués : plus proposé")
+
+# Formation : les titulaires vont au poste correspondant à leur poste (GK, DEF, MID, FWD) ; remplaçants jamais placés ;
+# plusieurs titulaires au même poste : pied fort puis prénom alphabétique.
+fs = find(h, lambda o: o.metaObject().className().startswith("FormationSheet"))
+def P(name, position, foot="", role="starter"):
+    return {"name": name, "firstName": name, "lastName": "", "position": position, "foot": foot, "role": role}
+def formation_labels(spec, name="4-4-2"):
+    be.setProperty("squad", [dict(p, id=i + 1) for i, p in enumerate(spec)]); h.spin(100)
+    QMetaObject.invokeMethod(bm, "clearAll") if False else None
+    QMetaObject.invokeMethod(fs, "picked", Q_ARG("QString", name), Q_ARG("bool", False)); h.spin(400)
+    return {i["label"]: (round(i["x"], 2), round(i["y"], 2)) for i in board_items() if i["kind"] == "player"}
+# La liste est mélangée volontairement : le poste décide, pas l'ordre.
+full = [P("Att1", "FWD"), P("Def1", "DEF"), P("Mil1", "MID"), P("Gar", "GK"), P("Def2", "DEF"), P("Mil2", "MID"),
+        P("Def3", "DEF"), P("Att2", "FWD"), P("Mil3", "MID"), P("Def4", "DEF"), P("Mil4", "MID")]
+pos = formation_labels(full)
+check(len(pos) == 11, f"11 titulaires, 11 joueurs posés : {len(pos)}")
+check(pos["Gar"][0] < 0.1, f"le gardien est au but : {pos['Gar']}")
+check(all(pos[n][0] < 0.3 for n in ("Def1", "Def2", "Def3", "Def4")), "les défenseurs sont dans la ligne défensive")
+check(all(0.3 < pos[n][0] < 0.55 for n in ("Mil1", "Mil2", "Mil3", "Mil4")), "les milieux sont dans la ligne du milieu")
+check(all(pos[n][0] > 0.6 for n in ("Att1", "Att2")), "les attaquants sont en pointe")
+# Remplaçants : jamais placés, même au bon poste et même s'il manque un titulaire.
+sq = [P("Gar", "GK"), P("Def1", "DEF"), P("Remp", "DEF", role="substitute"), P("Remp2", "GK", role="substitute")]
+pos = formation_labels(sq)
+check(set(pos) == {"Gar", "Def1"}, f"les remplaçants ne sont pas placés : {sorted(pos)}")
+# Plusieurs titulaires au même poste : le pied fort décide (droitier à droite, gaucher à gauche), puis le prénom.
+defs = [P("Zoe", "DEF", "R"), P("Yan", "DEF", "L"), P("Xav", "DEF", "R"), P("Wil", "DEF", "L"), P("Vic", "DEF", "B"), P("Gar", "GK")]
+pos = formation_labels(defs)
+right_back = [n for n, p in pos.items() if p[1] > 0.8 and p[0] < 0.3]
+left_back = [n for n, p in pos.items() if p[1] < 0.2 and p[0] < 0.3]
+check(right_back == ["Xav"], f"latéral droit : un droitier, le premier par prénom (Xav avant Zoe) : {right_back}")
+check(left_back == ["Wil"], f"latéral gauche : un gaucher, le premier par prénom (Wil avant Yan) : {left_back}")
+line = lambda p_: sorted(n for n, q in p_.items() if q[0] < 0.3 and n != "Gar")
+check(line(pos) == ["Wil", "Xav", "Yan", "Zoe"], f"défense : latéraux Xav (D) et Wil (G), axe droit Zoe (D) et axe gauche Yan (G) : {line(pos)}")
+check(pos["Zoe"][1] > 0.5 and pos["Yan"][1] < 0.5, "axe : le droitier côté droit, le gaucher côté gauche")
+check(pos["Vic"][0] > 0.3, f"Vic (« les deux », 5e défenseur) occupe une case libre hors de la défense : {pos['Vic']}")
+# À pied fort identique ou inconnu : ordre alphabétique des prénoms (accents ignorés), pas l'ordre de la liste.
+same = [P("Léo", "DEF"), P("Éric", "DEF"), P("Adam", "DEF"), P("Zack", "DEF"), P("Bob", "DEF"), P("Gar", "GK")]
+pos = formation_labels(same)
+check(line(pos) == ["Adam", "Bob", "Léo", "Éric"], f"pieds inconnus : défense = Adam, Bob, Éric, Léo (prénom, accents ignorés) : {line(pos)}")
+check(pos["Zack"][0] > 0.3, "pieds inconnus : Zack, dernier par prénom, hors de la défense")
+# Un « les deux pieds » joue des deux côtés, mais après le pied adapté.
+mix = [P("Bi", "DEF", "B"), P("Dr", "DEF", "R"), P("Ga", "DEF", "L"), P("Ax", "DEF", "B"), P("Gar", "GK")]
+pos = formation_labels(mix)
+check([n for n, p in pos.items() if p[1] > 0.8 and p[0] < 0.3] == ["Dr"] and [n for n, p in pos.items() if p[1] < 0.2 and p[0] < 0.3] == ["Ga"], "pied adapté d'abord, « les deux » ensuite")
+# 4-2-3-1 : 1 seul attaquant ; le second attaquant (poste sans place) prend un poste restant.
+pos = formation_labels(full, "4-2-3-1")
+check(pos["Gar"][0] < 0.1 and pos["Att1"][0] > 0.7, f"4-2-3-1 : gardien au but, premier attaquant en pointe : {pos.get('Att1')}")
+check(len(pos) == 11 and 0.3 < pos["Att2"][0] < 0.65, f"4-2-3-1 : le 2e attaquant (poste sans place) prend un poste restant : {pos.get('Att2')}")
+# Postes absents : joueurs sans poste placés dans les cases libres, jamais au but ; gardien absent : but vide.
+pos = formation_labels([P("A", ""), P("B", ""), P("C", "DEF")])
+check(len(pos) == 3 and all(p[0] > 0.1 for p in pos.values()), f"sans poste ni gardien : placés dans le champ, but vide : {pos}")
+check(pos["C"][0] < 0.3, "le défenseur reste en défense")
+# Deux gardiens : le second ne va pas dans le champ.
+pos = formation_labels([P("G1", "GK"), P("G2", "GK"), P("D", "DEF")])
+check(set(pos) == {"G1", "D"}, f"deux gardiens : un seul placé : {sorted(pos)}")
 
 # Aucun convoqué : message, pas de liste, pas de rond.
 call(page, "closeEditor") if False else None
