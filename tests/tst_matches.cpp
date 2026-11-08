@@ -7,7 +7,12 @@
 #include "core/SessionRepository.h"
 #include "core/TeamRepository.h"
 
+#include "app/ChallengeSheet.h"
+
+#include <QProcess>
 #include <QSqlQuery>
+#include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QtTest>
 
 // Clubs (L4) et matchs (L5) : dépôts, règles de liens des schémas, API du Backend.
@@ -447,7 +452,117 @@ private slots:
         QCOMPARE(b.teams().size(), 1);
         QVERIFY(!b.deleteClub(b.clubs().first().toMap().value("id").toInt()).value("ok").toBool());   // dernier club
     }
+
+    // ----- Feuille de challenge 2/2 -----
+    void challengeLicenceMustBeTenDigits()
+    {
+        QVERIFY(ChallengeSheet::isValidLicence(QStringLiteral("9603907336")));
+        QVERIFY(ChallengeSheet::isValidLicence(QStringLiteral(" 96 0390 7336 ")));      // espaces ignorés
+        QVERIFY(ChallengeSheet::isValidLicence(QStringLiteral("2318073452")));
+        QVERIFY(!ChallengeSheet::isValidLicence(QString()));
+        QVERIFY(!ChallengeSheet::isValidLicence(QStringLiteral("960390733")));          // 9 chiffres
+        QVERIFY(!ChallengeSheet::isValidLicence(QStringLiteral("96039073366")));        // 11 chiffres
+        QVERIFY(!ChallengeSheet::isValidLicence(QStringLiteral("96039A7336")));         // une lettre
+        QVERIFY(!ChallengeSheet::isValidLicence(QStringLiteral("9603-07336")));
+    }
+
+    void challengeSheetCheckAndExport()
+    {
+        Backend b(m_db.handle());
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        auto addPlayer = [&](const QString &first, const QString &last, const QString &licence) {
+            return b.savePlayer({{"teamId", m_team}, {"firstName", first}, {"lastName", last}, {"licence", licence}})
+                .value("id").toInt();
+        };
+        const int match = b.saveMatch({{"teamId", m_team}, {"date", "2026-11-14"}, {"time", "10:30"}, {"opponent", "AS Test"}})
+                              .value("id").toInt();
+        QVERIFY(match > 0);
+        const QString out = dir.filePath(QStringLiteral("feuille.pdf"));
+
+        // Aucun convoqué : refus, aucun fichier.
+        QVariantMap r = b.exportChallengeSheet(match, out);
+        QVERIFY(!r.value("ok").toBool());
+        QVERIFY2(r.value("error").toString().contains(QStringLiteral("Aucun joueur")), qPrintable(r.value("error").toString()));
+        QVERIFY(!QFileInfo::exists(out));
+
+        // Licence manquante ou invalide : refus ; le compte-rendu nomme chaque joueur et sa raison.
+        const int ok1 = addPlayer("Adam", "Alioua", "9605922556");
+        const int none = addPlayer("Sans", "Licence", "");
+        const int bad = addPlayer("Trop", "Court", "960592255");
+        const int letters = addPlayer("Avec", "Lettres", "96059AB556");
+        const int ok2 = addPlayer("Ilyan", "Alioua", "9605922562");
+        QVERIFY(b.setMatchPlayers(match, {QVariantMap{{"playerId", ok1}, {"role", "starter"}},
+                                          QVariantMap{{"playerId", none}, {"role", "starter"}},
+                                          QVariantMap{{"playerId", bad}, {"role", "substitute"}},
+                                          QVariantMap{{"playerId", letters}, {"role", "substitute"}},
+                                          QVariantMap{{"playerId", ok2}, {"role", "starter"}}}).value("ok").toBool());
+        r = b.challengeSheetCheck(match);
+        QVERIFY(!r.value("ok").toBool());
+        QCOMPARE(r.value("count").toInt(), 5);
+        const QVariantList problems = r.value("problems").toList();
+        QCOMPARE(problems.size(), 3);
+        // Ordre alphabétique des noms : Court, Lettres, Licence.
+        QVERIFY(problems.at(0).toMap().value("name").toString().contains(QStringLiteral("Court")));
+        QVERIFY(problems.at(0).toMap().value("message").toString().contains(QStringLiteral("10 chiffres")));
+        QVERIFY(problems.at(1).toMap().value("name").toString().contains(QStringLiteral("Lettres")));
+        QVERIFY(problems.at(1).toMap().value("message").toString().contains(QStringLiteral("10 chiffres")));
+        QVERIFY(problems.at(2).toMap().value("name").toString().contains(QStringLiteral("Licence")));
+        QVERIFY(problems.at(2).toMap().value("message").toString().contains(QStringLiteral("manquant")));
+        r = b.exportChallengeSheet(match, out);
+        QVERIFY(!r.value("ok").toBool());
+        QVERIFY(!QFileInfo::exists(out));
+
+        // Les non convoqués ne comptent pas : on ne garde que les joueurs valides.
+        QVERIFY(b.setMatchPlayers(match, {QVariantMap{{"playerId", ok2}, {"role", "starter"}},
+                                          QVariantMap{{"playerId", ok1}, {"role", "starter"}}}).value("ok").toBool());
+        r = b.challengeSheetCheck(match);
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(r.value("teamName").toString(), QStringLiteral("U15"));
+        QCOMPARE(r.value("fileName").toString(), QStringLiteral("feuille-challenge-u15-2026-11-14.pdf"));
+        r = b.exportChallengeSheet(match, QUrl::fromLocalFile(out).toString());
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QFile f(out);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray pdf = f.readAll();
+        QCOMPARE(pdf.left(5), QByteArray("%PDF-"));
+        QCOMPARE(qint64(pdf.size()), r.value("bytes").toLongLong());
+        QVERIFY(pdf.size() > 4000);
+        QCOMPARE(pdf.count("/Type /Page\n"), 1);          // une seule page
+        // Contenu et ordre des lignes (nom puis prénom), vérifiés si pdftotext est installé.
+        const QString tool = QStandardPaths::findExecutable(QStringLiteral("pdftotext"));
+        if (!tool.isEmpty()) {
+            QProcess p;
+            p.start(tool, {QStringLiteral("-layout"), out, QStringLiteral("-")});
+            QVERIFY(p.waitForFinished(15000));
+            const QString text = QString::fromUtf8(p.readAllStandardOutput());
+            QVERIFY(text.contains(QStringLiteral("FEUILLE DE CHALLENGE 2/2")));
+            QVERIFY(text.contains(QStringLiteral("U15")));
+            const int adam = text.indexOf(QStringLiteral("9605922556")), ilyan = text.indexOf(QStringLiteral("9605922562"));
+            QVERIFY(adam > 0 && ilyan > adam);              // Alioua Adam avant Alioua Ilyan malgré l'ordre de convocation
+            QCOMPARE(text.count(QStringLiteral("Blessure")), 5);   // quatre en-têtes de bloc + la note de bas de page
+        }
+
+        // Plus de 12 convoqués : refus avec le nombre à retirer.
+        QVariantList many;
+        for (int i = 0; i < 13; ++i)
+            many.append(QVariantMap{{"playerId", addPlayer(QStringLiteral("J%1").arg(i), QStringLiteral("N%1").arg(i),
+                                                           QStringLiteral("96000000%1").arg(i + 10)) },
+                                    {"role", "starter"}});
+        QVERIFY(b.setMatchPlayers(match, many).value("ok").toBool());
+        r = b.challengeSheetCheck(match);
+        QVERIFY(!r.value("ok").toBool());
+        QVERIFY2(r.value("error").toString().contains(QStringLiteral("12 lignes")), qPrintable(r.value("error").toString()));
+        QVERIFY2(r.value("error").toString().contains(QStringLiteral("Retirez-en 1")), qPrintable(r.value("error").toString()));
+
+        // Match inconnu, fichier impossible à écrire.
+        QVERIFY(!b.challengeSheetCheck(9999).value("ok").toBool());
+        QVERIFY(b.setMatchPlayers(match, {QVariantMap{{"playerId", ok1}, {"role", "starter"}}}).value("ok").toBool());
+        r = b.exportChallengeSheet(match, dir.filePath(QStringLiteral("absent/feuille.pdf")));
+        QVERIFY(!r.value("ok").toBool());
+        QVERIFY2(r.value("error").toString().contains(QStringLiteral("écrire")), qPrintable(r.value("error").toString()));
+    }
 };
 
-QTEST_GUILESS_MAIN(MatchesTest)
+QTEST_MAIN(MatchesTest)   // QGuiApplication (hors écran) : le PDF de la feuille de challenge utilise les polices
 #include "tst_matches.moc"

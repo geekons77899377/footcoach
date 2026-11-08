@@ -1,7 +1,13 @@
 #include "Backend.h"
 
+#include "ChallengeSheet.h"
+
+#include <QBuffer>
 #include <QDate>
+#include <QFile>
 #include <QHash>
+#include <QUrl>
+#include <algorithm>
 
 namespace {
 
@@ -176,5 +182,147 @@ QVariantMap Backend::createMatchBoard(int matchId)
     QVariantMap r = result(true, matchId);
     r.insert(QStringLiteral("boardId"), record.id);
     r.insert(QStringLiteral("created"), true);
+    return r;
+}
+
+// --- Feuille de challenge ---------------------------------------------------------------------------------
+
+namespace {
+
+QString slug(const QString &s)
+{
+    QString out;
+    for (const QChar c : PlayerRepository::fold(s)) {
+        if (c.isLetterOrNumber() && c.unicode() < 128)
+            out += c;
+        else if (!out.isEmpty() && !out.endsWith(QLatin1Char('-')))
+            out += QLatin1Char('-');
+    }
+    while (out.endsWith(QLatin1Char('-')))
+        out.chop(1);
+    return out.isEmpty() ? QStringLiteral("equipe") : out;
+}
+
+// Ordre alphabétique : nom, puis prénom, sans tenir compte des accents ni de la casse.
+void sortByName(QList<Player> *players)
+{
+    std::sort(players->begin(), players->end(), [](const Player &a, const Player &b) {
+        const QString la = PlayerRepository::fold(a.lastName), lb = PlayerRepository::fold(b.lastName);
+        return la != lb ? la < lb : PlayerRepository::fold(a.firstName) < PlayerRepository::fold(b.firstName);
+    });
+}
+
+} // namespace
+
+// Rassemble la feuille d'un match : convoqués triés (nom, prénom), contrôle des licences. ok faux si rien n'est imprimable.
+QVariantMap Backend::challengeSheetCheck(int matchId)
+{
+    QVariantMap r;
+    r.insert(QStringLiteral("ok"), false);
+    r.insert(QStringLiteral("count"), 0);
+    r.insert(QStringLiteral("problems"), QVariantList());
+    auto refuse = [&](const QString &message) {
+        r.insert(QStringLiteral("error"), message);
+        setError(message);
+        return r;
+    };
+
+    QString error;
+    const Match m = m_matches.get(matchId, &error);
+    if (m.id < 0)
+        return refuse(error.isEmpty() ? tr("Match introuvable.") : error);
+    QString teamName;
+    for (const Team &t : m_teams.all(&error)) {
+        if (t.id == m.teamId)
+            teamName = t.name;
+    }
+    r.insert(QStringLiteral("teamName"), teamName);
+    r.insert(QStringLiteral("fileName"),
+             QStringLiteral("feuille-challenge-%1-%2.pdf").arg(slug(teamName), m.startAt.date().toString(kDay)));
+
+    QHash<int, Player> byId;
+    for (const Player &p : m_players.list(m.teamId, true, &error))
+        byId.insert(p.id, p);
+    QList<Player> players;
+    for (const MatchPlayer &mp : m_matches.players(matchId, &error)) {
+        if (byId.contains(mp.playerId))
+            players.append(byId.value(mp.playerId));
+    }
+    sortByName(&players);
+    r.insert(QStringLiteral("count"), players.size());
+    if (players.isEmpty())
+        return refuse(tr("Aucun joueur convoqué pour ce match."));
+    if (players.size() > ChallengeSheet::kRows)
+        return refuse(tr("La feuille a %1 lignes : %2 joueurs sont convoqués. Retirez-en %3 de la convocation.")
+                          .arg(ChallengeSheet::kRows).arg(players.size()).arg(players.size() - ChallengeSheet::kRows));
+
+    QVariantList problems;
+    for (const Player &p : players) {
+        if (ChallengeSheet::isValidLicence(p.licence))
+            continue;
+        QVariantMap e;
+        e.insert(QStringLiteral("name"), p.fullName());
+        e.insert(QStringLiteral("message"),
+                 p.licence.isEmpty() ? tr("n° de licence manquant")
+                                     : tr("n° de licence invalide (%1 chiffres attendus)").arg(ChallengeSheet::kLicenceDigits));
+        problems.append(e);
+    }
+    if (!problems.isEmpty()) {
+        r.insert(QStringLiteral("problems"), problems);
+        return refuse(problems.size() > 1 ? tr("%1 joueurs n'ont pas de n° de licence valide.").arg(problems.size())
+                                          : tr("1 joueur n'a pas de n° de licence valide."));
+    }
+    r.insert(QStringLiteral("ok"), true);
+    r.insert(QStringLiteral("error"), QString());
+    setError(QString());
+    return r;
+}
+
+QVariantMap Backend::exportChallengeSheet(int matchId, const QString &url)
+{
+    QVariantMap r = challengeSheetCheck(matchId);
+    if (!r.value(QStringLiteral("ok")).toBool())
+        return r;
+    auto fail = [&](const QString &message) {
+        r.insert(QStringLiteral("ok"), false);
+        r.insert(QStringLiteral("error"), message);
+        setError(message);
+        return r;
+    };
+
+    // Mêmes convoqués, dans le même ordre que le contrôle.
+    QString error;
+    const Match m = m_matches.get(matchId, &error);
+    QHash<int, Player> byId;
+    for (const Player &p : m_players.list(m.teamId, true, &error))
+        byId.insert(p.id, p);
+    QList<Player> players;
+    for (const MatchPlayer &mp : m_matches.players(matchId, &error)) {
+        if (byId.contains(mp.playerId))
+            players.append(byId.value(mp.playerId));
+    }
+    sortByName(&players);
+    QList<ChallengeEntry> entries;
+    for (const Player &p : players)
+        entries.append({p.lastName, p.firstName, PlayerRepository::normalizeLicence(p.licence)});
+
+    QByteArray pdf;
+    QBuffer buffer(&pdf);
+    buffer.open(QIODevice::WriteOnly);
+    QString problem;
+    if (!ChallengeSheet::writePdf(&buffer, r.value(QStringLiteral("teamName")).toString(), entries, &problem))
+        return fail(tr("Impossible de créer le PDF : %1").arg(problem));
+    buffer.close();
+
+    const QUrl u(url);
+    QFile f(u.isLocalFile() ? u.toLocalFile() : url);       // content:// (Android) s'ouvre tel quel avec QFile
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return fail(tr("Impossible d'écrire le fichier : %1").arg(f.errorString()));
+    const bool written = f.write(pdf) == pdf.size();
+    f.close();
+    if (!written)
+        return fail(tr("Écriture incomplète du fichier."));
+    r.insert(QStringLiteral("bytes"), pdf.size());
+    setError(QString());
     return r;
 }

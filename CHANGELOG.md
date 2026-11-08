@@ -1,5 +1,18 @@
 # Journal des modifications
 
+## Non publié — feuille de challenge 2/2 (PDF noir et blanc) depuis un match
+- Fiche d'un match : bloc **« Feuille de challenge »** avec le bouton « Créer la feuille (PDF) ». Possible **seulement depuis un match enregistré** (bouton désactivé tant qu'il y a des modifications non enregistrées : le PDF reflète la base).
+- Contenu : page **A4 paysage** reprenant la feuille 2/2 du district (4 blocs « Équipe 1 à 4 »). **Seul le bloc Équipe 1 est rempli** : nom de l'équipe et **joueurs convoqués du match** (titulaires et remplaçants), triés par nom puis prénom : n°, nom, prénom, n° de licence. Colonne « Blessure », responsable et n° de licence du responsable : vides, à compléter à la main. Pas de logo ni de motif décoratif.
+- **Noir et blanc** : traits noirs fins sur fond blanc, aucun aplat, aucune couleur ni nuance de gris (contrôlé : écart RGB nul sur le rendu). Les noms longs réduisent la police (jusqu'à 6,5 pt) avant d'être tronqués.
+- **Règles de refus** (rien n'est écrit) : aucun convoqué ; plus de 12 convoqués (la feuille a 12 lignes ; le message dit combien en retirer) ; un convoqué sans **n° de licence de 10 chiffres** (manquant ou invalide) — la fenêtre liste chaque joueur et la raison. Hypothèse : une licence = exactement 10 chiffres (`ChallengeSheet::kLicenceDigits`), comme les numéros vus sur la FFF.
+- Enregistrement via le sélecteur de fichiers (nom proposé `feuille-challenge-<équipe>-<date>.pdf`), puis impression depuis le lecteur PDF de l'appareil. Pas d'impression directe (Qt n'en fournit pas sous Android).
+- Tests : C++ (`tst_matches` : validité de la licence, refus, ordre alphabétique, PDF d'une page, quatre blocs ; l'ordre et le texte sont relus avec `pdftotext` quand il est installé) et `t_challenge.py` (interface, backend **simulé**). Non vérifié : écriture réelle sur Android (`content://`), nom proposé par le sélecteur, rendu sur une vraie imprimante noir et blanc.
+
+## Non publié — photo dans la liste des joueurs
+- Dans l'Effectif (liste téléphone et grille tablette), la **photo du joueur remplace le numéro dans la pastille ronde** ; le numéro reste lisible dans une petite pastille en bas à droite. Sans photo : pastille avec le numéro, comme avant. Composant `PlayerAvatar.qml`.
+- La photo est lue à l'affichage de chaque carte visible (`playerPhoto`), pas stockée en mémoire pour toute l'équipe. Convocations et autres écrans inchangés.
+- Test : `t_photo.py` (backend **simulé**, grille et liste). Non vérifié sur appareil : fluidité du défilement avec beaucoup de photos.
+
 ## Non publié — import de photos en lot (Effectif)
 - Bouton **photo** dans l'en-tête de l'Effectif : on choisit plusieurs images ; chaque fichier **`<n° de licence>.jpg`** (ou .png, .jpeg, .webp, .bmp ; casse ignorée) est rattaché au joueur **de l'équipe affichée** qui porte cette licence. Chaque image est réduite comme une photo de la fiche (480 px, JPEG).
 - **Photo déjà présente : remplacée.** Chaque fichier est indépendant (pas de « tout ou rien »). Compte-rendu : photos ajoutées, remplacées, fichiers ignorés avec la raison (licence inconnue dans l'équipe, image illisible, deux fichiers pour la même licence : le premier est utilisé). Maximum 400 fichiers par import.

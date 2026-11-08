@@ -137,4 +137,22 @@ shot(h, "photos_import_result")
 QMetaObject.invokeMethod(res, "close"); h.spin(300)
 QMetaObject.invokeMethod(page, "importPhotos", Q_ARG("QVariant", [])); h.spin(300)
 check(res.property("visible") is not True, "aucun fichier : pas de compte-rendu (message d'erreur)")
+# Liste des joueurs : la photo remplace le numéro dans la pastille (numéro en petite pastille), sans photo = numéro seul.
+def collect_all(root, name):
+    out = []
+    def walk(it):
+        for c in it.childItems():
+            if c.objectName() == name: out.append(c)
+            walk(c)
+    walk(root); return out
+for label, (w, hh) in [("grille tablette", (1024, 768)), ("liste téléphone", (400, 800))]:
+    b = B5(); b.keep = []
+    h = Harness(w, hh, backend=b)
+    QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "squad"), Q_ARG("QVariant", -1)); h.spin(900)
+    root_item = h.win.contentItem()
+    photos = [p for p in collect_all(root_item, "avatarPhoto") if p.isVisible()]
+    chips = [c for c in collect_all(root_item, "avatarNumber") if c.isVisible()]
+    check(len(photos) == 1, f"{label} : une seule photo affichée dans la liste ({len(photos)})")
+    check(len(chips) == 1, f"{label} : numéro conservé en pastille ({len(chips)})")
+    shot(h, "photo_liste_" + ("tablette" if w > 500 else "tel"))
 print(f"\n{len(errs)} échec(s)"); sys.exit(1 if errs else 0)

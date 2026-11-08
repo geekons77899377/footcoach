@@ -26,6 +26,10 @@ par WhatsApp ou e-mail) à un autre de vos appareils. Ce transfert est initié p
 choix et n'implique aucun serveur de l'éditeur de FootCoach. L'application elle-même n'envoie rien. Le fichier contient
 les noms, dates de naissance, numéros de licence, photos, téléphones et adresses e-mail saisis : traitez-le comme vos données d'origine.
 
+Depuis la fiche d'un match, l'application peut aussi créer la « feuille de challenge » en PDF (nom de l'équipe, noms, prénoms
+et numéros de licence des joueurs convoqués). Le fichier est enregistré à l'endroit que vous choisissez, sur votre appareil ;
+l'application ne l'envoie nulle part. À vous de décider à qui vous le transmettez ou si vous l'imprimez.
+
 ## Assistance (signalement, e-mail)
 Le menu « Paramètres » permet de signaler un problème, de proposer une amélioration ou de contacter le support. Si vous
 touchez « Envoyer le signalement », l'application publie votre message (titre, description, et la version de

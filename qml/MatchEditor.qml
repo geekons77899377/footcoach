@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import "DateUtil.js" as DateUtil
 import "Status.js" as Status
 
@@ -167,6 +168,24 @@ Item {
         changed();
         toast.show("Match enregistré");
         return true;
+    }
+
+    // Feuille de challenge 2/2 : contrôle des convoqués (licence de 10 chiffres), puis choix du fichier PDF.
+    property string sheetFileName: "feuille-challenge.pdf"
+
+    function startChallengeSheet() {
+        if (isNew || dirty) {
+            toast.show("Enregistrez d'abord le match et ses convoqués.");
+            return;
+        }
+        var c = backend.challengeSheetCheck(matchId);
+        if (!c.ok) {
+            challengeProblems.show(c);
+            return;
+        }
+        sheetFileName = c.fileName;
+        sheetDialog.currentFile = "file:///" + c.fileName;
+        sheetDialog.open();
     }
 
     function remove() {
@@ -567,6 +586,40 @@ Item {
                 }
             }
 
+            Card {
+                width: parent.width
+                padding: 16
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    Text {
+                        width: parent.width
+                        text: "Feuille de challenge"
+                        font.pixelSize: 17
+                        font.weight: Font.Bold
+                        color: Theme.text
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        text: root.isNew ? "Enregistrez le match pour créer sa feuille de challenge."
+                              : root.dirty ? "Enregistrez les modifications pour créer la feuille de challenge."
+                              : "PDF noir et blanc (feuille 2/2) avec les joueurs convoqués. Chacun doit avoir un n° de licence de 10 chiffres."
+                        font.pixelSize: 14
+                        color: Theme.textMuted
+                    }
+                    AppButton {
+                        objectName: "challengeSheetButton"
+                        width: parent.width
+                        kind: "outline"
+                        iconName: "text"
+                        enabled: !root.isNew && !root.dirty
+                        text: "Créer la feuille (PDF)"
+                        onClicked: root.startChallengeSheet()
+                    }
+                }
+            }
+
             AppButton {
                 width: parent.width
                 kind: "primary"
@@ -602,6 +655,29 @@ Item {
             }
             onLoaded: item.open(root.openBoardId)
         }
+    }
+
+    FileDialog {
+        id: sheetDialog
+        objectName: "challengeSheetDialog"
+        title: "Enregistrer la feuille de challenge"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["Document PDF (*.pdf)", "Tous les fichiers (*)"]
+        defaultSuffix: "pdf"
+        onAccepted: {
+            var r = backend.exportChallengeSheet(root.matchId, selectedFile.toString());
+            if (r.ok)
+                toast.show("Feuille créée (" + Math.max(1, Math.round(r.bytes / 1024)) + " Ko). Ouvrez le PDF pour l'imprimer.");
+            else if (r.problems && r.problems.length > 0)
+                challengeProblems.show(r);
+            else
+                toast.show(r.error);
+        }
+    }
+
+    ChallengeProblems {
+        id: challengeProblems
+        objectName: "challengeProblems"
     }
 
     Toast { id: toast }

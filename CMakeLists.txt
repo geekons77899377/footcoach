@@ -159,6 +159,8 @@ if(FOOTCOACH_HAVE_QML)
         src/app/BackendData.cpp
         src/app/IssueReporter.h
         src/app/IssueReporter.cpp
+        src/app/ChallengeSheet.h
+        src/app/ChallengeSheet.cpp
     )
     if(WIN32)
         target_sources(FootCoach PRIVATE windows/footcoach.rc)
@@ -173,7 +175,7 @@ if(FOOTCOACH_HAVE_QML)
         ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml SquadFormation.js BoardThumb.qml BoardToken.qml
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
-        CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
+        CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerAvatar.qml ChallengeProblems.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml PrivacyPage.qml PrivacyText.js Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
         BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
     )
@@ -241,7 +243,7 @@ if(FOOTCOACH_BUILD_TESTS)
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
     foreach(test_name repositories sessions attendance plan board backend dataformat matches issuereporter)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp src/app/ChallengeSheet.h src/app/ChallengeSheet.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"

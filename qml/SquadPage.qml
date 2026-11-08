@@ -443,23 +443,15 @@ Item {
                 highlighted: page.split && page.editing && page.currentId === modelData.id
                 opacity: modelData.active ? 1 : 0.55
 
-                Rectangle {
+                PlayerAvatar {
                     id: badge
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 46
-                    height: 46
-                    radius: 23
-                    color: Theme.accentSoft
-                    border.width: 1
-                    border.color: Theme.accent
-                    Text {
-                        anchors.centerIn: parent
-                        text: row.modelData.jerseyNumber > 0 ? row.modelData.jerseyNumber : "–"
-                        font.pixelSize: 18
-                        font.weight: Font.ExtraBold
-                        color: Theme.accent
-                    }
+                    size: 46
+                    playerId: row.modelData.id
+                    hasPhoto: row.modelData.hasPhoto === true
+                    number: row.modelData.jerseyNumber
+                    maskColor: row.color
                 }
                 Column {
                     anchors.left: badge.right
@@ -542,24 +534,17 @@ Item {
                     padding: 14
                     radius: Theme.radiusLg
                     opacity: cell.modelData.active ? 1 : 0.55
-                    Rectangle {
+                    PlayerAvatar {
                         id: gbadge
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 52
-                        height: 52
-                        radius: 26
-                        color: Theme.accentSoft
-                        border.width: 1
-                        border.color: Theme.accent
-                        Text {
-                            anchors.centerIn: parent
-                            text: cell.modelData.jerseyNumber > 0 ? cell.modelData.jerseyNumber : "–"
-                            font.family: Theme.fontHeading
-                            font.pixelSize: 20
-                            font.weight: Font.ExtraBold
-                            color: Theme.accent
-                        }
+                        size: 52
+                        numberPixelSize: 20
+                        numberFont: Theme.fontHeading
+                        playerId: cell.modelData.id
+                        hasPhoto: cell.modelData.hasPhoto === true
+                        number: cell.modelData.jerseyNumber
+                        maskColor: Theme.surface
                     }
                     Column {
                         anchors.left: gbadge.right

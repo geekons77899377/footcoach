@@ -123,6 +123,13 @@ public:
     // Remplace les convoqués : entries [{playerId, role (starter|substitute)}]. Refus (rien n'est modifié) si un
     // joueur n'est pas de l'équipe du match.
     Q_INVOKABLE QVariantMap setMatchPlayers(int matchId, const QVariantList &entries);
+    // Feuille de challenge 2/2 d'un match (PDF noir et blanc, voir ChallengeSheet) : joueurs = convoqués du match, ordre
+    // alphabétique. Contrôle : {ok, error, count, problems [{name, message}], teamName, fileName}. Refus (ok faux) si aucun
+    // convoqué, plus de 12, ou si l'un n'a pas un n° de licence de 10 chiffres (problems les liste). Export : mêmes clés,
+    // écrit le PDF dans le fichier choisi (file://, content:// ou chemin) et ajoute bytes.
+    Q_INVOKABLE QVariantMap challengeSheetCheck(int matchId);
+    Q_INVOKABLE QVariantMap exportChallengeSheet(int matchId, const QString &url);
+
     // Schéma tactique du match, créé à la demande (terrain vide, titre « Match contre … »). Idempotent :
     // {ok, error, id, boardId, created}. L'ouverture, l'enregistrement et le retrait se font avec board(), saveBoard()
     // et deleteBoard().
