@@ -5,7 +5,10 @@
 #include <QBuffer>
 #include <QDate>
 #include <QFile>
+#include <QFileInfo>
+#include <QDir>
 #include <QHash>
+#include <QStandardPaths>
 #include <QUrl>
 #include <algorithm>
 
@@ -276,6 +279,19 @@ QVariantMap Backend::challengeSheetCheck(int matchId)
     r.insert(QStringLiteral("error"), QString());
     setError(QString());
     return r;
+}
+
+// Fichier temporaire (cache de l'application) où la feuille est créée avant d'être ouverte dans une application externe.
+QString Backend::challengeSheetTempUrl(const QString &fileName)
+{
+    QDir dir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation));
+    if (!dir.mkpath(QStringLiteral("challenge")))
+        return QString();
+    dir.cd(QStringLiteral("challenge"));
+    QString name = QFileInfo(fileName).fileName();           // jamais de chemin fourni par l'appelant
+    if (name.isEmpty() || !name.endsWith(QStringLiteral(".pdf")))
+        name = QStringLiteral("feuille-challenge.pdf");
+    return QUrl::fromLocalFile(dir.filePath(name)).toString();
 }
 
 QVariantMap Backend::exportChallengeSheet(int matchId, const QString &url)

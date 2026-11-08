@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## Non publié — la feuille de challenge s'ouvre d'abord, l'utilisateur l'enregistre ensuite
+- « Créer la feuille » ne demande plus de dossier : le PDF est créé dans le **cache de l'application** (`challengeSheetTempUrl`, nom sans chemin) puis **ouvert aussitôt** (`Qt.openUrlExternally`) dans l'application de l'appareil (lecteur PDF) ; l'utilisateur y imprime ou l'enregistre. Message : « Feuille ouverte. Enregistrez-la ou imprimez-la depuis l'application qui s'ouvre. »
+- **Repli** : si aucune application n'a pu l'ouvrir, le sélecteur « Enregistrer sous » s'ouvre avec le même nom (« Feuille enregistrée. »).
+- Test : `t_challenge.py` (simulé, sans lancer d'application réelle). **Non vérifié sur Android** : si l'ouverture d'un fichier du cache (`file://`) par une application externe est acceptée (Android peut la refuser sans FileProvider ; le code de Qt n'a pas pu être relu dans cette session). Si elle échoue, le repli s'affiche ; à défaut il faudra passer par un FileProvider.
+
 ## Non publié — feuille de challenge 2/2 (PDF noir et blanc) depuis un match
 - Fiche d'un match : bloc **« Feuille de challenge »** avec le bouton « Créer la feuille (PDF) ». Possible **seulement depuis un match enregistré** (bouton désactivé tant qu'il y a des modifications non enregistrées : le PDF reflète la base).
 - Contenu : page **A4 paysage** reprenant la feuille 2/2 du district (4 blocs « Équipe 1 à 4 »). **Seul le bloc Équipe 1 est rempli** : nom de l'équipe et **joueurs convoqués du match** (titulaires et remplaçants), triés par nom puis prénom : n°, nom, prénom, n° de licence. Colonne « Blessure », responsable et n° de licence du responsable : vides, à compléter à la main. Pas de logo ni de motif décoratif.

@@ -184,8 +184,40 @@ Item {
             return;
         }
         sheetFileName = c.fileName;
-        sheetDialog.currentFile = "file:///" + c.fileName;
+        // La feuille est créée puis ouverte tout de suite ; l'enregistrement se fait depuis l'application qui s'ouvre.
+        var url = backend.challengeSheetTempUrl(c.fileName);
+        if (url === "") {
+            toast.show("Impossible de préparer le fichier de la feuille.");
+            return;
+        }
+        var r = backend.exportChallengeSheet(matchId, url);
+        if (!r.ok) {
+            toast.show(r.error);
+            return;
+        }
+        openSheet(url);
+    }
+
+    function chooseSheetFile() {
+        sheetDialog.currentFile = "file:///" + sheetFileName;
         sheetDialog.open();
+    }
+
+    // Ouvre le PDF dans l'application externe de l'appareil (lecteur PDF, impression, partage) : c'est elle qui imprime.
+    property bool dryRun: false                 // tests : ne lance aucune application
+    property bool dryRunOpens: true
+    property string lastOpened: ""
+
+    function openSheet(url) {
+        lastOpened = url;
+        var opened = dryRun ? dryRunOpens : Qt.openUrlExternally(url);
+        if (opened) {
+            toast.show("Feuille ouverte. Enregistrez-la ou imprimez-la depuis l'application qui s'ouvre.");
+        } else {
+            // Aucune application n'a pu l'ouvrir : repli sur l'enregistrement dans un dossier au choix.
+            toast.show("Impossible d'ouvrir la feuille ici : choisissez où l'enregistrer.");
+            chooseSheetFile();
+        }
     }
 
     function remove() {
@@ -667,7 +699,7 @@ Item {
         onAccepted: {
             var r = backend.exportChallengeSheet(root.matchId, selectedFile.toString());
             if (r.ok)
-                toast.show("Feuille créée (" + Math.max(1, Math.round(r.bytes / 1024)) + " Ko). Ouvrez le PDF pour l'imprimer.");
+                toast.show("Feuille enregistrée.");
             else if (r.problems && r.problems.length > 0)
                 challengeProblems.show(r);
             else

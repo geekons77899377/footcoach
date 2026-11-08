@@ -128,6 +128,7 @@ public:
     // convoqué, plus de 12, ou si l'un n'a pas un n° de licence de 10 chiffres (problems les liste). Export : mêmes clés,
     // écrit le PDF dans le fichier choisi (file://, content:// ou chemin) et ajoute bytes.
     Q_INVOKABLE QVariantMap challengeSheetCheck(int matchId);
+    Q_INVOKABLE QString challengeSheetTempUrl(const QString &fileName);
     Q_INVOKABLE QVariantMap exportChallengeSheet(int matchId, const QString &url);
 
     // Schéma tactique du match, créé à la demande (terrain vide, titre « Match contre … »). Idempotent :

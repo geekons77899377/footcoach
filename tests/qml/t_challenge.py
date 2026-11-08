@@ -17,6 +17,9 @@ class B7(B6):
     def challengeSheetCheck(self, mid):
         B7.checks += 1
         return dict(B7.check_result)
+    @Slot(str, result=str)
+    def challengeSheetTempUrl(self, name):
+        return "file:///tmp/cache/challenge/" + name
     @Slot(int, str, result="QVariantMap")
     def exportChallengeSheet(self, mid, url):
         B7.exported.append((mid, url))
@@ -77,16 +80,28 @@ check(dlg.property("visible") is True and m and "12 lignes" in m[0].property("te
       and len(collect(dlg.property("contentItem"), "challengeProblem", [])) == 0, "trop de convoqués : message sans liste")
 call(dlg, "close"); h.spin(300)
 
-# Tout est valide : nom de fichier proposé, export demandé après le choix du fichier.
+# Tout est valide : la feuille est créée dans un fichier temporaire et ouverte aussitôt (pas de sélecteur d'abord).
 B7.check_result = {"ok": True, "error": "", "count": 5, "problems": [], "teamName": "Senior A",
                    "fileName": "feuille-challenge-senior-a-2026-11-14.pdf"}
-call(ed, "startChallengeSheet"); h.spin(400)
-check(ed.property("sheetFileName") == "feuille-challenge-senior-a-2026-11-14.pdf", "nom de fichier proposé : feuille-challenge-<équipe>-<date>.pdf")
-check(dlg.property("visible") is not True, "pas de fenêtre d'erreur quand tout est valide")
+ed.setProperty("dryRun", True)                       # aucune application réelle n'est lancée
 sd = named(h, "challengeSheetDialog")
-check("feuille-challenge-senior-a-2026-11-14.pdf" in str(sd.property("currentFile")), "le sélecteur propose ce nom")
+call(ed, "startChallengeSheet"); h.spin(400)
+want = "file:///tmp/cache/challenge/feuille-challenge-senior-a-2026-11-14.pdf"
+check(len(B7.exported) == 1 and B7.exported[0] == (ed.property("matchId"), want), f"export vers le fichier temporaire ({B7.exported})")
+check(ed.property("lastOpened") == want, f"le PDF créé est ouvert dans une application externe ({ed.property('lastOpened')})")
+check(sd.property("visible") is not True, "pas de sélecteur de fichier quand l'ouverture réussit")
+check(dlg.property("visible") is not True, "pas de fenêtre d'erreur quand tout est valide")
+def toast_text(h):
+    msgs = [str(o.property("message")) for o in h.win.findChildren(QObject)
+            if o.metaObject().className().startswith("Toast") and o.property("message")]
+    return " | ".join(msgs)
+check("Enregistrez-la ou imprimez-la" in toast_text(h), f"message de réussite ({toast_text(h)})")
+
+# Ouverture impossible : repli sur le sélecteur pour enregistrer.
+ed.setProperty("dryRunOpens", False); h.spin(100)
+call(ed, "startChallengeSheet"); h.spin(400)
+check(len(B7.exported) == 2 and sd.property("visible") is True and "feuille-challenge-senior-a-2026-11-14.pdf" in str(sd.property("currentFile")),
+      "ouverture impossible : le sélecteur propose d'enregistrer sous le même nom")
 QMetaObject.invokeMethod(sd, "close") if sd.property("visible") else None
-QMetaObject.invokeMethod(sd, "accepted"); h.spin(300)
-check(len(B7.exported) == 1 and B7.exported[0][0] == ed.property("matchId"), f"export demandé pour ce match ({B7.exported})")
 
 print(f"\n{len(errs)} échec(s)"); sys.exit(1 if errs else 0)
