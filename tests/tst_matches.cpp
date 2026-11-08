@@ -543,6 +543,36 @@ private slots:
             QCOMPARE(text.count(QStringLiteral("Blessure")), 5);   // quatre en-têtes de bloc + la note de bas de page
         }
 
+        // Fichier déjà présent : réécrit en entier, sans reste de l'ancien contenu (ancien fichier plus gros).
+        {
+            QFile big(out);
+            QVERIFY(big.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            big.write(QByteArray(pdf.size() + 5000, 'x'));
+            big.close();
+            r = b.exportChallengeSheet(match, QUrl::fromLocalFile(out).toString());
+            QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+            QFile again(out);
+            QVERIFY(again.open(QIODevice::ReadOnly));
+            QCOMPARE(again.size(), qint64(pdf.size()));
+            QCOMPARE(again.read(5), QByteArray("%PDF-"));
+        }
+        // Fichier temporaire d'ouverture : nom sans chemin, ancienne feuille supprimée, jamais d'écrasement bloquant.
+        {
+            const QUrl t1(b.challengeSheetTempUrl(QStringLiteral("../../x/feuille-challenge-u15-2026-11-14.pdf")));
+            QVERIFY(t1.isLocalFile());
+            QCOMPARE(QFileInfo(t1.toLocalFile()).fileName(), QStringLiteral("feuille-challenge-u15-2026-11-14.pdf"));
+            QFile first(t1.toLocalFile());
+            QVERIFY(first.open(QIODevice::WriteOnly));
+            first.write("ancienne feuille");
+            first.close();
+            const QUrl t2(b.challengeSheetTempUrl(QStringLiteral("feuille-challenge-u15-2026-11-14.pdf")));
+            QCOMPARE(t2, t1);                                       // l'ancienne a été supprimée : même nom, fichier neuf
+            QVERIFY(!QFileInfo::exists(t2.toLocalFile()));
+            QVERIFY(b.exportChallengeSheet(match, t2.toString()).value("ok").toBool());
+            QVERIFY(QFileInfo(t2.toLocalFile()).size() > 4000);
+            QFile::remove(t2.toLocalFile());
+        }
+
         // Plus de 12 convoqués : refus avec le nombre à retirer.
         QVariantList many;
         for (int i = 0; i < 13; ++i)

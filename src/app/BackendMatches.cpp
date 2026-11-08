@@ -291,7 +291,15 @@ QString Backend::challengeSheetTempUrl(const QString &fileName)
     QString name = QFileInfo(fileName).fileName();           // jamais de chemin fourni par l'appelant
     if (name.isEmpty() || !name.endsWith(QStringLiteral(".pdf")))
         name = QStringLiteral("feuille-challenge.pdf");
-    return QUrl::fromLocalFile(dir.filePath(name)).toString();
+    // Les feuilles précédentes ne servent plus : on les supprime. Si l'une est verrouillée (lecteur encore ouvert),
+    // on prend un nom libre plutôt que d'écraser un fichier en cours de lecture.
+    for (const QFileInfo &old : dir.entryInfoList({QStringLiteral("*.pdf")}, QDir::Files))
+        QFile::remove(old.absoluteFilePath());
+    const QString base = name.chopped(4);
+    QString candidate = name;
+    for (int n = 2; QFile::exists(dir.filePath(candidate)) && n < 100; ++n)
+        candidate = QStringLiteral("%1-%2.pdf").arg(base).arg(n);
+    return QUrl::fromLocalFile(dir.filePath(candidate)).toString();
 }
 
 QVariantMap Backend::exportChallengeSheet(int matchId, const QString &url)
