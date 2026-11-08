@@ -33,6 +33,8 @@ struct Player
     QString email;
     QString notes;
     bool active = true;
+    QString licence;            // numéro de licence, vide = aucun
+    bool hasPhoto = false;      // renseigné par list() ; la photo elle-même se lit avec PlayerRepository::photo()
 
     QString fullName() const { return QStringLiteral("%1 %2").arg(firstName, lastName).trimmed(); }
 };

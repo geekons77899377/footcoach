@@ -2,7 +2,15 @@
 
 #include "core/TacticalBoard.h"
 
+#include <QBuffer>
 #include <QDate>
+#include <QCoreApplication>
+#include <QFile>
+#include <QFileInfo>
+#include <QImage>
+#include <QImageReader>
+#include <QPainter>
+#include <QUrl>
 #include <QHash>
 #include <QRegularExpression>
 #include <QSet>
@@ -246,10 +254,168 @@ QVariantMap toMap(const Player &p)
     m.insert(QStringLiteral("email"), p.email);
     m.insert(QStringLiteral("notes"), p.notes);
     m.insert(QStringLiteral("active"), p.active);
+    m.insert(QStringLiteral("licence"), p.licence);
+    m.insert(QStringLiteral("hasPhoto"), p.hasPhoto);
     return m;
 }
 
+constexpr int kPhotoMaxSide = 480;               // côté le plus long de la photo stockée
+constexpr qint64 kPhotoMaxSource = 40LL * 1024 * 1024;   // image choisie : 40 Mo au plus
+constexpr int kPhotoMaxStored = 400 * 1024;      // octets de la photo réduite
+const QString kPhotoPrefix = QStringLiteral("data:image/jpeg;base64,");
+
+QByteArray decodePhotoData(const QString &dataUrl)
+{
+    if (!dataUrl.startsWith(kPhotoPrefix))
+        return {};
+    return QByteArray::fromBase64(dataUrl.mid(kPhotoPrefix.size()).toLatin1());
+}
+
+// Lit l'image (file://, content:// ou chemin brut), la réduit en JPEG ; faux + message si impossible.
+bool reducePhotoFile(const QString &url, QByteArray *jpegOut, QString *error)
+{
+    auto fail = [&](const char *msg) {
+        *error = QCoreApplication::translate("Backend", msg);
+        return false;
+    };
+    const QUrl u(url);
+    const QString path = u.isLocalFile() ? u.toLocalFile() : url;   // content:// (Android) s'ouvre tel quel avec QFile
+    QFile f(path);
+    if (path.isEmpty() || !f.open(QIODevice::ReadOnly))
+        return fail("Impossible d'ouvrir cette image.");
+    if (f.size() > kPhotoMaxSource)
+        return fail("Cette image est trop volumineuse.");
+    QImageReader reader(&f);
+    reader.setAutoTransform(true);          // respecte l'orientation EXIF des photos de téléphone
+    QImage img = reader.read();
+    if (img.isNull())
+        return fail("Ce fichier n'est pas une image lisible.");
+    if (img.width() > kPhotoMaxSide || img.height() > kPhotoMaxSide)
+        img = img.scaled(kPhotoMaxSide, kPhotoMaxSide, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // JPEG sans transparence : fond blanc.
+    QImage flat(img.size(), QImage::Format_RGB32);
+    flat.fill(Qt::white);
+    {
+        QPainter painter(&flat);
+        painter.drawImage(0, 0, img);
+    }
+    QByteArray jpeg;
+    for (int quality : {85, 70, 55}) {
+        jpeg.clear();
+        QBuffer buf(&jpeg);
+        buf.open(QIODevice::WriteOnly);
+        if (!flat.save(&buf, "JPEG", quality))
+            return fail("Impossible de réduire cette image.");
+        if (jpeg.size() <= kPhotoMaxStored)
+            break;
+    }
+    if (jpeg.size() > kPhotoMaxStored)
+        return fail("Cette image est trop volumineuse.");
+    *jpegOut = jpeg;
+    return true;
+}
+
 } // namespace
+
+QVariantMap Backend::preparePhoto(const QString &url)
+{
+    QVariantMap out;
+    QByteArray jpeg;
+    QString error;
+    const bool ok = reducePhotoFile(url, &jpeg, &error);
+    out.insert(QStringLiteral("ok"), ok);
+    if (ok)
+        out.insert(QStringLiteral("data"), kPhotoPrefix + QString::fromLatin1(jpeg.toBase64()));
+    else
+        out.insert(QStringLiteral("error"), error);
+    return out;
+}
+
+// Import en lot : « <licence>.jpg » → joueur de l'équipe qui porte cette licence (casse ignorée). Chaque fichier est
+// indépendant ; une photo existante est remplacée. Compte-rendu par fichier : status = added | replaced | unknown | error.
+QVariantMap Backend::importPhotos(int teamId, const QVariantList &urls)
+{
+    constexpr int kMaxFiles = 400;
+    QVariantMap out;
+    QVariantList items;
+    int added = 0, replaced = 0, failed = 0;
+    auto finish = [&](bool ok, const QString &error) {
+        out.insert(QStringLiteral("ok"), ok);
+        out.insert(QStringLiteral("error"), error);
+        out.insert(QStringLiteral("added"), added);
+        out.insert(QStringLiteral("replaced"), replaced);
+        out.insert(QStringLiteral("failed"), failed);
+        out.insert(QStringLiteral("items"), items);
+        if (!ok)
+            setError(error);
+        return out;
+    };
+
+    QString error;
+    bool teamFound = false;
+    for (const Team &t : m_teams.all(&error))
+        teamFound = teamFound || t.id == teamId;
+    if (!teamFound)
+        return finish(false, tr("Aucune équipe sélectionnée."));
+    if (urls.isEmpty())
+        return finish(false, tr("Aucune photo choisie."));
+    if (urls.size() > kMaxFiles)
+        return finish(false, tr("Trop de fichiers (%1 au plus).").arg(kMaxFiles));
+
+    QHash<QString, Player> byLicence;       // licence normalisée -> joueur
+    for (const Player &p : m_players.list(teamId, true, &error)) {
+        if (!p.licence.isEmpty())
+            byLicence.insert(p.licence, p);
+    }
+    QSet<QString> seen;                     // une licence n'est traitée qu'une fois par import
+    for (const QVariant &v : urls) {
+        const QString url = v.toString();
+        const QUrl u(url);
+        const QString path = u.isLocalFile() ? u.toLocalFile() : url;
+        const QString file = QFileInfo(path).fileName();
+        const QString base = PlayerRepository::normalizeLicence(QFileInfo(path).completeBaseName());
+        QVariantMap item{{QStringLiteral("file"), file}};
+        auto add = [&](const QString &status, const QString &message, const QString &player = QString()) {
+            item.insert(QStringLiteral("status"), status);
+            item.insert(QStringLiteral("message"), message);
+            item.insert(QStringLiteral("player"), player);
+            items.append(item);
+        };
+        if (!byLicence.contains(base)) {
+            ++failed;
+            add(QStringLiteral("unknown"), tr("Aucun joueur de l'équipe n'a ce numéro de licence."));
+            continue;
+        }
+        if (seen.contains(base)) {
+            ++failed;
+            add(QStringLiteral("error"), tr("Plusieurs fichiers pour la même licence : seul le premier est utilisé."));
+            continue;
+        }
+        seen.insert(base);
+        const Player &p = byLicence.value(base);
+        QByteArray jpeg;
+        QString problem;
+        if (!reducePhotoFile(url, &jpeg, &problem) || !m_players.setPhoto(p.id, jpeg, &problem)) {
+            ++failed;
+            add(QStringLiteral("error"), problem, p.fullName());
+            continue;
+        }
+        if (p.hasPhoto) {
+            ++replaced;
+            add(QStringLiteral("replaced"), tr("Photo remplacée."), p.fullName());
+        } else {
+            ++added;
+            add(QStringLiteral("added"), tr("Photo ajoutée."), p.fullName());
+        }
+    }
+    return finish(true, QString());
+}
+
+QString Backend::playerPhoto(int id)
+{
+    const QByteArray jpeg = m_players.photo(id);
+    return jpeg.isEmpty() ? QString() : kPhotoPrefix + QString::fromLatin1(jpeg.toBase64());
+}
 
 QVariantList Backend::clubs()
 {
@@ -364,6 +530,7 @@ QVariantMap Backend::savePlayer(const QVariantMap &in)
     p.email = in.value(QStringLiteral("email")).toString().trimmed();
     p.notes = in.value(QStringLiteral("notes")).toString().trimmed();
     p.active = in.value(QStringLiteral("active"), true).toBool();
+    p.licence = PlayerRepository::normalizeLicence(in.value(QStringLiteral("licence")).toString());
 
     const QString birth = in.value(QStringLiteral("birthDate")).toString().trimmed();
     if (!birth.isEmpty()) {
@@ -381,6 +548,10 @@ QVariantMap Backend::savePlayer(const QVariantMap &in)
         problem = tr("Le prénom est obligatoire.");
     else if (m_players.nameTaken(p.teamId, p.firstName, p.lastName, p.id))
         problem = tr("%1 est déjà dans l'effectif de cette équipe.").arg(p.fullName());
+    else if (p.licence.size() > 20 || p.licence.contains(QRegularExpression(QStringLiteral("[^\\p{L}\\p{N}]"))))
+        problem = tr("Le numéro de licence ne peut contenir que des lettres et des chiffres (20 au plus).");
+    else if (m_players.licenceTaken(p.teamId, p.licence, p.id))
+        problem = tr("Le numéro de licence %1 est déjà utilisé dans cette équipe.").arg(p.licence);
     else if (p.jerseyNumber < 0 || p.jerseyNumber > 99)
         problem = tr("Le numéro de maillot doit être compris entre 1 et 99.");
     else if (!p.position.isEmpty() && p.position != QLatin1String("GK") && p.position != QLatin1String("DEF")
@@ -391,13 +562,25 @@ QVariantMap Backend::savePlayer(const QVariantMap &in)
         problem = tr("Pied fort inconnu.");
     else if (p.active && p.jerseyNumber > 0 && m_players.jerseyTaken(p.teamId, p.jerseyNumber, p.id))
         problem = tr("Le numéro %1 est déjà porté par un autre joueur actif de l'équipe.").arg(p.jerseyNumber);
+    // Photo : « photo » = image déjà réduite par preparePhoto(), « removePhoto » = la retirer ; sinon inchangée.
+    QByteArray newPhoto;
+    const bool removePhoto = in.value(QStringLiteral("removePhoto")).toBool();
+    const QString photoData = in.value(QStringLiteral("photo")).toString();
+    if (problem.isEmpty() && !photoData.isEmpty()) {
+        newPhoto = decodePhotoData(photoData);
+        QImage check;
+        if (newPhoto.isEmpty() || newPhoto.size() > kPhotoMaxStored || !check.loadFromData(newPhoto, "JPEG"))
+            problem = tr("La photo n'est pas valide.");
+    }
     if (!problem.isEmpty()) {
         setError(problem);
         return result(false, -1, problem);
     }
 
     QString error;
-    const bool ok = p.id > 0 ? m_players.update(p, &error) : m_players.insert(p, &error);
+    bool ok = p.id > 0 ? m_players.update(p, &error) : m_players.insert(p, &error);
+    if (ok && (removePhoto || !newPhoto.isEmpty()))
+        ok = m_players.setPhoto(p.id, removePhoto && newPhoto.isEmpty() ? QByteArray() : newPhoto, &error);
     setError(error);
     return ok ? result(true, p.id) : result(false, -1, error);
 }

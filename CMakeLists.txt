@@ -78,6 +78,7 @@ set(SQL_MIGRATIONS
     sql/004_seed_exercises.sql
     sql/005_block_board.sql
     sql/006_club_match.sql
+    sql/007_player_photo_licence.sql
 )
 
 qt_add_executable(FootCoachWidgets WIN32
@@ -172,7 +173,7 @@ if(FOOTCOACH_HAVE_QML)
         ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml SquadFormation.js BoardThumb.qml BoardToken.qml
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
-        CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
+        CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml PrivacyPage.qml PrivacyText.js Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
         BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
     )
@@ -247,9 +248,11 @@ if(FOOTCOACH_BUILD_TESTS)
             FILES ${SQL_MIGRATIONS}
         )
         target_include_directories(tst_${test_name} PRIVATE src)
-        target_link_libraries(tst_${test_name} PRIVATE Qt6::Sql Qt6::Network Qt6::Test)
+        target_link_libraries(tst_${test_name} PRIVATE Qt6::Sql Qt6::Network Qt6::Gui Qt6::Test)
         target_compile_definitions(tst_${test_name} PRIVATE FOOTCOACH_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
         add_test(NAME ${test_name} COMMAND tst_${test_name})
+        # Qt6::Gui (QImage de la photo joueur) fait démarrer QTEST_MAIN avec un QGuiApplication : plateforme hors écran.
+        set_tests_properties(${test_name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endforeach()
 
     # Logique JavaScript pure de la séance du jour (choix selon l'heure, chronomètres) : nécessite Node.js.

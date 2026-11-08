@@ -8,22 +8,23 @@ données elle traite.
 
 ## Données traitées
 Vous saisissez dans l'application : équipes, joueurs (nom, prénom, date de naissance, poste, numéro,
-téléphone, adresse e-mail, remarques éventuelles), séances d'entraînement, présences et schémas tactiques.
+numéro de licence, photo, téléphone, adresse e-mail, remarques éventuelles), séances d'entraînement, présences et schémas tactiques.
 
 ## Où sont-elles stockées ?
-Uniquement **sur votre appareil**, dans le stockage privé de l'application (base SQLite). L'éditeur de
-l'application ne reçoit, ne collecte et ne consulte aucune de ces données.
+Uniquement **sur votre appareil**, dans le stockage privé de l'application (base SQLite). La photo d'un joueur, que
+vous choisissez vous-même dans vos fichiers, y est enregistrée **réduite** (480 pixels au plus, format JPEG) ; l'image
+d'origine n'est ni copiée ni modifiée. L'éditeur de l'application ne reçoit, ne collecte et ne consulte aucune de ces données.
 
 ## Partage et collecte
 - L'application n'utilise Internet que pour une seule chose : envoyer un signalement d'assistance, **uniquement lorsque vous touchez « Envoyer le signalement »** (voir « Assistance » ci-dessous). Aucune autre donnée n'est transmise, et rien n'est envoyé en arrière-plan.
 - Aucune publicité, aucun outil de mesure d'audience, aucun service tiers.
-- Une seule permission Android : « Internet », nécessaire à cet envoi. Aucun accès aux contacts, à la position, aux photos, au micro ni à l'appareil photo.
+- Une seule permission Android : « Internet », nécessaire à cet envoi. Aucun accès aux contacts, à la position, au micro ni à l'appareil photo ; l'application ne lit pas votre galerie : elle ne reçoit que l'image que vous choisissez pour un joueur.
 
 ## Export et import volontaires
 La page « Données » permet de créer un fichier contenant toutes vos données, que vous envoyez vous-même (par exemple
 par WhatsApp ou e-mail) à un autre de vos appareils. Ce transfert est initié par vous, passe par l'application de votre
 choix et n'implique aucun serveur de l'éditeur de FootCoach. L'application elle-même n'envoie rien. Le fichier contient
-les noms, dates de naissance, téléphones et adresses e-mail saisis : traitez-le comme vos données d'origine.
+les noms, dates de naissance, numéros de licence, photos, téléphones et adresses e-mail saisis : traitez-le comme vos données d'origine.
 
 ## Assistance (signalement, e-mail)
 Le menu « Paramètres » permet de signaler un problème, de proposer une amélioration ou de contacter le support. Si vous

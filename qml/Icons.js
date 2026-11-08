@@ -68,6 +68,7 @@ function draw(c, name) {
     case "board": rrect(c, 3, 5, 18, 14, 2); line(c, 12, 5, 12, 19); circle(c, 12, 12, 2.8); break;
     case "exercise": poly(c, [[12, 4], [19, 20], [5, 20]], true); line(c, 8.2, 14, 15.8, 14); break;
     case "session": circle(c, 12, 12, 8.5); poly(c, [[12, 7], [12, 12], [15.5, 14]]); break;
+    case "photo": rrect(c, 3, 5, 18, 14, 2.5); circle(c, 8.5, 10, 1.6); poly(c, [[4, 18], [10, 13], [14, 16.5], [16.5, 14.5], [20, 18]]); break;
     case "text": line(c, 6, 6, 18, 6); line(c, 12, 6, 12, 19); line(c, 9, 19, 15, 19); break;
     case "orient": poly(c, [[4, 12], [4, 7], [9, 7]]); c.beginPath(); c.arc(12, 12, 7.5, Math.PI * 1.1, Math.PI * 1.9, false); c.stroke(); break;
     // Outils du terrain

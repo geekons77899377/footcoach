@@ -75,6 +75,11 @@ public:
     // Crée (id absent ou <= 0) ou modifie un joueur. Refus : prénom vide (le nom est facultatif), prénom + nom déjà dans l'équipe, date invalide, numéro hors 0..99
     // ou déjà porté par un autre joueur actif de l'équipe, poste ou pied inconnu. Résultat {ok, id, error}.
     Q_INVOKABLE QVariantMap savePlayer(const QVariantMap &player);
+    // Lit l'image choisie (file:// ou content://), la réduit (480 px, JPEG) ; {ok, error, data = data URL JPEG}.
+    Q_INVOKABLE QVariantMap preparePhoto(const QString &url);
+    // Import en lot : fichiers « <licence>.jpg » rattachés aux joueurs de l'équipe ; {ok, error, added, replaced, failed, items}.
+    Q_INVOKABLE QVariantMap importPhotos(int teamId, const QVariantList &urls);
+    Q_INVOKABLE QString playerPhoto(int id);        // data URL JPEG, "" si pas de photo
     // Import d'une liste collée : un joueur par ligne, champs séparés par « ; » ou une tabulation, dans l'ordre
     // Prénom ; Nom ; Numéro ; Poste ; Naissance (JJ/MM/AAAA ou AAAA-MM-JJ). Seul le prénom est obligatoire ; une première ligne
     // « Prénom ; Nom … » est ignorée. Prénom + nom unique dans l'équipe (accents et majuscules ignorés), numéro unique parmi

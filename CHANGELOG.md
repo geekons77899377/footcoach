@@ -1,5 +1,19 @@
 # Journal des modifications
 
+## Non publié — import de photos en lot (Effectif)
+- Bouton **photo** dans l'en-tête de l'Effectif : on choisit plusieurs images ; chaque fichier **`<n° de licence>.jpg`** (ou .png, .jpeg, .webp, .bmp ; casse ignorée) est rattaché au joueur **de l'équipe affichée** qui porte cette licence. Chaque image est réduite comme une photo de la fiche (480 px, JPEG).
+- **Photo déjà présente : remplacée.** Chaque fichier est indépendant (pas de « tout ou rien »). Compte-rendu : photos ajoutées, remplacées, fichiers ignorés avec la raison (licence inconnue dans l'équipe, image illisible, deux fichiers pour la même licence : le premier est utilisé). Maximum 400 fichiers par import.
+- Prérequis : le joueur doit **déjà avoir son n° de licence** (fiche joueur). L'import de liste de joueurs ne le prend pas encore.
+- Tests : C++ `importPhotosByLicence` et `t_photo.py` (backend **simulé**). Non vérifié sur appareil : sur Android, le nom affiché d'un fichier choisi (`content://`) doit être lu correctement par `QFileInfo` ; sinon les fichiers sont signalés « licence inconnue » sans rien modifier.
+
+## Non publié — photo et numéro de licence d'un joueur (schéma 7)
+- La **fiche joueur** propose une **photo** (bouton « Ajouter / Changer la photo », « Retirer la photo ») : choix d'une image dans les fichiers (aucune permission, pas de prise de vue). L'image est **réduite à 480 px en JPEG** (orientation EXIF respectée, fond blanc si transparente) et **stockée dans la base**. Sans photo, les initiales s'affichent. La photo n'apparaît que dans la fiche (pas dans les listes, cartes ni convocations).
+- **N° de licence** facultatif : lettres et chiffres, 20 au plus, enregistré en majuscules, **unique dans l'équipe** (casse ignorée, joueurs inactifs compris) ; une autre équipe peut avoir la même. Message clair en cas de doublon ; garde-fou en base (index unique, valable aussi à l'import).
+- Migration `007_player_photo_licence.sql` (schéma 6 → 7, données conservées). Export/import `.footcoach` : colonnes `licence` et `photo` (octets en base64) ; les fichiers des schémas 1 à 6 restent importables ; un fichier du schéma 7 est refusé par une application plus ancienne (message « plus récente »). Nouveau fichier de référence `tests/fixtures/schema7.footcoach`.
+- Confidentialité : texte in-app et `docs/confidentialite.md` mis à jour (photo enregistrée réduite, incluse dans les exports, jamais envoyée ; aucune permission ajoutée).
+- Tests : C++ (licence, photo, mauvaise entrée, aller-retour du schéma 7, doublon de licence refusé à l'import) et `t_photo.py` (backend **simulé**). Non vérifié sur appareil : sélecteur de fichiers Android (`content://`) et lecture réelle de l'image.
+- Limites : la liste d'import de joueurs ne prend pas encore de licence ; le plafond d'une photo est 400 Ko après réduction.
+
 ## Non publié — formation d'un match placée selon les postes
 - Choisir une formation sur le terrain d'un match place les **titulaires** selon leur **poste** (gardien, défenseur, milieu, attaquant) : lignes d'après le nom de la formation (4-2-3-1 = 4 défenseurs, 5 milieux, 1 attaquant). **Les remplaçants ne sont jamais placés.**
 - **Plusieurs titulaires au même poste** : choix d'après le **pied fort** (droitier à droite, gaucher à gauche, « les deux » partout mais après le pied adapté, pied inconnu ensuite ; l'axe compte comme un côté à partir de 0,44/0,56 de largeur), puis à égalité par **prénom alphabétique** (accents et casse ignorés), puis nom. Couloirs remplis avant l'axe.

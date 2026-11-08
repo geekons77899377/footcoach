@@ -31,6 +31,7 @@ void bindPlayer(QSqlQuery &q, const Player &p)
     q.addBindValue(nullIfEmpty(p.email));
     q.addBindValue(nullIfEmpty(p.notes));
     q.addBindValue(p.active ? 1 : 0);
+    q.addBindValue(nullIfEmpty(PlayerRepository::normalizeLicence(p.licence)));
 }
 
 } // namespace
@@ -67,7 +68,7 @@ QList<Player> PlayerRepository::list(int teamId, bool includeInactive, QString *
     QSqlQuery q(m_db);
     QString sql = QStringLiteral(
         "SELECT id, team_id, first_name, last_name, birth_date, jersey_number, position, "
-        "preferred_foot, phone, email, notes, active FROM player WHERE team_id = ?");
+        "preferred_foot, phone, email, notes, active, licence, photo IS NOT NULL FROM player WHERE team_id = ?");
     if (!includeInactive)
         sql += QStringLiteral(" AND active = 1");
     sql += QStringLiteral(" ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE");
@@ -92,6 +93,8 @@ QList<Player> PlayerRepository::list(int teamId, bool includeInactive, QString *
         p.email = q.value(9).toString();
         p.notes = q.value(10).toString();
         p.active = q.value(11).toInt() != 0;
+        p.licence = q.value(12).toString();
+        p.hasPhoto = q.value(13).toInt() != 0;
         players.append(p);
     }
     return players;
@@ -102,7 +105,7 @@ bool PlayerRepository::insert(Player &player, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "INSERT INTO player(team_id, first_name, last_name, birth_date, jersey_number, position, "
-        "preferred_foot, phone, email, notes, active) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "preferred_foot, phone, email, notes, active, licence) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     bindPlayer(q, player);
     if (!q.exec()) {
         setError(error, q.lastError().text());
@@ -118,7 +121,7 @@ bool PlayerRepository::update(const Player &player, QString *error)
     q.prepare(QStringLiteral(
         "UPDATE player SET team_id = ?, first_name = ?, last_name = ?, birth_date = ?, "
         "jersey_number = ?, position = ?, preferred_foot = ?, phone = ?, email = ?, notes = ?, "
-        "active = ? WHERE id = ?"));
+        "active = ?, licence = ? WHERE id = ?"));
     bindPlayer(q, player);
     q.addBindValue(player.id);
     if (!q.exec()) {
@@ -146,6 +149,51 @@ bool PlayerRepository::remove(int id, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral("DELETE FROM player WHERE id = ?"));
     q.addBindValue(id);
+    if (!q.exec()) {
+        setError(error, q.lastError().text());
+        return false;
+    }
+    return true;
+}
+
+QString PlayerRepository::normalizeLicence(const QString &s)
+{
+    QString out;
+    for (const QChar c : s) {
+        if (!c.isSpace())
+            out += c.toUpper();
+    }
+    return out;
+}
+
+bool PlayerRepository::licenceTaken(int teamId, const QString &licence, int excludeId) const
+{
+    const QString key = normalizeLicence(licence);
+    if (key.isEmpty())
+        return false;
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT 1 FROM player WHERE team_id = ? AND UPPER(licence) = ? AND id <> ? LIMIT 1"));
+    q.addBindValue(teamId);
+    q.addBindValue(key);
+    q.addBindValue(excludeId);
+    return q.exec() && q.next();
+}
+
+QByteArray PlayerRepository::photo(int playerId) const
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("SELECT photo FROM player WHERE id = ?"));
+    q.addBindValue(playerId);
+    return (q.exec() && q.next()) ? q.value(0).toByteArray() : QByteArray();
+}
+
+bool PlayerRepository::setPhoto(int playerId, const QByteArray &jpeg, QString *error)
+{
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral("UPDATE player SET photo = ? WHERE id = ?"));
+    q.addBindValue(jpeg.isEmpty() ? QVariant(QMetaType(QMetaType::QByteArray)) : QVariant(jpeg));
+    q.addBindValue(playerId);
     if (!q.exec()) {
         setError(error, q.lastError().text());
         return false;

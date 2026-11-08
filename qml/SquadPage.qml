@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import "DateUtil.js" as DateUtil
 import "Status.js" as Status
 
@@ -220,6 +221,34 @@ Item {
         }
     }
 
+    // Import en lot des photos : fichiers nommés d'après le numéro de licence (voir Backend::importPhotos).
+    FileDialog {
+        id: photosDialog
+        objectName: "photosDialog"
+        title: "Choisir les photos"
+        fileMode: FileDialog.OpenFiles
+        nameFilters: ["Images (*.jpg *.jpeg *.png *.webp *.bmp)", "Tous les fichiers (*)"]
+        onAccepted: page.importPhotos(selectedFiles)
+    }
+
+    PhotosImportResult {
+        id: photosResult
+        objectName: "photosResult"
+    }
+
+    function importPhotos(files) {
+        var urls = [];
+        for (var i = 0; i < files.length; ++i)
+            urls.push(files[i].toString());
+        var r = backend.importPhotos(page.teamId, urls);
+        if (!r.ok) {
+            toast.show(r.error);
+            return;
+        }
+        refreshTeams();
+        photosResult.show(r);
+    }
+
     ActionSheet {
         id: teamSheet
         title: "Équipe"
@@ -303,6 +332,14 @@ Item {
                 fillColor: Theme.surface
                 accessibleName: "Importer une liste de joueurs"
                 onClicked: importDialog.openFor(page.teamId)
+            }
+            IconButton {
+                objectName: "photosButton"
+                visible: page.team !== null
+                iconName: "photo"
+                fillColor: Theme.surface
+                accessibleName: "Importer des photos"
+                onClicked: photosDialog.open()
             }
             IconButton {
                 visible: page.team !== null

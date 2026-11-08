@@ -2,6 +2,8 @@
 #include "core/Database.h"
 #include "core/TacticalBoard.h"
 
+#include <QBuffer>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -373,6 +375,163 @@ private slots:
             QVERIFY(!b.createBlockBoard(i1).value("ok").toBool());
             QVERIFY(b.plan(sess).value("entries").toList().at(0).toMap().value("boardId").toInt() == -1);
         }
+    }
+
+    // Licence : facultative, lettres et chiffres, 20 au plus, unique dans l'équipe sans tenir compte de la casse.
+    void playerLicenceValidationAndUniqueness()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        const int other = b.saveTeam({{"name", "U17"}}).value("id").toInt();
+        auto save = [&](int t, const QString &first, const QString &licence, int id = -1) {
+            return b.savePlayer({{"id", id}, {"teamId", t}, {"firstName", first}, {"licence", licence}});
+        };
+        const QVariantMap a = save(team, "Ana", " ab 123 ");
+        QVERIFY2(a.value("ok").toBool(), qPrintable(a.value("error").toString()));
+        QCOMPARE(b.players(team, true).first().toMap().value("licence").toString(), QStringLiteral("AB123"));   // normalisée
+        QVERIFY(save(team, "Bob", "").value("ok").toBool());                                   // facultative
+        QVERIFY(save(team, "Cléo", "").value("ok").toBool());                                  // plusieurs joueurs sans licence
+        const QVariantMap dup = save(team, "Dan", "ab123");
+        QVERIFY(!dup.value("ok").toBool());
+        QVERIFY2(dup.value("error").toString().contains(QStringLiteral("déjà utilisé")), qPrintable(dup.value("error").toString()));
+        QVERIFY(save(other, "Dan", "AB123").value("ok").toBool());                             // autre équipe : permis
+        QVERIFY(!save(team, "Eve", "AB-123").value("ok").toBool());                            // caractère interdit
+        QVERIFY(!save(team, "Eve", "123456789012345678901").value("ok").toBool());             // 21 caractères
+        QVERIFY(save(team, "Eve", "123456789012345678AB").value("ok").toBool());               // 20 caractères
+        // Modifier un joueur sans changer sa licence reste possible ; lui donner celle d'un autre est refusé, même inactif.
+        const int ana = a.value("id").toInt();
+        QVERIFY(save(team, "Ana", "AB123", ana).value("ok").toBool());
+        const int bob = b.players(team, true).at(1).toMap().value("id").toInt();
+        QVERIFY(b.setPlayerActive(ana, false).value("ok").toBool());
+        QVERIFY(!save(team, "Bob", "ab123", bob).value("ok").toBool());
+        // Retirer la licence libère le numéro.
+        QVERIFY(save(team, "Ana", "", ana).value("ok").toBool());
+        QVERIFY(save(team, "Bob", "ab123", bob).value("ok").toBool());
+    }
+
+    // Photo : réduite à 480 px en JPEG, stockée dans la base, hors des listes ; retirée ou conservée selon les clés.
+    void playerPhotoStoredReducedAndOptional()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        QImage big(1600, 900, QImage::Format_ARGB32);
+        big.fill(QColor(30, 160, 90, 128));                         // translucide : doit devenir un JPEG opaque
+        const QString src = m_dir.filePath(QStringLiteral("grande.png"));
+        QVERIFY(big.save(src));
+        const QVariantMap prep = b.preparePhoto(QUrl::fromLocalFile(src).toString());
+        QVERIFY2(prep.value("ok").toBool(), qPrintable(prep.value("error").toString()));
+        const QString data = prep.value("data").toString();
+        QVERIFY(data.startsWith(QStringLiteral("data:image/jpeg;base64,")));
+        QImage reduced;
+        QVERIFY(reduced.loadFromData(QByteArray::fromBase64(data.mid(23).toLatin1()), "JPEG"));
+        QCOMPARE(qMax(reduced.width(), reduced.height()), 480);
+        QCOMPARE(reduced.width() * 9, reduced.height() * 16);        // proportions conservées (480 × 270)
+        // Les chemins sans « file:// » (content://, chemin brut) passent aussi par QFile.
+        QVERIFY(b.preparePhoto(src).value("ok").toBool());
+
+        const QVariantMap saved = b.savePlayer({{"teamId", team}, {"firstName", "Ana"}, {"photo", data}});
+        QVERIFY2(saved.value("ok").toBool(), qPrintable(saved.value("error").toString()));
+        const int id = saved.value("id").toInt();
+        QVERIFY(b.players(team, true).first().toMap().value("hasPhoto").toBool());
+        QCOMPARE(b.playerPhoto(id), data);
+        // Enregistrer sans les clés photo ne touche pas à l'image.
+        QVERIFY(b.savePlayer({{"id", id}, {"teamId", team}, {"firstName", "Ana"}, {"notes", "x"}}).value("ok").toBool());
+        QCOMPARE(b.playerPhoto(id), data);
+        // Un joueur sans photo : chaîne vide, hasPhoto faux.
+        const int bob = b.savePlayer({{"teamId", team}, {"firstName", "Bob"}}).value("id").toInt();
+        QVERIFY(b.playerPhoto(bob).isEmpty());
+        QVERIFY(!b.players(team, true).at(1).toMap().value("hasPhoto").toBool());
+        // Retrait.
+        QVERIFY(b.savePlayer({{"id", id}, {"teamId", team}, {"firstName", "Ana"}, {"removePhoto", true}}).value("ok").toBool());
+        QVERIFY(b.playerPhoto(id).isEmpty());
+        QVERIFY(!b.players(team, true).first().toMap().value("hasPhoto").toBool());
+    }
+
+    // Import en lot : « <licence>.jpg » → joueur de l'équipe ; remplace l'existant ; signale inconnus, doublons, fichiers illisibles.
+    void importPhotosByLicence()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        const int other = b.saveTeam({{"name", "U17"}}).value("id").toInt();
+        auto mk = [&](int t, const QString &first, const QString &lic) {
+            return b.savePlayer({{"teamId", t}, {"firstName", first}, {"licence", lic}}).value("id").toInt();
+        };
+        const int ana = mk(team, "Ana", "9603907336");
+        const int bob = mk(team, "Bob", "9605678531");
+        const int dan = mk(other, "Dan", "9999999999");
+        mk(team, "Eve", "");                                         // sans licence : jamais ciblée
+        auto png = [&](const QString &name, const QColor &c) {
+            QImage img(60, 80, QImage::Format_RGB32);
+            img.fill(c);
+            const QString path = m_dir.filePath(name);
+            img.save(path);
+            return QUrl::fromLocalFile(path).toString();
+        };
+        const QString bobOld = png("old.png", Qt::red);
+        QVERIFY(b.savePlayer({{"id", bob}, {"teamId", team}, {"firstName", "Bob"}, {"licence", "9605678531"},
+                              {"photo", b.preparePhoto(bobOld).value("data")}}).value("ok").toBool());
+        const QString bobBefore = b.playerPhoto(bob);
+        QDir(m_dir.path()).mkdir(QStringLiteral("lot"));
+        QFile bad(m_dir.filePath(QStringLiteral("lot/9603885403.jpg")));
+        QVERIFY(bad.open(QIODevice::WriteOnly));
+        bad.write("pas une image");
+        bad.close();
+        const QVariantList urls = {
+            png("lot/9603907336.png", Qt::blue),                    // Ana : ajoutée
+            png("lot/9605678531.PNG", Qt::green),                   // Bob : remplacée (extension en majuscules)
+            png("lot/9999999999.png", Qt::yellow),                  // licence d'une autre équipe : inconnue ici
+            png("lot/0000000000.png", Qt::black),                   // inconnue
+            png("lot/9603907336 (1).png", Qt::white),               // nom non conforme : inconnue
+            QUrl::fromLocalFile(m_dir.filePath(QStringLiteral("lot/9603885403.jpg"))).toString(),   // illisible mais licence inconnue
+        };
+        const QVariantMap r = b.importPhotos(team, urls);
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(r.value("added").toInt(), 1);
+        QCOMPARE(r.value("replaced").toInt(), 1);
+        QCOMPARE(r.value("failed").toInt(), 4);
+        QVERIFY(!b.playerPhoto(ana).isEmpty());
+        QVERIFY(b.playerPhoto(bob) != bobBefore);
+        QVERIFY(b.playerPhoto(dan).isEmpty());                      // l'autre équipe n'est pas touchée
+        const QVariantList items = r.value("items").toList();
+        QCOMPARE(items.size(), 6);
+        QCOMPARE(items.at(0).toMap().value("status").toString(), QStringLiteral("added"));
+        QCOMPARE(items.at(1).toMap().value("status").toString(), QStringLiteral("replaced"));
+        QCOMPARE(items.at(1).toMap().value("player").toString(), QStringLiteral("Bob"));
+        QCOMPARE(items.at(2).toMap().value("status").toString(), QStringLiteral("unknown"));
+        // Fichier illisible pour une licence connue : erreur propre, la photo existante reste intacte.
+        const int cleo = mk(team, "Cléo", "9603885403");
+        const QVariantMap r2 = b.importPhotos(team, {QUrl::fromLocalFile(m_dir.filePath(QStringLiteral("lot/9603885403.jpg"))).toString()});
+        QCOMPARE(r2.value("failed").toInt(), 1);
+        QCOMPARE(r2.value("items").toList().first().toMap().value("status").toString(), QStringLiteral("error"));
+        QVERIFY(b.playerPhoto(cleo).isEmpty());
+        // Deux fichiers pour la même licence : le premier gagne, le second est signalé.
+        const QVariantMap r3 = b.importPhotos(team, {png("lot/9605678531.png", Qt::cyan), png("lot/9605678531.jpeg", Qt::magenta)});
+        QCOMPARE(r3.value("replaced").toInt(), 1);
+        QCOMPARE(r3.value("failed").toInt(), 1);
+        // Cas limites.
+        QVERIFY(!b.importPhotos(team, {}).value("ok").toBool());
+        QVERIFY(!b.importPhotos(9999, urls).value("ok").toBool());
+    }
+
+    void playerPhotoRefusesBadInput()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U15"}}).value("id").toInt();
+        const QString txt = m_dir.filePath(QStringLiteral("faux.png"));
+        QFile f(txt);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("ceci n'est pas une image");
+        f.close();
+        QVERIFY(!b.preparePhoto(txt).value("ok").toBool());
+        QVERIFY(!b.preparePhoto(QUrl::fromLocalFile(m_dir.filePath(QStringLiteral("absent.png"))).toString()).value("ok").toBool());
+        QVERIFY(!b.preparePhoto(QString()).value("ok").toBool());
+        // Le backend ne fait pas confiance à l'interface : une « photo » qui n'est pas un JPEG est refusée, rien n'est créé.
+        for (const QString &bad : {QStringLiteral("data:image/jpeg;base64,AAAA"), QStringLiteral("data:text/html;base64,PGI+"),
+                                   QStringLiteral("n'importe quoi")}) {
+            const QVariantMap r = b.savePlayer({{"teamId", team}, {"firstName", "Ana"}, {"photo", bad}});
+            QVERIFY2(!r.value("ok").toBool(), qPrintable(bad));
+        }
+        QCOMPARE(b.players(team, true).size(), 0);
     }
 
     void playerNameOptionalAndUnique()

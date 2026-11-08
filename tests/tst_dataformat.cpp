@@ -120,6 +120,12 @@ const QStringList kSampleDataSchema6 = {
     "VALUES(3,'Match contre FC Rivière','4-4-2','{\"items\":[{\"t\":\"player\",\"x\":0.75}]}',1)",
 };
 
+// Ajouts propres au schéma 7 : licence et photo (petit BLOB JPEG fictif) du joueur 1 ; licence du joueur 3 dans une autre équipe.
+const QStringList kSampleDataSchema7 = {
+    "UPDATE player SET licence = 'AB12345', photo = x'FFD8FFE000104A46494600FFD9' WHERE id = 1",
+    "UPDATE player SET licence = 'AB12345' WHERE id = 3",
+};
+
 // Prépare un fichier de base au schéma « schema » (migrations 001 à 00N, user_version, données d'exemple), sans passer par Database.
 bool buildDatabaseAtSchema(const QString &dbFile, const QString &conn, int schema, QString *error)
 {
@@ -149,6 +155,10 @@ bool buildDatabaseAtSchema(const QString &dbFile, const QString &conn, int schem
                 *error = q.lastError().text() + " / " + st;
     if (ok && schema >= 6)
         for (const QString &st : kSampleDataSchema6)
+            if (ok && !(ok = q.exec(st)))
+                *error = q.lastError().text() + " / " + st;
+    if (ok && schema >= 7)
+        for (const QString &st : kSampleDataSchema7)
             if (ok && !(ok = q.exec(st)))
                 *error = q.lastError().text() + " / " + st;
     return ok;
@@ -242,7 +252,7 @@ private slots:
         QVERIFY(QDir().mkpath(out));
         // Les fichiers 1 à 5 sont figés (créés par les versions d'époque) : seul le schéma courant se recrée, car l'export
         // du code actuel ne sait plus lire une base d'un schéma sans club.
-        for (int schema = 6; schema <= 6; ++schema) {
+        for (int schema = 7; schema <= 7; ++schema) {
             const QString conn = QStringLiteral("fixture-%1").arg(schema);
             const QString dbFile = m_dir.filePath(QStringLiteral("fx%1.db").arg(schema));
             {
@@ -252,6 +262,7 @@ private slots:
                 QCoreApplication::setApplicationVersion(schema == 4 ? QStringLiteral("0.8.0")
                                                         : schema == 5 ? QStringLiteral("0.10.0")
                                                         : schema == 6 ? QStringLiteral("0.11.0")
+                                                        : schema == 7 ? QStringLiteral("0.12.0")
                                                                       : QStringLiteral("reconstitue-schema-%1").arg(schema));
                 Backend b(db);
                 QVERIFY(b.exportDataFile(QDir(out).filePath(QStringLiteral("schema%1.footcoach").arg(schema))).value("ok").toBool());
@@ -264,7 +275,7 @@ private slots:
     void referenceFilesHaveTheV1Structure()
     {
         const QStringList keys = {"app", "exportedAt", "format", "schema", "tables", "version"};
-        for (int schema = 1; schema <= 6; ++schema) {
+        for (int schema = 1; schema <= 7; ++schema) {
             const QJsonObject o = readJson(fixturePath(schema));
             QVERIFY2(!o.isEmpty(), qPrintable(fixturePath(schema)));
             QCOMPARE(o.keys(), keys);
@@ -287,13 +298,52 @@ private slots:
     // Le fichier du schéma 6 contient bien les nouvelles données : club, match, convoqués, schéma tactique de match.
     void schema6ReferenceFileHasClubsAndMatches()
     {
-        const QJsonObject t = readJson(fixturePath(6)).value("tables").toObject();
+        const QJsonObject t = readJson(fixturePath(7)).value("tables").toObject();
         auto rows = [&](const char *name) { return t.value(QLatin1String(name)).toObject().value("rows").toArray().size(); };
         QCOMPARE(rows("club"), 1);
         QCOMPARE(rows("team"), 2);
         QCOMPARE(rows("football_match"), 1);
         QCOMPARE(rows("match_player"), 2);
         QCOMPARE(rows("tactical_board"), 3);
+    }
+
+    // Le fichier du schéma 7 porte licence et photo ; ils survivent à l'import, à l'API et à un nouvel export.
+    void schema7PhotoAndLicenceRoundTrip()
+    {
+        Backend b(m_db.handle());
+        QVERIFY(b.importDataFile(url(fixturePath(7))).value("ok").toBool());
+        QCOMPARE(b.players(1, true).at(1).toMap().value("licence").toString(), QStringLiteral("AB12345"));
+        QVERIFY(b.players(1, true).at(1).toMap().value("hasPhoto").toBool());
+        QVERIFY(!b.players(1, true).at(0).toMap().value("hasPhoto").toBool());
+        QVERIFY(b.playerPhoto(1).startsWith(QStringLiteral("data:image/jpeg;base64,/9j/")));   // FFD8FF...
+        QVERIFY(b.playerPhoto(2).isEmpty());
+        // Même licence dans une autre équipe : permise ; le export/import ne perd rien.
+        QCOMPARE(b.players(2, true).first().toMap().value("licence").toString(), QStringLiteral("AB12345"));
+        const QJsonObject first = stable(snapshot(b));
+        const QString out = m_dir.filePath(QStringLiteral("again.footcoach"));
+        QVERIFY(b.exportDataFile(out).value("ok").toBool());
+        QVERIFY(b.importDataFile(url(out)).value("ok").toBool());
+        QCOMPARE(stable(snapshot(b)), first);
+        // Un fichier qui donne deux fois la même licence à une équipe est refusé en entier.
+        QJsonObject root = readJson(fixturePath(7));
+        QJsonObject tables = root.value("tables").toObject();
+        QJsonObject pl = tables.value("player").toObject();
+        QJsonArray cols = pl.value("columns").toArray();
+        int li = -1;
+        for (int i = 0; i < cols.size(); ++i)
+            if (cols.at(i).toString() == QLatin1String("licence"))
+                li = i;
+        QVERIFY(li > 0);
+        QJsonArray rows = pl.value("rows").toArray();
+        QJsonArray second = rows.at(1).toArray();           // joueur 2, même équipe que le joueur 1
+        second[li] = QStringLiteral("ab12345");             // casse ignorée
+        rows[1] = second;
+        pl["rows"] = rows;
+        tables["player"] = pl;
+        root["tables"] = tables;
+        const QVariantMap r = b.importDataFile(url(tmpFile(root)));
+        QVERIFY(!r.value("ok").toBool());
+        QCOMPARE(stable(snapshot(b)), first);
     }
 
     // Un export fait aujourd'hui doit garder exactement la structure du fichier de référence du schéma courant (6),
@@ -303,12 +353,12 @@ private slots:
         Backend b(m_db.handle());
         const QString p = m_dir.filePath(QStringLiteral("now.footcoach"));
         QVERIFY(b.exportDataFile(p).value("ok").toBool());
-        const QJsonObject now = readJson(p), ref = readJson(fixturePath(6)), old = readJson(fixturePath(4));
+        const QJsonObject now = readJson(p), ref = readJson(fixturePath(7)), old = readJson(fixturePath(4));
         QCOMPARE(now.keys(), ref.keys());
         QCOMPARE(now.value("format"), ref.value("format"));
         QCOMPARE(now.value("version"), ref.value("version"));
         QCOMPARE(now.value("schema"), ref.value("schema"));
-        QCOMPARE(now.value("schema").toInt(), 6);
+        QCOMPARE(now.value("schema").toInt(), 7);
         for (const QString &t : kTables) {
             const QJsonArray cols = now.value("tables").toObject().value(t).toObject().value("columns").toArray();
             QCOMPARE(cols, ref.value("tables").toObject().value(t).toObject().value("columns").toArray());
@@ -325,7 +375,7 @@ private slots:
     void importReferenceFiles_data()
     {
         QTest::addColumn<int>("schema");
-        for (int s = 1; s <= 6; ++s)
+        for (int s = 1; s <= 7; ++s)
             QTest::newRow(qPrintable(QStringLiteral("schema %1").arg(s))) << s;
     }
 
@@ -433,7 +483,7 @@ private slots:
         Database db;
         QString error;
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 6);
+        QCOMPARE(db.schemaVersion(), 7);
         QSqlQuery q(db.handle());
         auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
         QCOMPARE(count("SELECT COUNT(*) FROM team"), 2);
@@ -464,7 +514,7 @@ private slots:
         // Rouvrir ne rejoue rien.
         db.close();
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 6);
+        QCOMPARE(db.schemaVersion(), 7);
         QSqlQuery q2(db.handle());
         QVERIFY(q2.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board")) && q2.next());
         QCOMPARE(q2.value(0).toInt(), 1);
@@ -489,12 +539,12 @@ private slots:
     void fileNewerThanCurrentSchemaIsRefusedWithAClearMessage()
     {
         Backend b(m_db.handle());
-        QJsonObject root = readJson(fixturePath(6));
-        root["schema"] = 7;
+        QJsonObject root = readJson(fixturePath(7));
+        root["schema"] = 8;
         const QVariantMap r = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r.value("ok").toBool());
         QVERIFY2(r.value("error").toString().contains(QStringLiteral("plus récente")), qPrintable(r.value("error").toString()));
-        root = readJson(fixturePath(6));
+        root = readJson(fixturePath(7));
         root["version"] = 2;
         const QVariantMap r2 = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r2.value("ok").toBool());
@@ -515,7 +565,7 @@ private slots:
     {
         QTest::addColumn<QByteArray>("mutation");
         QTest::addColumn<QString>("messagePart");
-        QTest::newRow("schema plus récent") << QByteArray("schema=7") << QString("plus récente");
+        QTest::newRow("schema plus récent") << QByteArray("schema=8") << QString("plus récente");
         QTest::newRow("schema très grand") << QByteArray("schema=999") << QString("plus récente");
         QTest::newRow("schema absent") << QByteArray("schema=remove") << QString("");
         QTest::newRow("schema nul") << QByteArray("schema=0") << QString("");

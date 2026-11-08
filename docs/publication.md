@@ -29,7 +29,7 @@ n'ajoute pas ACCESS_NETWORK_STATE ni WRITE_EXTERNAL_STORAGE).
 l'application n'affiche que l'envoi par e-mail. Le jeton est récupérable par quelqu'un qui décompile l'application : sa portée
 limitée est la seule protection (au pire, des tickets indésirables) ; en cas d'abus, le révoquer sur GitHub et publier une
 version avec un nouveau jeton. **Play Console, section « Sécurité des données » :** déclarer l'envoi de « Informations sur
-l'application » (texte du signalement saisi par l'utilisateur) à GitHub, facultatif, déclenché par l'utilisateur. Vérifier aussi `android:icon` et `allowBackup="false"` dans le manifeste généré.
+l'application » (texte du signalement saisi par l'utilisateur) à GitHub, facultatif, déclenché par l'utilisateur. La photo d'un joueur est choisie par l'utilisateur dans le sélecteur de fichiers du système (aucune permission « Photos et vidéos » ni appareil photo) et reste dans la base locale : rien à déclarer comme donnée collectée ou partagée. Vérifier aussi `android:icon` et `allowBackup="false"` dans le manifeste généré.
 
 ## 2. Clé d'upload (une seule fois, hors dépôt)
 ```

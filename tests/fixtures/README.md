@@ -6,6 +6,7 @@ Ne pas modifier à la main. Ne pas régénérer pour faire passer un test.
 |---|---|
 | `schema4.footcoach` | Export complet réel fait par le code de FootCoach 0.8.0 (commit `aa65676`), champ `app` = `0.8.0`. |
 | `schema5.footcoach` | Export fait par le code courant (0.10.0, branche `v1`) sur une base au schéma 5, avec un terrain rattaché à un bloc. Champ `app` = `0.10.0`. N'est pas un export de version publiée. |
+| `schema7.footcoach` | Export fait par le code courant sur une base au schéma 7 (licence et photo fictives pour le joueur 1, même licence dans l'autre équipe). Champ `app` = `0.12.0`. N'est pas un export de version publiée. |
 | `schema1.footcoach`, `schema2.footcoach`, `schema3.footcoach` | **Reconstitués** : même code d'export, base créée avec les migrations `001` à `00N`. Aucune version publiée n'a produit de fichier avec ces schémas. Champ `app` = `reconstitue-schema-N`. |
 
 Toutes les données sont fictives.
