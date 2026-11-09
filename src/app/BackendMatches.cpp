@@ -338,14 +338,39 @@ QVariantMap Backend::exportChallengeSheet(int matchId, const QString &url)
         return fail(tr("Impossible de créer le PDF : %1").arg(problem));
     buffer.close();
 
+    // Sur Android, une adresse content:// vers un fichier déjà existant n'accepte pas toujours le mode « tronquer » :
+    // on essaie plusieurs modes d'ouverture, puis on ajuste la taille ; l'erreur indique le dernier motif connu.
     const QUrl u(url);
-    QFile f(u.isLocalFile() ? u.toLocalFile() : url);       // content:// (Android) s'ouvre tel quel avec QFile
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        return fail(tr("Impossible d'écrire le fichier : %1").arg(f.errorString()));
+    const QString target = u.isLocalFile() ? u.toLocalFile() : url;
+    QFile f(target);
+    const QIODevice::OpenMode modes[] = {QIODevice::WriteOnly | QIODevice::Truncate,
+                                         QIODevice::ReadWrite | QIODevice::Truncate,
+                                         QIODevice::WriteOnly,
+                                         QIODevice::ReadWrite};
+    bool opened = false, truncated = false;
+    for (const QIODevice::OpenMode mode : modes) {
+        if (f.open(mode)) {
+            opened = true;
+            truncated = mode.testFlag(QIODevice::Truncate);
+            break;
+        }
+    }
+    if (!opened && u.isLocalFile() && QFile::exists(target) && QFile::remove(target)) {
+        opened = f.open(QIODevice::WriteOnly | QIODevice::Truncate);      // fichier en lecture seule : on le remplace
+        truncated = opened;
+    }
+    if (!opened)
+        return fail(tr("Impossible d'écrire le fichier (%1) : %2")
+                        .arg(u.scheme().isEmpty() ? QStringLiteral("local") : u.scheme(), f.errorString()));
     const bool written = f.write(pdf) == pdf.size();
+    bool sized = true;
+    if (written && !truncated)
+        sized = f.resize(pdf.size());                                    // ancien contenu plus long : on coupe le reste
     f.close();
     if (!written)
         return fail(tr("Écriture incomplète du fichier."));
+    if (!sized)
+        r.insert(QStringLiteral("warning"), tr("Le fichier existait déjà : un reste de l'ancien contenu peut subsister."));
     r.insert(QStringLiteral("bytes"), pdf.size());
     setError(QString());
     return r;
