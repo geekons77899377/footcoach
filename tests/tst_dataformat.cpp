@@ -357,8 +357,7 @@ private slots:
         QCOMPARE(now.keys(), ref.keys());
         QCOMPARE(now.value("format"), ref.value("format"));
         QCOMPARE(now.value("version"), ref.value("version"));
-        QCOMPARE(now.value("schema"), ref.value("schema"));
-        QCOMPARE(now.value("schema").toInt(), 7);
+        QCOMPARE(now.value("schema").toInt(), 8);                // 008 : exemples seulement, aucune colonne ajoutée
         for (const QString &t : kTables) {
             const QJsonArray cols = now.value("tables").toObject().value(t).toObject().value("columns").toArray();
             QCOMPARE(cols, ref.value("tables").toObject().value(t).toObject().value("columns").toArray());
@@ -483,7 +482,7 @@ private slots:
         Database db;
         QString error;
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 7);
+        QCOMPARE(db.schemaVersion(), 8);
         QSqlQuery q(db.handle());
         auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
         QCOMPARE(count("SELECT COUNT(*) FROM team"), 2);
@@ -493,9 +492,9 @@ private slots:
         QCOMPARE(count("SELECT COUNT(*) FROM session_exercise"), 1);
         QCOMPARE(count("SELECT COUNT(*) FROM injury"), 1);
         QVERIFY(count("SELECT COUNT(*) FROM exercise") > 1);                     // exercices de départ de la 004 conservés
-        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 1);
-        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NULL"), 1);
-        QVERIFY(q.exec(QStringLiteral("SELECT title, formation, scene_json, length(thumbnail), exercise_id, session_id FROM tactical_board")) && q.next());
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 28);                // 1 schéma de l'utilisateur + 27 exemples U10-U11 (008)
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NULL"), 28);
+        QVERIFY(q.exec(QStringLiteral("SELECT title, formation, scene_json, length(thumbnail), exercise_id, session_id FROM tactical_board WHERE session_id IS NOT NULL")) && q.next());
         QCOMPARE(q.value(0).toString(), QStringLiteral("Pressing haut"));
         QCOMPARE(q.value(1).toString(), QStringLiteral("4-3-3"));
         QCOMPARE(q.value(3).toInt(), 8);
@@ -514,10 +513,10 @@ private slots:
         // Rouvrir ne rejoue rien.
         db.close();
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 7);
+        QCOMPARE(db.schemaVersion(), 8);
         QSqlQuery q2(db.handle());
         QVERIFY(q2.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board")) && q2.next());
-        QCOMPARE(q2.value(0).toInt(), 1);
+        QCOMPARE(q2.value(0).toInt(), 28);
     }
 
     // Cascade réelle après import du fichier de référence du schéma 5 : bloc → terrain, séance → blocs → terrains.
@@ -540,7 +539,7 @@ private slots:
     {
         Backend b(m_db.handle());
         QJsonObject root = readJson(fixturePath(7));
-        root["schema"] = 8;
+        root["schema"] = 9;
         const QVariantMap r = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r.value("ok").toBool());
         QVERIFY2(r.value("error").toString().contains(QStringLiteral("plus récente")), qPrintable(r.value("error").toString()));
@@ -565,7 +564,7 @@ private slots:
     {
         QTest::addColumn<QByteArray>("mutation");
         QTest::addColumn<QString>("messagePart");
-        QTest::newRow("schema plus récent") << QByteArray("schema=8") << QString("plus récente");
+        QTest::newRow("schema plus récent") << QByteArray("schema=9") << QString("plus récente");
         QTest::newRow("schema très grand") << QByteArray("schema=999") << QString("plus récente");
         QTest::newRow("schema absent") << QByteArray("schema=remove") << QString("");
         QTest::newRow("schema nul") << QByteArray("schema=0") << QString("");

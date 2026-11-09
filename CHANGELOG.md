@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## Non publié — exemples d'exercices U10-U11 avec placement sur le terrain (schéma 8)
+- Migration `008_seed_u10_u11_exercises.sql` (schéma 7 → 8, **INSERT seulement** : aucune donnée existante modifiée) : **27 exercices** préfixés « U10-U11 · », chacun avec **son schéma de terrain de référence** (demi-terrain, joueurs, adversaires, plots, ballons, flèches).
+- **24 viennent du GIFE U10/U11 de la FFF** (jeux et situations de référence, thèmes 1 à 24, pages 110 à 133 du PDF) : objectif, espace, effectif, durée, consignes, buts, variantes et points de vigilance **reformulés** ; la page source est indiquée dans chaque description. **3 viennent de la note de l'éducateur du 10/11** (déménageurs avec passe, attaque contre défense 3 contre 2, match à 8 avec contrainte), en formulation de travail : détails manquants à confirmer.
+- **Placement** : seuls **9 schémas du GIFE sont figés** dans le PDF (thèmes 4 à 8 et 18 à 21) : placement repris **à l'œil** de l'image, sans les mouvements animés. Les **15 autres** (thèmes 1 à 3, 9 à 17, 22 à 24) sont des schémas **reconstitués d'après le texte** (le schéma du PDF est une animation non lisible) ; chaque description le dit. Effectifs réduits : schémas illustratifs.
+- Modifiables, archivables et supprimables comme les exercices de départ. Les bases existantes les reçoivent à la mise à jour.
+- **Conséquence du numéro de schéma** : un export `.footcoach` fait après cette mise à jour porte `schema = 8` et sera refusé par une application plus ancienne (message « plus récente »). Les fichiers des schémas 1 à 7 restent importables.
+- Tests : C++ (27 exemples présents, chacun avec une fiche de référence lisible et dans les bornes, une seule fiche par exercice, migration depuis un schéma 4 avec données conservées). Les anciens tests partent d'une base sans exemples. Non vérifié : affichage dans l'application sur appareil, conformité du placement avec les animations du GIFE.
+
 ## Non publié — la feuille de challenge s'ouvre d'abord, l'utilisateur l'enregistre ensuite
 - « Créer la feuille » ne demande plus de dossier : le PDF est créé dans le **cache de l'application** (`challengeSheetTempUrl`, nom sans chemin) puis **ouvert aussitôt** (`Qt.openUrlExternally`) dans l'application de l'appareil (lecteur PDF) ; l'utilisateur y imprime ou l'enregistre. Message : « Feuille ouverte. Enregistrez-la ou imprimez-la depuis l'application qui s'ouvre. »
 - **Repli** : si aucune application n'a pu l'ouvrir, le sélecteur « Enregistrer sous » s'ouvre avec le même nom (« Feuille enregistrée. »).

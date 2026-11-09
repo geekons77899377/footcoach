@@ -212,6 +212,9 @@ private slots:
         m_db = new Database;
         QString error;
         QVERIFY2(m_db->open(QStringLiteral(":memory:"), &error), qPrintable(error));
+        // Les exemples U10-U11 (migration 008) ont leur propre test : ici on part d'une base sans schéma tactique.
+        QSqlQuery((*m_db).handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE title LIKE 'U10-U11%')"));
+
         m_repo = new BoardRepository(m_db->handle());
         m_ex = new ExerciseRepository(m_db->handle());
         m_plan = new PlanRepository(m_db->handle());
@@ -230,6 +233,50 @@ private slots:
         delete m_ex;
         delete m_repo;
         delete m_db;
+    }
+
+    void u10u11ExamplesAreSeededWithAReferenceBoard()
+    {
+        Database seeded;
+        QString openError;
+        QVERIFY2(seeded.open(QStringLiteral(":memory:"), &openError), qPrintable(openError));
+        BoardRepository seededRepo(seeded.handle());
+        QSqlQuery q(seeded.handle());
+        QVERIFY(q.exec(QStringLiteral(
+            "SELECT e.id, e.title, e.category, b.scene_json FROM exercise e "
+            "JOIN tactical_board b ON b.exercise_id = e.id AND b.session_exercise_id IS NULL "
+            "WHERE e.title LIKE 'U10-U11%' ORDER BY e.id")));
+        int n = 0;
+        QSet<int> ids;
+        while (q.next()) {
+            ++n;
+            const QString title = q.value(1).toString();
+            QVERIFY2(!ids.contains(q.value(0).toInt()), qPrintable(title));
+            ids.insert(q.value(0).toInt());
+            Board board;
+            QString error;
+            QVERIFY2(fromJson(q.value(3).toString(), &board, &error), qPrintable(title + " : " + error));
+            QVERIFY2(!board.items.isEmpty(), qPrintable(title));
+            QVERIFY2(board.pitch == Pitch::Half, qPrintable(title));
+            for (const Item &it : board.items) {
+                QVERIFY2(it.pos.x() >= 0 && it.pos.x() <= 1 && it.pos.y() >= 0 && it.pos.y() <= 1, qPrintable(title));
+            }
+            // Un schéma normalisé relu puis réécrit ne change pas (rien n'a été écrêté à la lecture).
+            Board again;
+            QVERIFY(fromJson(toJson(board), &again));
+            QVERIFY2(again == board, qPrintable(title));
+        }
+        QCOMPARE(n, 27);
+        // Une seule fiche de référence par exercice, via le dépôt.
+        QVERIFY(q.exec(QStringLiteral("SELECT id FROM exercise WHERE title LIKE 'U10-U11%'")));
+        while (q.next())
+        {
+            BoardRecord rec;
+            QVERIFY(seededRepo.referenceForExercise(q.value(0).toInt(), &rec));
+            QVERIFY(rec.id > 0);
+        }
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM exercise WHERE archived = 0 AND title LIKE 'U10-U11%'")) && q.next());
+        QCOMPARE(q.value(0).toInt(), 27);
     }
 
     void repositoryCrud()

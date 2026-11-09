@@ -33,7 +33,7 @@ private slots:
 
     void migrationsApplied()
     {
-        QCOMPARE(m_db->schemaVersion(), 7);
+        QCOMPARE(m_db->schemaVersion(), 8);
     }
 
     void insertAndList()
