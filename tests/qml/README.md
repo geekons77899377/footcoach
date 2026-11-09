@@ -14,6 +14,7 @@ l'écran, ni le bouton retour du système.
 | `t_live3.py` | séance du jour : ouverture de la fiche de l'exercice, reprise après relance de l'application |
 | `t_back.py` | bouton retour : fermeture des fiches, du plein écran, retour à l'accueil, sortie depuis l'accueil |
 | `t_blockboard.py` | terrain d'un bloc dans le plan : états (sans terrain, avec, illisible, séance annulée), création à la demande, ouverture du bon terrain, sauvegarde automatique et au retour, défilement conservé, retour Android, import pendant l'édition, 5 formats. **Backend simulé** : le C++ réel est testé par `tst_backend` et `tst_board` |
+| `t_exboard.py` | fiche d'un exercice : section « Terrain » (miniature, ouverture dans Tactique, création à la demande), bureau et téléphone. **Backend simulé** : le C++ réel est testé par `tst_backend` |
 | `t_fields.py` | **chaque champ de saisie** avec le clavier simulé (fenêtre réduite) : champ visible, en-tête immobile |
 
 `t_fields.py` compte aussi les champs déclarés dans `qml/` : si on en ajoute un sans l'ajouter au test, il échoue.

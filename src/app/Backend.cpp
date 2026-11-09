@@ -92,6 +92,64 @@ QVariantMap Backend::board(int id)
     return m;
 }
 
+QVariantMap Backend::exerciseBoard(int exerciseId)
+{
+    QVariantMap m;
+    m.insert(QStringLiteral("boardId"), 0);
+    BoardRecord r;
+    QString error;
+    if (!m_repo.referenceForExercise(exerciseId, &r, &error)) {
+        setError(error);
+        return m;
+    }
+    Tactics::Board parsed;
+    const bool readable = Tactics::fromJson(r.sceneJson, &parsed);
+    m.insert(QStringLiteral("boardId"), r.id);
+    m.insert(QStringLiteral("title"), r.title);
+    m.insert(QStringLiteral("readable"), readable);
+    m.insert(QStringLiteral("json"), readable ? Tactics::toJson(parsed) : QString());
+    setError(QString());
+    return m;
+}
+
+QVariantMap Backend::createExerciseBoard(int exerciseId)
+{
+    QVariantMap m;
+    auto fail = [&](const QString &msg) {
+        setError(msg);
+        m.insert(QStringLiteral("ok"), false);
+        m.insert(QStringLiteral("error"), msg);
+        return m;
+    };
+    QString error;
+    QString title;
+    for (const Exercise &e : m_exercises.list(true, &error))
+        if (e.id == exerciseId)
+            title = e.title;
+    if (title.isEmpty())
+        return fail(error.isEmpty() ? tr("Cet exercice n'existe plus.") : error);
+
+    BoardRecord existing;
+    if (m_repo.referenceForExercise(exerciseId, &existing, &error)) {
+        m.insert(QStringLiteral("ok"), true);
+        m.insert(QStringLiteral("boardId"), existing.id);
+        m.insert(QStringLiteral("created"), false);
+        return m;
+    }
+    if (!error.isEmpty())
+        return fail(error);
+    BoardRecord r;
+    r.title = title;
+    r.exerciseId = exerciseId;
+    if (!m_repo.insert(r, &error))
+        return fail(error);
+    setError(QString());
+    m.insert(QStringLiteral("ok"), true);
+    m.insert(QStringLiteral("boardId"), r.id);
+    m.insert(QStringLiteral("created"), true);
+    return m;
+}
+
 int Backend::createBoard(const QString &title)
 {
     BoardRecord r;

@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## Non publié — le terrain d'un exercice est visible et ouvrable depuis sa fiche
+- Fiche d'un exercice : nouvelle section **« Terrain »** avec la miniature du schéma de référence et le bouton **« Ouvrir le terrain »** (ouvre le schéma dans la section Tactique ; « retour » revient à l'exercice). Sans terrain : bouton **« Créer le terrain »** (schéma vide, au titre de l'exercice, lié à l'exercice). Les 27 exemples U10-U11 y sont donc exploitables.
+- Backend : `exerciseBoard(exerciseId)` et `createExerciseBoard(exerciseId)` (un seul schéma de référence par exercice). Tests : C++ (`tst_backend`) et `t_exboard.py` (backend **simulé**). Non vérifié : rendu et navigation sur appareil, et que les modifications faites dans l'éditeur sont retrouvées au retour sur la fiche.
+- Limite connue : les schémas de référence des exercices figurent aussi dans la bibliothèque de la page Tactique.
+
 ## Non publié — exemples d'exercices U10-U11 avec placement sur le terrain (schéma 8)
 - Migration `008_seed_u10_u11_exercises.sql` (schéma 7 → 8, **INSERT seulement** : aucune donnée existante modifiée) : **27 exercices** préfixés « U10-U11 · », chacun avec **son schéma de terrain de référence** (demi-terrain, joueurs, adversaires, plots, ballons, flèches).
 - **24 viennent du GIFE U10/U11 de la FFF** (jeux et situations de référence, thèmes 1 à 24, pages 110 à 133 du PDF) : objectif, espace, effectif, durée, consignes, buts, variantes et points de vigilance **reformulés** ; la page source est indiquée dans chaque description. **3 viennent de la note de l'éducateur du 10/11** (déménageurs avec passe, attaque contre défense 3 contre 2, match à 8 avec contrainte), en formulation de travail : détails manquants à confirmer.

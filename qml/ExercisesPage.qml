@@ -7,6 +7,8 @@ import "Status.js" as Status
 Item {
     id: page
 
+    signal openBoard(int boardId)      // ouvre le terrain de l'exercice dans la section Tactique
+
     property var categories: []
     property var exercises: []
     property string query: ""
@@ -491,6 +493,7 @@ Item {
         visible: page.editing
         showBack: !page.split
         onCloseRequested: page.backFromForm()
+        onOpenBoardRequested: (id) => page.openBoard(id)
         onSaved: {
             page.currentId = form.exerciseId;
             page.refresh();

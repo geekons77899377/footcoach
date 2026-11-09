@@ -40,6 +40,11 @@ public:
     // à ne pas modifier, pour ne pas écraser ce qu'il contient). Map vide si l'id n'existe pas.
     Q_INVOKABLE QVariantMap board(int id);
 
+    // Schéma de référence d'un exercice : {boardId, title, json, readable}, boardId = 0 si l'exercice n'en a pas.
+    Q_INVOKABLE QVariantMap exerciseBoard(int exerciseId);
+    // Crée le schéma de référence (vide) d'un exercice qui n'en a pas, ou renvoie l'existant : {ok, boardId, created, error}.
+    Q_INVOKABLE QVariantMap createExerciseBoard(int exerciseId);
+
     Q_INVOKABLE int createBoard(const QString &title);     // id du nouveau schéma, -1 en cas d'échec
     Q_INVOKABLE int duplicateBoard(int id);                // id de la copie, -1 en cas d'échec
     Q_INVOKABLE bool renameBoard(int id, const QString &title);

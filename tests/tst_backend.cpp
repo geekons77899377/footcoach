@@ -37,6 +37,54 @@ private slots:
         QFile::remove(m_dir.filePath(QStringLiteral("t.db")));
     }
 
+    void exerciseBoardIsCreatedOnDemandAndReadThroughTheBackend()
+    {
+        Backend b(m_db.handle());
+        const QVariantMap saved = b.saveExercise({{"title", "Rondo test"}, {"category", "technical"}});
+        QVERIFY(saved.value("ok").toBool());
+        const int ex = saved.value("id").toInt();
+        QCOMPARE(b.exerciseBoard(ex).value("boardId").toInt(), 0);               // aucun terrain au départ
+
+        const QVariantMap created = b.createExerciseBoard(ex);
+        QVERIFY(created.value("ok").toBool());
+        QVERIFY(created.value("created").toBool());
+        const int boardId = created.value("boardId").toInt();
+        QVERIFY(boardId > 0);
+
+        const QVariantMap again = b.createExerciseBoard(ex);                      // pas de deuxième schéma de référence
+        QVERIFY(again.value("ok").toBool());
+        QVERIFY(!again.value("created").toBool());
+        QCOMPARE(again.value("boardId").toInt(), boardId);
+
+        const QVariantMap read = b.exerciseBoard(ex);
+        QCOMPARE(read.value("boardId").toInt(), boardId);
+        QCOMPARE(read.value("title").toString(), QStringLiteral("Rondo test"));
+        QVERIFY(read.value("readable").toBool());
+
+        QVERIFY(!b.createExerciseBoard(424242).value("ok").toBool());            // exercice inconnu
+        QCOMPARE(b.exerciseBoard(424242).value("boardId").toInt(), 0);
+    }
+
+    void seededU10U11ExerciseHasItsBoardThroughTheBackend()
+    {
+        Database fresh;
+        QString error;
+        QVERIFY2(fresh.open(QStringLiteral(":memory:"), &error), qPrintable(error));
+        Backend b(fresh.handle());
+        int found = 0;
+        for (const QVariant &v : b.exercises(false)) {
+            const QVariantMap e = v.toMap();
+            if (!e.value("title").toString().startsWith(QStringLiteral("U10-U11")))
+                continue;
+            ++found;
+            const QVariantMap board = b.exerciseBoard(e.value("id").toInt());
+            QVERIFY2(board.value("boardId").toInt() > 0, qPrintable(e.value("title").toString()));
+            QVERIFY(board.value("readable").toBool());
+            QVERIFY(board.value("json").toString().contains(QStringLiteral("\"items\"")));
+        }
+        QCOMPARE(found, 27);
+    }
+
     void createListRenameDelete()
     {
         Backend b(m_db.handle());

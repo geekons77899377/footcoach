@@ -12,13 +12,36 @@ Item {
     property string errorText: ""
     property var categories: []
 
+    property int boardId: 0                // terrain (schéma de référence) de l'exercice, 0 : aucun
+    property string boardJson: ""
+
     signal closeRequested()
+    signal openBoardRequested(int boardId)
     signal saved()
     signal archiveRequested()
     signal deleteRequested()
 
+    function loadBoard() {
+        var b = exerciseId > 0 ? backend.exerciseBoard(exerciseId) : ({});
+        boardId = b.boardId > 0 ? b.boardId : 0;
+        boardJson = b.json ? b.json : "";
+    }
+
+    function createBoard() {
+        var r = backend.createExerciseBoard(exerciseId);
+        if (!r.ok) {
+            errorText = r.error;
+            scroll.contentY = 0;
+            return;
+        }
+        loadBoard();
+        openBoardRequested(r.boardId);
+    }
+
     function openNew() {
         exerciseId = -1;
+        boardId = 0;
+        boardJson = "";
         archived = false;
         usage = 0;
         errorText = "";
@@ -46,6 +69,7 @@ Item {
         playersMax.text = e.playersMax > 0 ? String(e.playersMax) : "";
         equipment.text = e.equipment;
         description.text = e.description;
+        loadBoard();
         scroll.contentY = 0;
     }
 
@@ -69,6 +93,7 @@ Item {
         if (r.ok) {
             errorText = "";
             exerciseId = r.id;
+            loadBoard();
             saved();
         } else {
             errorText = r.error;
@@ -220,6 +245,35 @@ Item {
                 placeholder: "Organisation, consignes, variantes…"
                 multiline: true
                 maxLength: 2000
+            }
+            Column {
+                visible: root.exerciseId > 0
+                width: parent.width
+                spacing: 8
+                Text {
+                    text: "Terrain"
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    color: Theme.textMuted
+                }
+                BoardThumb {
+                    objectName: "exerciseBoardThumb"
+                    visible: root.boardId > 0
+                    width: parent.width
+                    height: Math.round(width * 0.62)
+                    json: root.boardJson
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.openBoardRequested(root.boardId)
+                    }
+                }
+                AppButton {
+                    objectName: root.boardId > 0 ? "openExerciseBoard" : "createExerciseBoard"
+                    width: parent.width
+                    kind: "outline"
+                    text: root.boardId > 0 ? "Ouvrir le terrain" : "Créer le terrain"
+                    onClicked: root.boardId > 0 ? root.openBoardRequested(root.boardId) : root.createBoard()
+                }
             }
             AppButton {
                 width: parent.width
