@@ -27,7 +27,7 @@ private slots:
         QString error;
         QVERIFY2(m_db.open(m_dir.filePath(QStringLiteral("t.db")), &error), qPrintable(error));
         // Les exemples U10-U11 (migration 008) ont leur propre test : ici on part d'une base sans schéma tactique.
-        QSqlQuery(m_db.handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE title LIKE 'U10-U11%')"));
+        QSqlQuery(m_db.handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11'))"));
 
     }
 
@@ -74,7 +74,7 @@ private slots:
         int found = 0;
         for (const QVariant &v : b.exercises(false)) {
             const QVariantMap e = v.toMap();
-            if (!e.value("title").toString().startsWith(QStringLiteral("U10-U11")))
+            if (e.value("categoryName").toString() != QStringLiteral("U10-U11"))
                 continue;
             ++found;
             const QVariantMap board = b.exerciseBoard(e.value("id").toInt());
@@ -83,6 +83,71 @@ private slots:
             QVERIFY(board.value("json").toString().contains(QStringLiteral("\"items\"")));
         }
         QCOMPARE(found, 27);
+    }
+
+    // Migration 009 : « U10-U11 · » quitte les titres et devient une catégorie.
+    void migration009MovesU10U11FromTitlesToACategory()
+    {
+        Database fresh;
+        QString error;
+        QVERIFY2(fresh.open(QStringLiteral(":memory:"), &error), qPrintable(error));
+        Backend b(fresh.handle());
+        const QVariantList cats = b.categories();
+        QCOMPARE(cats.size(), 1);
+        QCOMPARE(cats.at(0).toMap().value("name").toString(), QStringLiteral("U10-U11"));
+        QCOMPARE(cats.at(0).toMap().value("count").toInt(), 27);
+        int inCategory = 0;
+        for (const QVariant &v : b.exercises(true)) {
+            const QVariantMap e = v.toMap();
+            QVERIFY2(!e.value("title").toString().contains(QStringLiteral("U10-U11")), qPrintable(e.value("title").toString()));
+            if (e.value("categoryId").toInt() > 0)
+                ++inCategory;
+        }
+        QCOMPARE(inCategory, 27);
+        QSqlQuery q(fresh.handle());
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board WHERE title LIKE '%U10-U11%'")) && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+    }
+
+    void categoriesCanBeCreatedRenamedAssignedAndDeleted()
+    {
+        Backend b(m_db.handle());
+        const int seeded = b.categories().size();                 // U10-U11 (migration 009)
+
+        QVERIFY(!b.addCategory(QStringLiteral("   ")).value("ok").toBool());
+        QVERIFY(!b.addCategory(QString(41, QLatin1Char('x'))).value("ok").toBool());
+        QVERIFY(!b.addCategory(QStringLiteral("u10-u11")).value("ok").toBool());          // unique sans tenir compte de la casse
+        const QVariantMap added = b.addCategory(QStringLiteral("  U12   U13 "));
+        QVERIFY(added.value("ok").toBool());
+        const int cat = added.value("id").toInt();
+        QCOMPARE(b.categories().size(), seeded + 1);
+        QVERIFY(!b.addCategory(QStringLiteral("U12 U13")).value("ok").toBool());           // espaces normalisés
+
+        const QVariantMap saved = b.saveExercise({{"title", "Conduite"}, {"category", "technical"}, {"categoryId", cat}});
+        QVERIFY2(saved.value("ok").toBool(), qPrintable(saved.value("error").toString()));
+        QVariantMap mine;
+        for (const QVariant &v : b.exercises(false))
+            if (v.toMap().value("id").toInt() == saved.value("id").toInt())
+                mine = v.toMap();
+        QCOMPARE(mine.value("categoryId").toInt(), cat);
+        QCOMPARE(mine.value("categoryName").toString(), QStringLiteral("U12 U13"));
+        QCOMPARE(mine.value("category").toString(), QStringLiteral("technical"));          // l'activité est indépendante
+
+        QVERIFY(b.renameCategory(cat, QStringLiteral("U12-U13")).value("ok").toBool());
+        QVERIFY(!b.renameCategory(cat, QStringLiteral("U10-U11")).value("ok").toBool());   // déjà prise
+        QVERIFY(!b.renameCategory(987654, QStringLiteral("Autre")).value("ok").toBool());
+
+        // Supprimer la catégorie garde l'exercice, sans catégorie.
+        QVERIFY(b.deleteCategory(cat).value("ok").toBool());
+        QVERIFY(!b.deleteCategory(cat).value("ok").toBool());
+        for (const QVariant &v : b.exercises(false))
+            if (v.toMap().value("id").toInt() == saved.value("id").toInt()) {
+                QCOMPARE(v.toMap().value("categoryId").toInt(), 0);
+                QCOMPARE(v.toMap().value("categoryName").toString(), QString());
+            }
+        // Un exercice sans categoryId reste sans catégorie.
+        const QVariantMap plain = b.saveExercise({{"title", "Sans catégorie"}, {"category", "warmup"}});
+        QVERIFY(plain.value("ok").toBool());
     }
 
     void createListRenameDelete()

@@ -27,7 +27,7 @@ constexpr int kMaxRows = 500000;
 const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("team"),
                              QStringLiteral("player"),         QStringLiteral("training_session"),
                              QStringLiteral("attendance"),     QStringLiteral("football_match"),
-                             QStringLiteral("match_player"),   QStringLiteral("exercise"),
+                             QStringLiteral("match_player"),   QStringLiteral("exercise_category"), QStringLiteral("exercise"),
                              QStringLiteral("session_exercise"), QStringLiteral("tactical_board"),
                              QStringLiteral("injury")};
 
@@ -35,6 +35,14 @@ const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("t
 bool isSchema6Table(const QString &t)
 {
     return t == QLatin1String("club") || t == QLatin1String("football_match") || t == QLatin1String("match_player");
+}
+
+// Schéma de la première version qui contient la table (fichiers plus anciens : table absente, normal).
+int tableSince(const QString &t)
+{
+    if (t == QLatin1String("exercise_category"))
+        return 9;
+    return isSchema6Table(t) ? 6 : 1;
 }
 
 QVariantMap done(bool ok, const QString &error = QString())
@@ -249,7 +257,7 @@ bool Backend::parseDataFile(const QString &url, QJsonObject *root, QString *erro
     int total = 0;
     for (const QString &t : kTables) {
         const QJsonObject o = tables.value(t).toObject();
-        if (fileSchema < 6 && isSchema6Table(t))
+        if (fileSchema < tableSince(t))
             continue;
         if (!o.value(QStringLiteral("columns")).isArray() || !o.value(QStringLiteral("rows")).isArray()) {
             *error = tr("Fichier incomplet (table « %1 » absente).").arg(t);

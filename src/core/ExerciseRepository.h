@@ -17,6 +17,13 @@ public:
     bool setArchived(int id, bool archived, QString *error = nullptr);
     // Suppression définitive. Refusée (false + message) si l'exercice est utilisé dans au moins un plan.
     bool remove(int id, QString *error = nullptr);
+    // Catégories définies par l'utilisateur (triées par nom). Le nom est unique sans tenir compte de la casse.
+    QList<ExerciseCategory> categories(QString *error = nullptr) const;
+    bool addCategory(const QString &name, int *id, QString *error = nullptr);
+    bool renameCategory(int id, const QString &name, QString *error = nullptr);
+    // Supprime la catégorie : ses exercices restent, sans catégorie.
+    bool removeCategory(int id, QString *error = nullptr);
+
     // Nombre de plans de séance qui utilisent cet exercice.
     int usageCount(int id) const;
 

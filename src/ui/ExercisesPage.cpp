@@ -43,14 +43,14 @@ ExercisesPage::ExercisesPage(const QSqlDatabase &db, QWidget *parent)
     m_search->setClearButtonEnabled(true);
 
     m_category = new QComboBox;
-    m_category->addItem(tr("Toutes les catégories"), QString());
+    m_category->addItem(tr("Toutes les activités"), QString());
     for (const auto &e : Labels::categories())
         m_category->addItem(e.second, e.first);
 
     m_showArchived = new QCheckBox(tr("Afficher les exercices archivés"));
 
     m_table = new QTableWidget(0, 5);
-    m_table->setHorizontalHeaderLabels({tr("Exercice"), tr("Catégorie"), tr("Durée"), tr("Joueurs"), tr("Matériel")});
+    m_table->setHorizontalHeaderLabels({tr("Exercice"), tr("Activité"), tr("Durée"), tr("Joueurs"), tr("Matériel")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);

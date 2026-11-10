@@ -75,7 +75,7 @@ SessionsPage::SessionsPage(const QSqlDatabase &db, QWidget *parent)
     m_planTitle->setTextFormat(Qt::RichText);
 
     m_planTable = new QTableWidget(0, 6);
-    m_planTable->setHorizontalHeaderLabels({tr("N°"), tr("Horaire"), tr("Exercice"), tr("Catégorie"), tr("Durée"), tr("Note")});
+    m_planTable->setHorizontalHeaderLabels({tr("N°"), tr("Horaire"), tr("Exercice"), tr("Activité"), tr("Durée"), tr("Note")});
     m_planTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_planTable->setSelectionMode(QAbstractItemView::SingleSelection);
     m_planTable->setEditTriggers(QAbstractItemView::NoEditTriggers);

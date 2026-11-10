@@ -25,12 +25,12 @@ ExercisePicker::ExercisePicker(const QList<Exercise> &exercises, QWidget *parent
     m_search->setClearButtonEnabled(true);
 
     m_category = new QComboBox;
-    m_category->addItem(tr("Toutes les catégories"), QString());
+    m_category->addItem(tr("Toutes les activités"), QString());
     for (const auto &e : Labels::categories())
         m_category->addItem(e.second, e.first);
 
     m_table = new QTableWidget(0, 3);
-    m_table->setHorizontalHeaderLabels({tr("Exercice"), tr("Catégorie"), tr("Durée")});
+    m_table->setHorizontalHeaderLabels({tr("Exercice"), tr("Activité"), tr("Durée")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);

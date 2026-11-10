@@ -12,6 +12,14 @@ namespace {
 const QStringList kCategories = {QStringLiteral("warmup"), QStringLiteral("technical"), QStringLiteral("tactical"),
                                  QStringLiteral("physical"), QStringLiteral("game"), QStringLiteral("cooldown")};
 
+bool categoryExists(const ExerciseRepository &repo, int id)
+{
+    for (const ExerciseCategory &c : repo.categories())
+        if (c.id == id)
+            return true;
+    return false;
+}
+
 QString categoryLabel(const QString &id)
 {
     if (id == QLatin1String("warmup")) return QObject::tr("Échauffement");
@@ -46,6 +54,8 @@ QVariantMap exerciseMap(const Exercise &e, int usage)
     m.insert(QStringLiteral("equipment"), e.equipment);
     m.insert(QStringLiteral("description"), e.description);
     m.insert(QStringLiteral("archived"), e.archived);
+    m.insert(QStringLiteral("categoryId"), e.categoryId);
+    m.insert(QStringLiteral("categoryName"), e.categoryName);
     m.insert(QStringLiteral("usage"), usage);
     return m;
 }
@@ -77,6 +87,46 @@ QVariantList Backend::exerciseCategories() const
     return list;
 }
 
+QVariantList Backend::categories()
+{
+    QVariantList list;
+    QString error;
+    for (const ExerciseCategory &c : m_exercises.categories(&error)) {
+        QVariantMap m;
+        m.insert(QStringLiteral("id"), c.id);
+        m.insert(QStringLiteral("name"), c.name);
+        m.insert(QStringLiteral("count"), c.exerciseCount);
+        list.append(m);
+    }
+    setError(error);
+    return list;
+}
+
+QVariantMap Backend::addCategory(const QString &name)
+{
+    QString error;
+    int id = -1;
+    const bool ok = m_exercises.addCategory(name, &id, &error);
+    setError(ok ? QString() : error);
+    return done(ok, ok ? id : -1, error);
+}
+
+QVariantMap Backend::renameCategory(int id, const QString &name)
+{
+    QString error;
+    const bool ok = m_exercises.renameCategory(id, name, &error);
+    setError(ok ? QString() : error);
+    return done(ok, id, error);
+}
+
+QVariantMap Backend::deleteCategory(int id)
+{
+    QString error;
+    const bool ok = m_exercises.removeCategory(id, &error);
+    setError(ok ? QString() : error);
+    return done(ok, id, error);
+}
+
 QVariantList Backend::exercises(bool includeArchived)
 {
     QVariantList list;
@@ -101,12 +151,15 @@ QVariantMap Backend::saveExercise(const QVariantMap &in)
     e.equipment = in.value(QStringLiteral("equipment")).toString().trimmed();
     e.description = in.value(QStringLiteral("description")).toString().trimmed();
     e.archived = in.value(QStringLiteral("archived"), false).toBool();
+    e.categoryId = in.value(QStringLiteral("categoryId"), 0).toInt();
 
     QString problem;
     if (e.title.isEmpty())
         problem = tr("Le titre est obligatoire.");
     else if (!kCategories.contains(e.category))
-        problem = tr("Catégorie inconnue.");
+        problem = tr("Activité inconnue.");
+    else if (e.categoryId > 0 && !categoryExists(m_exercises, e.categoryId))
+        problem = tr("Cette catégorie n'existe plus.");
     else if (e.durationMin < 0 || e.durationMin > 300)
         problem = tr("La durée doit être comprise entre 1 et 300 minutes.");
     else if (e.playersMin < 0 || e.playersMax < 0 || e.playersMin > 30 || e.playersMax > 30)

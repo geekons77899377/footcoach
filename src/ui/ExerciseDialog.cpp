@@ -64,7 +64,7 @@ ExerciseDialog::ExerciseDialog(const Exercise &initial, QWidget *parent)
 
     auto *form = new QFormLayout;
     form->addRow(tr("Titre *"), m_title);
-    form->addRow(tr("Catégorie *"), m_category);
+    form->addRow(tr("Activité *"), m_category);
     form->addRow(tr("Objectif"), m_objective);
     form->addRow(tr("Durée conseillée"), m_duration);
     form->addRow(tr("Joueurs"), players);

@@ -207,6 +207,7 @@ nouvelle clé étrangère : insertion des parents d'abord, suppression en ordre 
 | 4 | `004_seed_exercises.sql` | exercices de départ | `3b9b2b0` (0.3.0) | réel (0.8.0) |
 | 5 | `005_block_board.sql` | `tactical_board.session_exercise_id` : terrain propre à un bloc de séance (NULL partout pour les données existantes) | 0.10.0 (branche `v1`, non publiée) | produit par le code d'export de la 0.10.0 |
 | 8 | `008_seed_u10_u11_exercises.sql` | 27 exemples d'exercices U10-U11 (GIFE FFF et note de l'éducateur) et leur schéma de terrain de référence (INSERT seulement, aucune colonne ajoutée) | 0.12.0 (branche `v1`, non publiée) | aucun : le format d'export ne change pas, seul le numéro de schéma passe à 8 |
+| 9 | `009_exercise_category.sql` | table `exercise_category` (catégories d'exercices définies par l'utilisateur) et colonne `exercise.category_id` ; les 27 exemples U10-U11 passent dans la catégorie U10-U11 sans leur préfixe | 0.12.0 (branche `v1`, non publiée) | oui : table `exercise_category` et colonne `exercise.category_id` ajoutées à l'export ; le numéro de schéma passe à 9 (format v1 inchangé) |
 
 Les quatre migrations apparaissent dès le premier commit du dépôt : l'historique Git ne permet pas de dire dans quelle
 version de l'application chaque schéma est né, ni lesquels ont été installés sur un appareil. Seul le schéma 4 est

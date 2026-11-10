@@ -213,7 +213,7 @@ private slots:
         QString error;
         QVERIFY2(m_db->open(QStringLiteral(":memory:"), &error), qPrintable(error));
         // Les exemples U10-U11 (migration 008) ont leur propre test : ici on part d'une base sans schéma tactique.
-        QSqlQuery((*m_db).handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE title LIKE 'U10-U11%')"));
+        QSqlQuery((*m_db).handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11'))"));
 
         m_repo = new BoardRepository(m_db->handle());
         m_ex = new ExerciseRepository(m_db->handle());
@@ -245,7 +245,7 @@ private slots:
         QVERIFY(q.exec(QStringLiteral(
             "SELECT e.id, e.title, e.category, b.scene_json FROM exercise e "
             "JOIN tactical_board b ON b.exercise_id = e.id AND b.session_exercise_id IS NULL "
-            "WHERE e.title LIKE 'U10-U11%' ORDER BY e.id")));
+            "WHERE e.category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11') ORDER BY e.id")));
         int n = 0;
         QSet<int> ids;
         while (q.next()) {
@@ -268,14 +268,14 @@ private slots:
         }
         QCOMPARE(n, 27);
         // Une seule fiche de référence par exercice, via le dépôt.
-        QVERIFY(q.exec(QStringLiteral("SELECT id FROM exercise WHERE title LIKE 'U10-U11%'")));
+        QVERIFY(q.exec(QStringLiteral("SELECT id FROM exercise WHERE category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11')")));
         while (q.next())
         {
             BoardRecord rec;
             QVERIFY(seededRepo.referenceForExercise(q.value(0).toInt(), &rec));
             QVERIFY(rec.id > 0);
         }
-        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM exercise WHERE archived = 0 AND title LIKE 'U10-U11%'")) && q.next());
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM exercise WHERE archived = 0 AND category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11')")) && q.next());
         QCOMPARE(q.value(0).toInt(), 27);
     }
 

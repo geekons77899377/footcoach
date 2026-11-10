@@ -7,8 +7,10 @@ Popup {
     id: root
 
     property var exercises: []
+    property var activities: []
     property var categories: []
     property string query: ""
+    property string activityFilter: ""
     property string categoryFilter: ""
     property real navInset: AppState.bottomInset
     signal picked(var exercise)
@@ -18,7 +20,9 @@ Popup {
         var out = [];
         for (var i = 0; i < exercises.length; ++i) {
             var e = exercises[i];
-            if (categoryFilter !== "" && e.category !== categoryFilter)
+            if (activityFilter !== "" && e.category !== activityFilter)
+                continue;
+            if (categoryFilter !== "" && String(e.categoryId) !== categoryFilter)
                 continue;
             if (q !== "" && e.title.toLowerCase().indexOf(q) < 0 && e.objective.toLowerCase().indexOf(q) < 0)
                 continue;
@@ -29,8 +33,10 @@ Popup {
 
     function pick() {
         exercises = backend.exercises(false);
-        categories = backend.exerciseCategories();
+        activities = backend.exerciseCategories();
+        categories = backend.categories();
         query = "";
+        activityFilter = "";
         categoryFilter = "";
         search.text = "";
         open();
@@ -100,13 +106,31 @@ Popup {
             }
         }
         ChipRow {
-            id: chips
+            id: categoryChips
+            visible: root.categories.length > 0
+            height: visible ? implicitHeight : 0
             anchors.top: searchBox.bottom
             anchors.topMargin: 10
             width: parent.width
+            label: "Catégorie"
             value: root.categoryFilter
-            options: root.categories
+            options: {
+                var out = [];
+                for (var i = 0; i < root.categories.length; ++i)
+                    out.push({ id: String(root.categories[i].id), text: root.categories[i].name });
+                return out;
+            }
             onPicked: (id) => root.categoryFilter = id
+        }
+        ChipRow {
+            id: chips
+            anchors.top: categoryChips.bottom
+            anchors.topMargin: 10
+            width: parent.width
+            label: "Activité"
+            value: root.activityFilter
+            options: root.activities
+            onPicked: (id) => root.activityFilter = id
         }
         ListView {
             id: list

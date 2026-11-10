@@ -67,6 +67,10 @@ class Backend(QObject):
         except Exception as e:
             ok = False; err = str(e)
         return {"id": i, "title": b["title"], "readable": ok, "error": err, "json": b["json"] if ok else ""}
+    @Slot(result="QVariantList")
+    def categories(self): return []
+    @Slot(str, result="QVariantMap")
+    def addCategory(self, name): return {"ok": False, "error": "Non simulé."}
     @Slot(int, result="QVariantMap")
     def exerciseBoard(self, ex): return {"boardId": 0}
     @Slot(int, result="QVariantMap")

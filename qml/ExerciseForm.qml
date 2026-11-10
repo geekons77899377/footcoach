@@ -10,7 +10,8 @@ Item {
     property int usage: 0                  // nombre de séances qui l'utilisent
     property bool showBack: true
     property string errorText: ""
-    property var categories: []
+    property var activities: []            // échauffement, technique... [{id, text}]
+    property var categories: []            // catégories définies par l'utilisateur (ex. U10-U11) : [{id, name, count}]
 
     property int boardId: 0                // terrain (schéma de référence) de l'exercice, 0 : aucun
     property string boardJson: ""
@@ -18,6 +19,7 @@ Item {
     signal closeRequested()
     signal openBoardRequested(int boardId)
     signal saved()
+    signal categoryAdded(int id)          // la liste des catégories a changé : l'appelant la recharge
     signal archiveRequested()
     signal deleteRequested()
 
@@ -38,6 +40,27 @@ Item {
         openBoardRequested(r.boardId);
     }
 
+    // Pastilles de la rangée « Catégorie » : les catégories existantes puis « + Nouvelle ».
+    readonly property var categoryOptions: {
+        var out = [];
+        for (var i = 0; i < categories.length; ++i)
+            out.push({ id: String(categories[i].id), text: categories[i].name });
+        out.push({ id: "new", text: "+ Nouvelle" });
+        return out;
+    }
+
+    function createCategory(name) {
+        var r = backend.addCategory(name);
+        if (!r.ok) {
+            errorText = r.error;
+            scroll.contentY = 0;
+            return;
+        }
+        errorText = "";
+        categoryAdded(r.id);
+        categoryRow.value = String(r.id);
+    }
+
     function openNew() {
         exerciseId = -1;
         boardId = 0;
@@ -46,7 +69,8 @@ Item {
         usage = 0;
         errorText = "";
         titleField.text = "";
-        category.value = "technical";
+        activity.value = "technical";
+        categoryRow.value = "";
         objective.text = "";
         duration.text = "";
         playersMin.text = "";
@@ -62,7 +86,8 @@ Item {
         usage = e.usage;
         errorText = "";
         titleField.text = e.title;
-        category.value = e.category;
+        activity.value = e.category;
+        categoryRow.value = e.categoryId > 0 ? String(e.categoryId) : "";
         objective.text = e.objective;
         duration.text = e.durationMin > 0 ? String(e.durationMin) : "";
         playersMin.text = e.playersMin > 0 ? String(e.playersMin) : "";
@@ -86,7 +111,8 @@ Item {
             return;
         }
         var r = backend.saveExercise({
-            id: exerciseId, title: titleField.text, category: category.value || "technical",
+            id: exerciseId, title: titleField.text,
+            category: activity.value || "technical", categoryId: categoryRow.value === "" ? 0 : parseInt(categoryRow.value, 10),
             objective: objective.text, durationMin: d, playersMin: a, playersMax: b,
             equipment: equipment.text, description: description.text, archived: archived
         });
@@ -192,11 +218,27 @@ Item {
             }
             FormField { id: titleField; width: parent.width; label: "Titre"; required: true; maxLength: 100 }
             ChipRow {
-                id: category
+                id: categoryRow
                 width: parent.width
                 label: "Catégorie"
+                options: root.categoryOptions
+                onPicked: (id) => {
+                    if (id === "new") {
+                        value = previous;          // « + Nouvelle » n'est pas une catégorie : on garde le choix actuel
+                        newCategory.ask("Nouvelle catégorie", "", false, 40);
+                    } else {
+                        previous = id;
+                    }
+                }
+                property string previous: ""
+                onValueChanged: if (value !== "new") previous = value
+            }
+            ChipRow {
+                id: activity
+                width: parent.width
+                label: "Activité"
                 allowClear: false
-                options: root.categories
+                options: root.activities
             }
             FormField {
                 id: objective
@@ -283,5 +325,10 @@ Item {
                 onClicked: root.save()
             }
         }
+    }
+
+    PromptDialog {
+        id: newCategory
+        onAccepted: (text) => root.createCategory(text)
     }
 }

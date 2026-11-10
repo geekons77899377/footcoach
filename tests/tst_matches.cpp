@@ -45,7 +45,7 @@ private slots:
         QString error;
         QVERIFY2(m_db.open(QStringLiteral(":memory:"), &error), qPrintable(error));
         // Les exemples U10-U11 (migration 008) ont leur propre test : ici on part d'une base sans schéma tactique.
-        QSqlQuery(m_db.handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE title LIKE 'U10-U11%')"));
+        QSqlQuery(m_db.handle()).exec(QStringLiteral("DELETE FROM tactical_board WHERE exercise_id IN (SELECT id FROM exercise WHERE category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11'))"));
 
         TeamRepository teams(m_db.handle());
         Team t;

@@ -80,6 +80,7 @@ set(SQL_MIGRATIONS
     sql/006_club_match.sql
     sql/007_player_photo_licence.sql
     sql/008_seed_u10_u11_exercises.sql
+    sql/009_exercise_category.sql
 )
 
 qt_add_executable(FootCoachWidgets WIN32

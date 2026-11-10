@@ -159,6 +159,12 @@ public:
     // Bibliothèque triée par titre : [{id, title, category, categoryLabel, objective, durationMin, playersMin,
     // playersMax, equipment, description, archived, usage}] ; les archivés seulement sur demande.
     Q_INVOKABLE QVariantList exercises(bool includeArchived);
+    // Catégories d'exercices définies par l'utilisateur (ex. U10-U11) : [{id, name, count}] ; « Activité » (échauffement,
+    // technique...) reste exerciseCategories(). saveExercise accepte categoryId (0 : aucune).
+    Q_INVOKABLE QVariantList categories();
+    Q_INVOKABLE QVariantMap addCategory(const QString &name);              // {ok, id, error}
+    Q_INVOKABLE QVariantMap renameCategory(int id, const QString &name);
+    Q_INVOKABLE QVariantMap deleteCategory(int id);                        // les exercices restent, sans catégorie
     Q_INVOKABLE QVariantMap saveExercise(const QVariantMap &exercise);   // id < 0 : création
     Q_INVOKABLE QVariantMap setExerciseArchived(int id, bool archived);
     Q_INVOKABLE QVariantMap deleteExercise(int id);      // refusé si l'exercice est dans un plan

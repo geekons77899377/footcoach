@@ -65,6 +65,16 @@ struct Exercise
     QString equipment;
     QString description;
     bool archived = false;
+    int categoryId = 0;         // catégorie définie par l'utilisateur (ex. U10-U11), 0 = aucune
+    QString categoryName;       // renseigné à la lecture
+};
+
+// Catégorie d'exercices définie par l'utilisateur.
+struct ExerciseCategory
+{
+    int id = -1;
+    QString name;
+    int exerciseCount = 0;      // exercices (archivés compris) qui la portent
 };
 
 // Une ligne du plan d'une séance : un exercice de la bibliothèque, à une position, avec sa durée du jour.

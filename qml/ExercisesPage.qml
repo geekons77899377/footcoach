@@ -9,10 +9,12 @@ Item {
 
     signal openBoard(int boardId)      // ouvre le terrain de l'exercice dans la section Tactique
 
-    property var categories: []
+    property var activities: []        // échauffement, technique...
+    property var categories: []        // catégories de l'utilisateur (ex. U10-U11) : [{id, name, count}]
     property var exercises: []
     property string query: ""
-    property string categoryFilter: ""
+    property string activityFilter: ""
+    property string categoryFilter: ""     // id de la catégorie choisie, "" : toutes
     property bool showArchived: false
     property int currentId: -1
     property bool editing: false
@@ -28,7 +30,9 @@ Item {
         var out = [];
         for (var i = 0; i < exercises.length; ++i) {
             var e = exercises[i];
-            if (categoryFilter !== "" && e.category !== categoryFilter)
+            if (activityFilter !== "" && e.category !== activityFilter)
+                continue;
+            if (categoryFilter !== "" && String(e.categoryId) !== categoryFilter)
                 continue;
             if (q !== "" && e.title.toLowerCase().indexOf(q) < 0 && e.objective.toLowerCase().indexOf(q) < 0)
                 continue;
@@ -38,7 +42,15 @@ Item {
     }
 
     function refresh() {
-        categories = backend.exerciseCategories();
+        activities = backend.exerciseCategories();
+        categories = backend.categories();
+        if (categoryFilter !== "") {          // catégorie supprimée entre-temps : plus de filtre
+            var found = false;
+            for (var i = 0; i < categories.length; ++i)
+                found = found || String(categories[i].id) === categoryFilter;
+            if (!found)
+                categoryFilter = "";
+        }
         exercises = backend.exercises(showArchived);
     }
 
@@ -196,10 +208,26 @@ Item {
                 }
             }
             ChipRow {
+                objectName: "categoryFilterRow"
+                visible: page.categories.length > 0
                 width: parent.width
+                label: "Catégorie"
                 value: page.categoryFilter
-                options: page.categories
+                options: {
+                    var out = [];
+                    for (var i = 0; i < page.categories.length; ++i)
+                        out.push({ id: String(page.categories[i].id), text: page.categories[i].name });
+                    return out;
+                }
                 onPicked: (id) => page.categoryFilter = id
+            }
+            ChipRow {
+                objectName: "activityFilterRow"
+                width: parent.width
+                label: "Activité"
+                value: page.activityFilter
+                options: page.activities
+                onPicked: (id) => page.activityFilter = id
             }
             Row {
                 spacing: 10
@@ -280,7 +308,10 @@ Item {
                         font.pixelSize: 13
                         color: Theme.textMuted
                         text: {
-                            var parts = [row.modelData.categoryLabel];
+                            var parts = [];
+                            if (row.modelData.categoryName)
+                                parts.push(row.modelData.categoryName);
+                            parts.push(row.modelData.categoryLabel);
                             if (row.modelData.durationMin > 0)
                                 parts.push(row.modelData.durationMin + " min");
                             var p = page.players(row.modelData);
@@ -386,7 +417,8 @@ Item {
                             font.weight: Font.Bold
                             font.letterSpacing: 1
                             color: cell.tint
-                            text: (cell.modelData.categoryLabel + "").toUpperCase()
+                            text: ((cell.modelData.categoryName ? cell.modelData.categoryName + "  ·  " : "")
+                                   + cell.modelData.categoryLabel + "").toUpperCase()
                                   + (cell.modelData.durationMin > 0 ? "  ·  " + cell.modelData.durationMin + " MIN" : "")
                                   + (cell.modelData.archived ? "  ·  ARCHIVÉ" : "")
                         }
@@ -486,7 +518,9 @@ Item {
 
     ExerciseForm {
         id: form
+        activities: page.activities
         categories: page.categories
+        onCategoryAdded: page.categories = backend.categories()
         x: page.split ? page.listWidth : 0
         width: page.width - x
         height: page.height
