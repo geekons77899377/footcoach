@@ -150,6 +150,62 @@ private slots:
         QVERIFY(plain.value("ok").toBool());
     }
 
+    // Ajouter au plan un exercice qui a un terrain préconfiguré recopie ce terrain dans le bloc (copie indépendante).
+    void addingAnExerciseToThePlanCopiesItsReferenceBoard()
+    {
+        Database fresh;                       // base neuve : les 27 exemples et leurs terrains (migration 008) sont là
+        QString openError;
+        QVERIFY2(fresh.open(QStringLiteral(":memory:"), &openError), qPrintable(openError));
+        Backend b(fresh.handle());
+        const int team = b.saveTeam({{"name", "U11"}}).value("id").toInt();
+        const int sess = b.saveSession({{"teamId", team}, {"date", "2026-11-11"}, {"time", "18:30"},
+                                        {"durationMin", 90}}, false).value("id").toInt();
+        int theme24 = -1;
+        for (const QVariant &v : b.exercises(true))
+            if (v.toMap().value("title").toString().startsWith(QStringLiteral("Thème 24")))
+                theme24 = v.toMap().value("id").toInt();
+        QVERIFY(theme24 > 0);
+        const QVariantMap ref = b.exerciseBoard(theme24);
+        QVERIFY(ref.value("boardId").toInt() > 0);
+        const int refId = ref.value("boardId").toInt();
+        const QString refJson = ref.value("json").toString();
+        QVERIFY(!refJson.isEmpty());
+
+        const QVariantMap added = b.addToPlan(sess, theme24, 0);
+        QVERIFY(added.value("ok").toBool());
+        QVERIFY(added.value("boardCopied").toBool());
+        QVariantMap row = b.plan(sess).value("entries").toList().at(0).toMap();
+        const int blockBoard = row.value("boardId").toInt();
+        QVERIFY(blockBoard > 0);
+        QVERIFY(blockBoard != refId);
+        QVERIFY(row.value("boardReadable").toBool());
+        QCOMPARE(row.value("boardJson").toString(), refJson);
+
+        // Copie indépendante : modifier le terrain de la séance ne touche pas celui de l'exercice.
+        QVERIFY(b.saveBoard(blockBoard, QStringLiteral("{\"version\":1,\"pitch\":\"half\",\"items\":[],\"arrows\":[]}")));
+        QCOMPARE(b.exerciseBoard(theme24).value("json").toString(), refJson);
+
+        // Deux ajouts du même exercice : deux terrains de bloc distincts.
+        QVERIFY(b.addToPlan(sess, theme24, 0).value("boardCopied").toBool());
+        const QVariantList rows = b.plan(sess).value("entries").toList();
+        QVERIFY(rows.at(1).toMap().value("boardId").toInt() > 0);
+        QVERIFY(rows.at(1).toMap().value("boardId").toInt() != blockBoard);
+
+        // Exercice sans terrain de référence : pas de terrain, comme avant.
+        const int plain = b.saveExercise({{"title", "Sans terrain"}, {"category", "game"}}).value("id").toInt();
+        const QVariantMap plainAdded = b.addToPlan(sess, plain, 10);
+        QVERIFY(plainAdded.value("ok").toBool());
+        QVERIFY(!plainAdded.value("boardCopied").toBool());
+        QCOMPARE(b.plan(sess).value("entries").toList().at(2).toMap().value("boardId").toInt(), -1);
+
+        // Bloc créé avant que l'exercice ait un terrain : « Ajouter un terrain » recopie le terrain devenu disponible.
+        QVERIFY(b.createExerciseBoard(plain).value("ok").toBool());
+        const int plainItem = plainAdded.value("id").toInt();
+        const QVariantMap made = b.createBlockBoard(plainItem);
+        QVERIFY(made.value("ok").toBool());
+        QVERIFY(made.value("boardId").toInt() > 0);
+    }
+
     void createListRenameDelete()
     {
         Backend b(m_db.handle());

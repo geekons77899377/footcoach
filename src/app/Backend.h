@@ -210,6 +210,7 @@ signals:
 
 private:
     QByteArray buildExport(int *schema = nullptr);
+    bool createBlockBoardFor(int itemId, int exerciseId, const QString &title, QString *error);
     bool parseDataFile(const QString &url, QJsonObject *root, QString *error) const;
     QVariantMap countsOfDatabase();
     bool find(int id, BoardRecord *out);

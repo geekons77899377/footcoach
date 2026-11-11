@@ -272,6 +272,25 @@ QVariantMap Backend::plan(int sessionId)
     return out;
 }
 
+// Crée le terrain du bloc `itemId`. S'il existe un schéma de référence lisible pour l'exercice, le bloc en reçoit une COPIE
+// (modifier le terrain de la séance ne change pas l'exercice, et inversement) ; sinon le terrain est vide.
+bool Backend::createBlockBoardFor(int itemId, int exerciseId, const QString &title, QString *error)
+{
+    BoardRecord record;
+    record.title = title.trimmed().isEmpty() ? tr("Terrain") : title.trimmed();
+    record.sessionExerciseId = itemId;
+    BoardRecord reference;
+    QString lookupError;
+    if (exerciseId > 0 && m_repo.referenceForExercise(exerciseId, &reference, &lookupError)) {
+        Tactics::Board parsed;
+        if (Tactics::fromJson(reference.sceneJson, &parsed)) {      // un schéma illisible n'est jamais recopié
+            record.sceneJson = Tactics::toJson(parsed);
+            record.formation = reference.formation;
+        }
+    }
+    return m_repo.insert(record, error);
+}
+
 QVariantMap Backend::addToPlan(int sessionId, int exerciseId, int durationMin)
 {
     QString error;
@@ -293,7 +312,28 @@ QVariantMap Backend::addToPlan(int sessionId, int exerciseId, int durationMin)
 
     const int id = m_plan.add(sessionId, exerciseId, minutes, QString(), &error);
     setError(id > 0 ? QString() : error);
-    return done(id > 0, id, error);
+    QVariantMap result = done(id > 0, id, error);
+    if (id > 0) {
+        // Le terrain préconfiguré de l'exercice, s'il en a un, est recopié dans le bloc. Un échec n'annule pas l'ajout
+        // (le bloc reste utilisable, « Ajouter un terrain » permet de réessayer) mais il est signalé.
+        bool hasReference = false;
+        BoardRecord reference;
+        hasReference = m_repo.referenceForExercise(exerciseId, &reference, nullptr);
+        if (hasReference) {
+            QString boardError;
+            QString title;
+            for (const Exercise &e : m_exercises.list(true, nullptr))
+                if (e.id == exerciseId)
+                    title = e.title;
+            const bool copied = createBlockBoardFor(id, exerciseId, title, &boardError);
+            result.insert(QStringLiteral("boardCopied"), copied);
+            if (!copied)
+                result.insert(QStringLiteral("boardError"), boardError);
+        } else {
+            result.insert(QStringLiteral("boardCopied"), false);
+        }
+    }
+    return result;
 }
 
 QVariantMap Backend::createBlockBoard(int itemId)
@@ -331,17 +371,21 @@ QVariantMap Backend::createBlockBoard(int itemId)
     }
 
     QString title = tr("Terrain");
+    int exerciseId = -1;
     for (const PlanEntry &e : m_plan.entries(sessionId, nullptr))
-        if (e.itemId == itemId && !e.exercise.title.trimmed().isEmpty())
-            title = e.exercise.title.trimmed();
+        if (e.itemId == itemId) {
+            exerciseId = e.exercise.id;
+            if (!e.exercise.title.trimmed().isEmpty())
+                title = e.exercise.title.trimmed();
+        }
 
-    BoardRecord record;
-    record.title = title;
-    record.sessionExerciseId = itemId;
-    if (!m_repo.insert(record, &error)) {
+    // Blocs ajoutés avant que le terrain de l'exercice soit recopié : « Ajouter un terrain » le recopie aussi.
+    if (!createBlockBoardFor(itemId, exerciseId, title, &error)) {
         setError(error);
         return done(false, itemId, error);
     }
+    BoardRecord record;
+    m_repo.forBlock(itemId, &record, nullptr);
     setError(QString());
     QVariantMap m = done(true, itemId);
     m.insert(QStringLiteral("boardId"), record.id);

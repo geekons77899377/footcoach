@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## Non publié — correction : le terrain préconfiguré suit l'exercice dans le plan de séance
+- Ajouter à une séance un exercice qui a un terrain préconfiguré (par exemple un des exemples U10-U11) **recopie ce terrain dans le bloc** ; avant, le bloc n'avait aucun terrain et il fallait en créer un vide à la main. Le terrain du bloc est une **copie** : le modifier ne change pas l'exercice, et inversement. Un exercice sans terrain de référence se comporte comme avant.
+- Les blocs déjà présents dans des séances (ajoutés avant la correction) ne sont pas modifiés automatiquement : « Ajouter un terrain » sur le bloc recopie désormais le terrain de l'exercice au lieu de créer un terrain vide.
+- Un terrain de référence illisible n'est jamais recopié (le bloc reçoit alors un terrain vide).
+- Test : `addingAnExerciseToThePlanCopiesItsReferenceBoard` (backend réel, base neuve avec les exemples). Non vérifié sur appareil.
+
 ## Non publié — catégories d'exercices (« U10-U11 » et suivantes) et « Activité » (schéma 9)
 - Nouvelle notion de **Catégorie** d'exercice, définie par l'utilisateur : **U10-U11** est la première ; on en crée d'autres depuis la fiche d'un exercice (pastille **« + Nouvelle »**). L'ancienne « Catégorie » (échauffement, technique, tactique, physique, jeu, retour au calme) s'appelle désormais **« Activité »** (écrans QML et ancienne interface Widgets). Un exercice a une activité (obligatoire) et peut avoir une catégorie (facultative).
 - Bibliothèque et choix d'exercice d'une séance : filtres **Catégorie** (affiché seulement s'il y en a) et **Activité**, combinables ; le nom de la catégorie figure dans la ligne de l'exercice.
