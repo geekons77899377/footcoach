@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
         QStringLiteral("buildInfo"),
         QVariantMap{{QStringLiteral("version"), QStringLiteral(FOOTCOACH_VERSION)},
                     {QStringLiteral("sha1"), sha},
-                    {QStringLiteral("shortSha"), sha.left(8)},
+                    {QStringLiteral("shortSha"), sha.left(7)},
                     {QStringLiteral("dirty"), FOOTCOACH_GIT_DIRTY != 0}});
     engine.rootContext()->setContextProperty(QStringLiteral("startupError"),
                                              opened ? QString() : QObject::tr("Impossible d'ouvrir la base de données :\n%1").arg(error));

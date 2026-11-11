@@ -1,5 +1,8 @@
 # Journal des modifications
 
+## Non publié — révision entre parenthèses dans le champ « Version »
+- Paramètres > Version affiche désormais « FootCoach 0.10.0 (2eb040d) » : les 7 premiers caractères du SHA-1, « , modifié » si des fichiers suivis n'étaient pas commités à la compilation. Le SHA-1 complet est en sous-titre de la même ligne. La ligne séparée « Révision (SHA-1) » disparaît.
+
 ## Non publié — SHA-1 du commit affiché avec la version
 - Paramètres > Informations : nouvelle ligne **« Révision (SHA-1) »** avec le SHA-1 complet (40 caractères) du commit compilé ; « modifications non commitées » est ajouté si des fichiers suivis étaient modifiés au moment de la compilation. « inconnu » si git n'est pas disponible ou hors dépôt.
 - Le SHA est recalculé à **chaque compilation** (`cmake/GitRevision.cmake`, cible `footcoach_git_revision`), pas seulement à la configuration, et l'en-tête généré n'est réécrit que s'il change. La version (`0.10.0`) est inchangée.

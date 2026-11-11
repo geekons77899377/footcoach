@@ -199,14 +199,11 @@ Item {
                         SettingRow {
                             objectName: "rowVersion"
                             icon: "info"; title: "Version"; chevron: false
-                            trailing: "FootCoach " + Qt.application.version
-                        }
-                        Rectangle { width: parent.width; height: 1; color: Theme.borderSubtle }
-                        SettingRow {
-                            objectName: "rowRevision"
-                            icon: "info"; title: "Révision (SHA-1)"; chevron: false
+                            // Révision git entre parenthèses ; le SHA-1 complet est en sous-titre.
+                            trailing: "FootCoach " + Qt.application.version + " (" + buildInfo.shortSha
+                                      + (buildInfo.dirty ? ", modifié" : "") + ")"
                             subtitleLines: buildInfo.dirty ? 3 : 2
-                            subtitle: buildInfo.sha1 + (buildInfo.dirty ? " (modifications non commitées)" : "")
+                            subtitle: "SHA-1 " + buildInfo.sha1 + (buildInfo.dirty ? " (modifications non commitées)" : "")
                         }
                         Rectangle { width: parent.width; height: 1; color: Theme.borderSubtle }
                         SettingRow {

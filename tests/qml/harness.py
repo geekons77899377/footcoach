@@ -236,7 +236,7 @@ class Harness:
         ctx.setContextProperty("backend", self.backend)
         self.reporter = reporter or IssueReporter()
         ctx.setContextProperty("issueReporter", self.reporter)
-        ctx.setContextProperty("buildInfo", {"version": "0.0.0", "sha1": "0123456789abcdef0123456789abcdef01234567", "shortSha": "01234567", "dirty": False})
+        ctx.setContextProperty("buildInfo", {"version": "0.0.0", "sha1": "0123456789abcdef0123456789abcdef01234567", "shortSha": "0123456", "dirty": False})
         ctx.setContextProperty("startupError", "")
         self.engine.addImportPath(RUN)
         self.engine.load(QUrl.fromLocalFile(os.path.join(RUN, "Main.qml")))
