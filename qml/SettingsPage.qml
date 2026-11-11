@@ -41,9 +41,10 @@ Item {
         property string subtitle: ""
         property string trailing: ""          // texte à droite (sinon chevron)
         property bool chevron: true
+        property int subtitleLines: 1         // > 1 : le sous-titre passe à la ligne (texte long sans espaces, ex. SHA-1)
         signal activated()
         width: parent.width
-        height: 64
+        height: 64 + (subtitleLines - 1) * 16
         Rectangle {
             id: ic
             anchors.left: parent.left
@@ -75,6 +76,8 @@ Item {
                 visible: row.subtitle !== ""
                 width: parent.width
                 elide: Text.ElideRight
+                wrapMode: row.subtitleLines > 1 ? Text.WrapAnywhere : Text.NoWrap
+                maximumLineCount: row.subtitleLines
                 text: row.subtitle
                 font.pixelSize: 12
                 color: Theme.textMuted
@@ -197,6 +200,13 @@ Item {
                             objectName: "rowVersion"
                             icon: "info"; title: "Version"; chevron: false
                             trailing: "FootCoach " + Qt.application.version
+                        }
+                        Rectangle { width: parent.width; height: 1; color: Theme.borderSubtle }
+                        SettingRow {
+                            objectName: "rowRevision"
+                            icon: "info"; title: "Révision (SHA-1)"; chevron: false
+                            subtitleLines: buildInfo.dirty ? 3 : 2
+                            subtitle: buildInfo.sha1 + (buildInfo.dirty ? " (modifications non commitées)" : "")
                         }
                         Rectangle { width: parent.width; height: 1; color: Theme.borderSubtle }
                         SettingRow {

@@ -9,6 +9,7 @@
 #include "app/Backend.h"
 #include "app/IssueReporter.h"
 #include "core/Database.h"
+#include "git_revision.h"
 
 int main(int argc, char *argv[])
 {
@@ -41,6 +42,14 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("issueReporter"), &issueReporter);
     engine.rootContext()->setContextProperty(QStringLiteral("backend"), backend.data());
+    // Version et révision git compilées : { version, sha1 (40 caractères ou « inconnu »), shortSha, dirty }.
+    const QString sha = QStringLiteral(FOOTCOACH_GIT_SHA);
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("buildInfo"),
+        QVariantMap{{QStringLiteral("version"), QStringLiteral(FOOTCOACH_VERSION)},
+                    {QStringLiteral("sha1"), sha},
+                    {QStringLiteral("shortSha"), sha.left(8)},
+                    {QStringLiteral("dirty"), FOOTCOACH_GIT_DIRTY != 0}});
     engine.rootContext()->setContextProperty(QStringLiteral("startupError"),
                                              opened ? QString() : QObject::tr("Impossible d'ouvrir la base de données :\n%1").arg(error));
 

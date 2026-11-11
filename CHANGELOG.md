@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## Non publié — SHA-1 du commit affiché avec la version
+- Paramètres > Informations : nouvelle ligne **« Révision (SHA-1) »** avec le SHA-1 complet (40 caractères) du commit compilé ; « modifications non commitées » est ajouté si des fichiers suivis étaient modifiés au moment de la compilation. « inconnu » si git n'est pas disponible ou hors dépôt.
+- Le SHA est recalculé à **chaque compilation** (`cmake/GitRevision.cmake`, cible `footcoach_git_revision`), pas seulement à la configuration, et l'en-tête généré n'est réécrit que s'il change. La version (`0.10.0`) est inchangée.
+- Test : `t_support.py` (SHA affiché, interface, backend simulé). Le script CMake est vérifié seul (SHA, indicateur de modifications, absence de git, pas de réécriture inutile). **Non vérifié :** le câblage CMake complet et la compilation de `main_qml.cpp` (cible Qt 6.9 non compilable ici), l'affichage sur appareil.
+
 ## Non publié — correction : le terrain préconfiguré suit l'exercice dans le plan de séance
 - Ajouter à une séance un exercice qui a un terrain préconfiguré (par exemple un des exemples U10-U11) **recopie ce terrain dans le bloc** ; avant, le bloc n'avait aucun terrain et il fallait en créer un vide à la main. Le terrain du bloc est une **copie** : le modifier ne change pas l'exercice, et inversement. Un exercice sans terrain de référence se comporte comme avant.
 - Les blocs déjà présents dans des séances (ajoutés avant la correction) ne sont pas modifiés automatiquement : « Ajouter un terrain » sur le bloc recopie désormais le terrain de l'exercice au lieu de créer un terrain vide.
