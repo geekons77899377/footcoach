@@ -202,12 +202,13 @@ if(FOOTCOACH_HAVE_QML)
         RESOURCES ${FONT_FILES_PATHS}
     )
 
-    # SHA-1 du commit compilé, recalculé à chaque compilation (en-tête généré, affiché dans Paramètres > Version).
-    add_custom_target(footcoach_git_revision ALWAYS
+    # SHA-1 du commit compilé, recalculé à chaque compilation (une cible personnalisée sans sortie déclarée est toujours
+    # exécutée) ; en-tête généré, affiché dans Paramètres > Version.
+    add_custom_target(footcoach_git_revision
         COMMAND ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_SOURCE_DIR} -DOUT=${CMAKE_BINARY_DIR}/generated/git_revision.h
                 -P ${CMAKE_SOURCE_DIR}/cmake/GitRevision.cmake
         BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/git_revision.h
-        COMMENT "Révision git"
+        COMMENT "Revision git"
         VERBATIM)
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated)
     add_dependencies(FootCoach footcoach_git_revision)
