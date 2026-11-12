@@ -12,7 +12,11 @@ Item {
 
     property var teams: []
     property int teamId: AppState.teamId           // partagé avec les autres pages
-    onTeamIdChanged: if (AppState.teamId !== teamId) AppState.teamId = teamId
+    onTeamIdChanged: {
+        clearSelection();
+        if (AppState.teamId !== teamId)
+            AppState.teamId = teamId;
+    }
     Connections {
         target: AppState
         function onTeamIdChanged() {
@@ -29,6 +33,19 @@ Item {
     property bool showInactive: false
     property int currentId: -1            // joueur ouvert (-1 : aucun)
     property bool editing: false          // fiche ouverte (joueur existant ou nouveau)
+    // Sélection multiple (appui long sur un joueur) : cases à cocher puis suppression groupée.
+    property bool selecting: false
+    property var selected: ({})           // id -> true
+    readonly property int selectedCount: Object.keys(selected).length
+    readonly property bool allShownSelected: {
+        var list = shown;
+        if (list.length === 0)
+            return false;
+        for (var i = 0; i < list.length; ++i)
+            if (!selected[list[i].id])
+                return false;
+        return true;
+    }
     readonly property bool split: width >= 900
     readonly property int listWidth: 380
     // Tablette (page trop étroite pour liste + fiche) sans fiche ouverte : grille de cartes joueurs.
@@ -109,6 +126,59 @@ Item {
         overview = { count: n, avgAge: ageN > 0 ? Math.round(ageSum / ageN) : -1, byPosition: by, rate: rate, top: top };
     }
 
+    function startSelection(p) {
+        if (page.editing)
+            page.closeForm();
+        var m = {};
+        m[p.id] = true;
+        selected = m;
+        selecting = true;
+    }
+    function toggleSelected(id) {
+        var m = Object.assign({}, selected);
+        if (m[id])
+            delete m[id];
+        else
+            m[id] = true;
+        selected = m;
+    }
+    function selectAllShown(on) {
+        var m = Object.assign({}, selected);
+        for (var i = 0; i < shown.length; ++i) {
+            if (on)
+                m[shown[i].id] = true;
+            else
+                delete m[shown[i].id];
+        }
+        selected = m;
+    }
+    function clearSelection() {
+        selecting = false;
+        selected = {};
+    }
+    function askDeleteSelected() {
+        var n = selectedCount;
+        if (n === 0)
+            return;
+        confirm.action = "deletePlayers";
+        confirm.confirm(n > 1 ? "Supprimer " + n + " joueurs ?" : "Supprimer 1 joueur ?",
+                        (n > 1 ? "Ces joueurs seront supprimés définitivement, avec leurs présences, leurs blessures et leurs photos."
+                               : "Ce joueur sera supprimé définitivement, avec ses présences, ses blessures et sa photo.")
+                        + "\n\nPour garder l'historique des présences, désactivez plutôt les joueurs qui ont quitté l'équipe.",
+                        "Supprimer", true);
+    }
+    function deleteSelected() {
+        var ids = Object.keys(selected).map(function (k) { return parseInt(k); });
+        var r = backend.deletePlayers(ids);
+        if (r.ok) {
+            clearSelection();
+            refreshTeams();
+            toast.show(r.removed > 1 ? r.removed + " joueurs supprimés" : "Joueur supprimé");
+        } else {
+            toast.show(r.error);
+        }
+    }
+
     function openPlayer(p) {
         currentId = p.id;
         form.openPlayer(p);
@@ -128,6 +198,10 @@ Item {
 
     // Bouton retour du téléphone : ferme la fiche ouverte. Retourne true si la page a utilisé le geste.
     function goBack() {
+        if (selecting) {
+            clearSelection();
+            return true;
+        }
         if (!editing)
             return false;
         closeForm();
@@ -182,7 +256,9 @@ Item {
         id: confirm
         property string action: ""
         onAccepted: {
-            if (action === "deletePlayer") {
+            if (action === "deletePlayers") {
+                page.deleteSelected();
+            } else if (action === "deletePlayer") {
                 var r = backend.deletePlayer(page.currentId);
                 if (r.ok) {
                     page.closeForm();
@@ -353,6 +429,102 @@ Item {
             }
         }
 
+        // Barre de sélection : remplace l'en-tête pendant la sélection multiple.
+        Rectangle {
+            id: selectionBar
+            objectName: "selectionBar"
+            visible: page.selecting
+            anchors.fill: listHeader
+            z: 3
+            color: Theme.bg
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.border
+            }
+            MouseArea { anchors.fill: parent }        // l'en-tête dessous ne reçoit rien
+            IconButton {
+                id: selClose
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.gutter - 6
+                anchors.verticalCenter: parent.verticalCenter
+                iconName: "close"
+                accessibleName: "Annuler la sélection"
+                onClicked: page.clearSelection()
+            }
+            Column {
+                anchors.left: selClose.right
+                anchors.leftMargin: 8
+                anchors.right: selAll.left
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+                Text {
+                    objectName: "selectionCount"
+                    width: parent.width
+                    elide: Text.ElideRight
+                    text: page.selectedCount === 0 ? "Aucun joueur"
+                          : page.selectedCount + (page.selectedCount > 1 ? " sélectionnés" : " sélectionné")
+                    font.family: Theme.fontHeading
+                    font.pixelSize: 22
+                    font.weight: Font.Bold
+                    color: Theme.text
+                }
+                Text {
+                    width: parent.width
+                    elide: Text.ElideRight
+                    text: "Touchez les joueurs à supprimer"
+                    font.pixelSize: 12
+                    color: Theme.textMuted
+                }
+            }
+            Rectangle {
+                id: selAll
+                objectName: "selectAllButton"
+                anchors.right: trashButton.left
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                height: 36
+                width: selAllText.implicitWidth + 24
+                radius: 18
+                color: selAllArea.pressed ? Theme.surfaceHi : Theme.surface
+                border.width: 1
+                border.color: Theme.border
+                Accessible.role: Accessible.Button
+                Accessible.name: selAllText.text
+                Text {
+                    id: selAllText
+                    anchors.centerIn: parent
+                    text: page.allShownSelected ? "Aucun" : "Tous"
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    color: Theme.text
+                }
+                MouseArea {
+                    id: selAllArea
+                    anchors.fill: parent
+                    onClicked: page.selectAllShown(!page.allShownSelected)
+                }
+            }
+            IconButton {
+                id: trashButton
+                objectName: "deleteSelectedButton"
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.gutter
+                anchors.verticalCenter: parent.verticalCenter
+                enabled: page.selectedCount > 0
+                iconName: "trash"
+                iconColor: Theme.text
+                fillColor: Theme.danger
+                diameter: 48
+                glow: true
+                accessibleName: "Supprimer les joueurs sélectionnés"
+                onClicked: page.askDeleteSelected()
+            }
+        }
+
         Column {
             id: filters
             visible: page.team !== null
@@ -437,10 +609,12 @@ Item {
             delegate: Card {
                 id: row
                 required property var modelData
+                objectName: "playerRow"
                 width: list.width - list.leftMargin - list.rightMargin
                 height: 72
                 padding: 12
-                highlighted: page.split && page.editing && page.currentId === modelData.id
+                highlighted: (page.split && page.editing && page.currentId === modelData.id)
+                             || (page.selecting && page.selected[modelData.id] === true)
                 opacity: modelData.active ? 1 : 0.55
 
                 PlayerAvatar {
@@ -487,15 +661,25 @@ Item {
                 }
                 Icon {
                     id: chevron
+                    visible: !page.selecting
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     name: "chevron"
                     color: Theme.textDim
                     size: 20
                 }
+                SelectMark {
+                    visible: page.selecting
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: page.selected[row.modelData.id] === true
+                }
                 MouseArea {
+                    objectName: "playerRowArea"
                     anchors.fill: parent
-                    onClicked: page.openPlayer(row.modelData)
+                    pressAndHoldInterval: 450
+                    onClicked: page.selecting ? page.toggleSelected(row.modelData.id) : page.openPlayer(row.modelData)
+                    onPressAndHold: page.selecting ? page.toggleSelected(row.modelData.id) : page.startSelection(row.modelData)
                 }
             }
 
@@ -533,6 +717,7 @@ Item {
                     height: 96
                     padding: 14
                     radius: Theme.radiusLg
+                    highlighted: page.selecting && page.selected[cell.modelData.id] === true
                     opacity: cell.modelData.active ? 1 : 0.55
                     PlayerAvatar {
                         id: gbadge
@@ -582,15 +767,24 @@ Item {
                     }
                     Icon {
                         id: gchevron
+                        visible: !page.selecting
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         name: "chevron"
                         color: Theme.accent
                         size: 20
                     }
+                    SelectMark {
+                        visible: page.selecting
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.selected[cell.modelData.id] === true
+                    }
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: page.openPlayer(cell.modelData)
+                        pressAndHoldInterval: 450
+                        onClicked: page.selecting ? page.toggleSelected(cell.modelData.id) : page.openPlayer(cell.modelData)
+                        onPressAndHold: page.selecting ? page.toggleSelected(cell.modelData.id) : page.startSelection(cell.modelData)
                     }
                 }
             }

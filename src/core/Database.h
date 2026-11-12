@@ -24,6 +24,11 @@ public:
     int schemaVersion() const;          // -1 si la lecture échoue
     QSqlDatabase handle() const;        // connexion à utiliser avec QSqlQuery / QSqlTableModel
 
+    // Données de départ d'une base neuve : les INSERT et UPDATE de toutes les migrations embarquées, dans l'ordre
+    // (club « Mon club », bibliothèque d'exercices, exemples U10-U11 et leurs terrains…). Rejoués sur des tables
+    // vides, ils redonnent le contenu d'une première installation. Liste vide et *error rempli en cas d'échec.
+    static QStringList seedStatements(QString *error = nullptr);
+
 private:
     bool migrate(QString *error);
     bool applyScript(const QString &resourcePath, QString *error);

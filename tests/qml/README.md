@@ -17,6 +17,7 @@ l'écran, ni le bouton retour du système.
 | `t_exboard.py` | fiche d'un exercice : section « Terrain » (miniature, ouverture dans Tactique, création à la demande), bureau et téléphone. **Backend simulé** : le C++ réel est testé par `tst_backend` |
 | `t_category.py` | catégories d'exercices (ex. U10-U11) distinctes de l'« Activité » : filtres, choix et création dans la fiche, `categoryId` à l'enregistrement, bureau et téléphone. **Backend simulé** : le C++ réel est testé par `tst_backend` et `tst_dataformat` |
 | `t_slots.py` | créneaux réguliers : liste, aperçu d'une modification en bloc, confirmation avant suppression, déprogrammation (à venir ou aussi passées sans appel), accès depuis le menu d'une séance, bouton retour, état vide, téléphone et bureau. **Backend simulé** : le C++ réel est testé par `tst_slots` |
+| `t_select.py` | Effectif : sélection multiple par appui long (cases à cocher, « Tous » / « Aucun », poubelle, confirmation, retour et croix), téléphone, tablette et bureau ; Données : « Tout effacer » (avertissement avec le contenu actuel, mot EFFACER à taper). **Backend simulé** : le C++ réel est testé par `tst_reset` |
 | `t_fields.py` | **chaque champ de saisie** avec le clavier simulé (fenêtre réduite) : champ visible, en-tête immobile |
 
 `t_fields.py` compte aussi les champs déclarés dans `qml/` : si on en ajoute un sans l'ajouter au test, il échoue.

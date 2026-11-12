@@ -672,6 +672,41 @@ QVariantMap Backend::deletePlayer(int id)
     return result(ok, id, error);
 }
 
+QVariantMap Backend::deletePlayers(const QVariantList &ids)
+{
+    QString error;
+    QList<int> list;
+    for (const QVariant &v : ids) {
+        const int id = v.toInt();
+        if (id > 0 && !list.contains(id))
+            list.append(id);
+    }
+    if (list.isEmpty()) {
+        setError(tr("Aucun joueur sélectionné."));
+        QVariantMap r = result(false, -1, m_lastError);
+        r.insert(QStringLiteral("removed"), 0);
+        return r;
+    }
+    bool ok = m_db.transaction();
+    if (!ok)
+        error = m_db.lastError().text();
+    for (int id : std::as_const(list)) {
+        if (!ok)
+            break;
+        ok = m_players.remove(id, &error);
+    }
+    if (ok && !m_db.commit()) {
+        ok = false;
+        error = m_db.lastError().text();
+    }
+    if (!ok)
+        m_db.rollback();
+    setError(error);
+    QVariantMap r = result(ok, -1, error);
+    r.insert(QStringLiteral("removed"), ok ? int(list.size()) : 0);
+    return r;
+}
+
 QVariantMap Backend::importPlayers(int teamId, const QString &text)
 {
     constexpr int kMaxPlayers = 300;

@@ -124,6 +124,32 @@ bool Database::applyScript(const QString &resourcePath, QString *error)
     return true;
 }
 
+QStringList Database::seedStatements(QString *error)
+{
+    const QDir dir(QStringLiteral(":/sql"));
+    std::vector<std::pair<int, QString>> scripts;
+    for (const QString &name : dir.entryList({QStringLiteral("*.sql")}, QDir::Files)) {
+        const int version = versionFromName(name);
+        if (version > 0)
+            scripts.emplace_back(version, dir.filePath(name));
+    }
+    std::sort(scripts.begin(), scripts.end());
+    QStringList out;
+    for (const auto &script : scripts) {
+        QFile file(script.second);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            setError(error, QStringLiteral("Ressource introuvable : %1").arg(script.second));
+            return {};
+        }
+        for (const QString &statement : splitStatements(QString::fromUtf8(file.readAll()))) {
+            const QString head = statement.trimmed().left(7).toUpper();
+            if (head.startsWith(QLatin1String("INSERT ")) || head.startsWith(QLatin1String("UPDATE ")))
+                out.append(statement);
+        }
+    }
+    return out;
+}
+
 bool Database::migrate(QString *error)
 {
     const QDir dir(QStringLiteral(":/sql"));

@@ -1,5 +1,6 @@
 // Export et import de toutes les données (fichier « .footcoach ») de Backend (voir Backend.h).
 #include "Backend.h"
+#include "core/Database.h"
 
 #include <algorithm>
 
@@ -495,6 +496,108 @@ QVariantMap Backend::importDataFile(const QString &url)
         for (int i = 0; i < all.size() - 3; ++i)
             QFile::remove(dir.filePath(all.at(i)));
     }
+
+    setError(QString());
+    emit dataReplaced();
+    QVariantMap m = done(true);
+    m.insert(QStringLiteral("backupName"), backupName);
+    return m;
+}
+
+// --- Effacement de toutes les données -----------------------------------------------------------------
+
+QVariantMap Backend::dataCounts()
+{
+    return countsOfDatabase();
+}
+
+QVariantMap Backend::resetAllData()
+{
+    QString error;
+    const QStringList seeds = Database::seedStatements(&error);
+    if (seeds.isEmpty()) {
+        error = error.isEmpty() ? tr("Données de départ introuvables.") : error;
+        setError(error);
+        return done(false, error);
+    }
+
+    // Copie de l'état actuel, écrite avant l'effacement (jamais d'écrasement) ; les 3 plus récentes sont gardées.
+    const QByteArray before = buildExport();
+    const QDir dir(QFileInfo(m_db.databaseName()).absolutePath() + QStringLiteral("/sauvegardes"));
+    QDir().mkpath(dir.absolutePath());
+    const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+    // Nom : avant-effacement-AAAAMMJJ-HHMMSS-NNN ; NNN suit le plus grand numéro déjà utilisé dans la même seconde,
+    // pour que l'ordre des noms reste l'ordre chronologique (la rotation supprime toujours les plus anciennes).
+    const QString prefix = QStringLiteral("avant-effacement-%1-").arg(stamp);
+    int next = 1;
+    for (const QString &f : dir.entryList({prefix + QStringLiteral("*.footcoach")}, QDir::Files))
+        next = std::max(next, QFileInfo(f).completeBaseName().mid(prefix.size()).toInt() + 1);
+    QString backupName;
+    QString backupPath;
+    QFile bf;
+    bool backupCreated = false;
+    for (int n = next; n < next + 1000 && !backupCreated; ++n) {
+        backupName = prefix + QStringLiteral("%1.footcoach").arg(n, 3, 10, QLatin1Char('0'));
+        backupPath = dir.filePath(backupName);
+        if (QFile::exists(backupPath))
+            continue;
+        bf.setFileName(backupPath);
+        backupCreated = bf.open(QIODevice::WriteOnly | QIODevice::NewOnly);
+    }
+    if (before.isEmpty() || !backupCreated || bf.write(before) != before.size()) {
+        if (backupCreated) {
+            bf.close();
+            QFile::remove(backupPath);
+        }
+        error = tr("Impossible d'écrire la copie de sécurité : rien n'a été effacé.");
+        setError(error);
+        return done(false, error);
+    }
+    bf.close();
+
+    // Tout ou rien : tables vidées, compteurs d'identifiants remis à zéro, données de départ rejouées.
+    bool ok = m_db.transaction();
+    QString failure = ok ? QString() : m_db.lastError().text();
+    for (int i = kTables.size() - 1; ok && i >= 0; --i) {
+        QSqlQuery q(m_db);
+        if (!q.exec(QStringLiteral("DELETE FROM %1").arg(kTables.at(i)))) {
+            ok = false;
+            failure = q.lastError().text();
+        }
+    }
+    if (ok) {
+        QSqlQuery q(m_db);
+        if (q.exec(QStringLiteral("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'")) && q.next()
+            && !q.exec(QStringLiteral("DELETE FROM sqlite_sequence"))) {
+            ok = false;
+            failure = q.lastError().text();
+        }
+    }
+    for (const QString &statement : seeds) {
+        if (!ok)
+            break;
+        QSqlQuery q(m_db);
+        if (!q.exec(statement)) {
+            ok = false;
+            failure = q.lastError().text();
+        }
+    }
+    if (ok && !m_db.commit()) {
+        ok = false;
+        failure = m_db.lastError().text();
+    }
+    if (!ok) {
+        m_db.rollback();
+        QFile::remove(backupPath);                  // rien n'a changé : la copie est sans objet
+        error = tr("Effacement impossible, aucune donnée n'a été modifiée (%1).").arg(failure);
+        setError(error);
+        return done(false, error);
+    }
+
+    // Rotation : seules les 3 copies « avant-effacement » les plus récentes sont gardées.
+    QStringList all = dir.entryList({QStringLiteral("avant-effacement-*.footcoach")}, QDir::Files, QDir::Name);
+    for (int i = 0; i + 3 < all.size(); ++i)
+        QFile::remove(dir.filePath(all.at(i)));
 
     setError(QString());
     emit dataReplaced();

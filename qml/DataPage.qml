@@ -72,6 +72,45 @@ Item {
         }
     }
 
+    // Tout effacer : 1) avertissement avec le contenu actuel, 2) mot à taper pour confirmer.
+    PromptDialog {
+        id: resetWarning
+        onAccepted: {
+            resetTyped.ask("Confirmer l'effacement", "", false, 20);
+            resetTyped.message = "Pour confirmer, tapez EFFACER ci-dessous.";
+            resetTyped.okText = "Tout effacer";
+            resetTyped.danger = true;
+        }
+    }
+    PromptDialog {
+        id: resetTyped
+        objectName: "resetTyped"
+        onAccepted: (text) => {
+            if (text.trim().toUpperCase() !== "EFFACER") {
+                toast.show("Effacement annulé : mot de confirmation incorrect");
+                return;
+            }
+            var r = backend.resetAllData();
+            if (r.ok) {
+                AppState.teamId = -1;
+                toast.show("Toutes les données ont été effacées");
+                page.imported();
+            } else {
+                toast.show(r.error);
+            }
+        }
+    }
+    function askReset() {
+        var c = backend.dataCounts();
+        resetWarning.confirm("Tout effacer ?",
+                             "Cet appareil contient " + page.describe(c) + ".\n\n"
+                             + "Tout sera supprimé : clubs, équipes, joueurs et photos, séances, présences, matchs, "
+                             + "schémas et exercices que vous avez créés. L'application revient à son état d'installation, "
+                             + "avec les exercices d'exemple.\n\n"
+                             + "Pour pouvoir revenir en arrière, créez d'abord un fichier avec « Envoyer mes données ».",
+                             "Continuer", true);
+    }
+
     PageHeader {
         id: header
         width: parent.width
@@ -159,6 +198,38 @@ Item {
                         iconName: "plus"
                         text: "Choisir un fichier"
                         onClicked: openDialog.open()
+                    }
+                }
+            }
+
+            Card {
+                objectName: "resetCard"
+                width: parent.width
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    Icon { name: "trash"; color: Theme.danger; size: 28 }
+                    Text {
+                        width: parent.width
+                        text: "Tout effacer"
+                        font.pixelSize: 18
+                        font.weight: Font.Bold
+                        color: Theme.text
+                    }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        font.pixelSize: 14
+                        color: Theme.textMuted
+                        text: "Supprime toutes les données de cet appareil et remet l'application dans son état "
+                              + "d'installation. À utiliser pour repartir de zéro, par exemple après une erreur d'import."
+                    }
+                    AppButton {
+                        objectName: "resetButton"
+                        kind: "danger"
+                        iconName: "trash"
+                        text: "Tout effacer…"
+                        onClicked: page.askReset()
                     }
                 }
             }

@@ -94,6 +94,8 @@ public:
     Q_INVOKABLE QVariantMap importPlayers(int teamId, const QString &text);
     Q_INVOKABLE QVariantMap setPlayerActive(int id, bool active);   // la réactivation vérifie le numéro
     Q_INVOKABLE QVariantMap deletePlayer(int id);                   // définitif (présences et blessures aussi)
+    // Suppression définitive de plusieurs joueurs, tout ou rien : {ok, error, removed}.
+    Q_INVOKABLE QVariantMap deletePlayers(const QVariantList &ids);
 
     // --- Séances (calendrier) ---------------------------------------------------------------------
     // Séances de l'équipe dont le jour est entre from et to (AAAA-MM-JJ, inclus), par date :
@@ -225,6 +227,12 @@ public:
     // REMPLACE toutes les données de l'appareil par celles du fichier, en une seule transaction (tout ou rien).
     // Une sauvegarde de l'état actuel est écrite avant : {ok, error, backupName}.
     Q_INVOKABLE QVariantMap importDataFile(const QString &url);
+    // Contenu actuel de la base, mêmes clés que inspectDataFile().current : {teams, players, sessions, exercises, boards…}.
+    Q_INVOKABLE QVariantMap dataCounts();
+    // Efface toutes les données et revient au contenu d'une première installation (club « Mon club », bibliothèque
+    // d'exercices et exemples). Tout ou rien. Une copie de l'état actuel est écrite avant dans le dossier des
+    // sauvegardes (avant-effacement-AAAAMMJJ-HHMMSS-NNN.footcoach, 3 gardées) : {ok, error, backupName}.
+    Q_INVOKABLE QVariantMap resetAllData();
 
 signals:
     void lastErrorChanged();
