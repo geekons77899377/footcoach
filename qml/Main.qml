@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
-import QtCore
 
 // Fenêtre principale. Trois dispositions de navigation selon la place disponible :
 //  - « bottom » (téléphone en portrait) : barre en bas, comme dans la maquette ;
@@ -28,40 +27,6 @@ ApplicationWindow {
 
     // Clavier à l'écran ouvert (Android : la fenêtre est alors réduite). Propriété simple pour pouvoir la simuler en test.
     property bool keyboardUp: Qt.inputMethod.visible
-
-    // Contournement (0.9.8), Android seulement : au premier affichage du clavier après le lancement, ses touches ne
-    // s'affichent pas (le deuxième champ touché est correct). Cause non trouvée ; on ouvre donc puis on referme le
-    // clavier une fois, sur un champ invisible, peu après le lancement. Désactivable dans Données > Clavier (essai).
-    Settings {
-        id: kbdPrefs
-        category: "keyboard"
-        property bool warmup: true
-    }
-    function warmUpKeyboard() {
-        warmField.forceActiveFocus();
-        Qt.inputMethod.show();
-        warmEnd.restart();
-    }
-    TextInput {
-        id: warmField
-        objectName: "warmField"
-        width: 2; height: 2; opacity: 0
-        z: -1
-    }
-    Timer {
-        id: warmStart
-        interval: 1500
-        running: Qt.platform.os === "android" && kbdPrefs.warmup
-        onTriggered: win.warmUpKeyboard()
-    }
-    Timer {
-        id: warmEnd
-        interval: 700
-        onTriggered: {
-            Qt.inputMethod.hide();
-            warmField.focus = false;
-        }
-    }
 
     readonly property string navMode: width < 600 ? "bottom" : (width >= 840 && height >= 520 ? "sidebar" : "rail")
     property string section: "home"

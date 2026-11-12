@@ -18,8 +18,6 @@ def kb(on):
 def inputs():
     out=[]
     for o in objs():
-        if o.objectName()=="warmField":
-            continue   # champ invisible du préchauffage du clavier (Main.qml), pas un champ de l'utilisateur
         if (o.inherits("QQuickTextInput") or o.inherits("QQuickTextEdit")) and o.property("visible"):
             out.append(o)
     return out

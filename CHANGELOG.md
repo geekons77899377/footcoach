@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## Non publié — suppression du préchauffage du clavier (0.9.8)
+- Retrait du contournement ajouté en 0.9.8 : ouverture puis fermeture du clavier 1,5 s après le lancement sur Android, sur un champ invisible. Il n'avait rien corrigé et faisait apparaître brièvement le clavier à chaque lancement. Disparaissent aussi le champ invisible, les deux minuteries et la carte « Clavier (essai) » de la page Données.
+- Le problème d'origine (premier clavier affiché sans ses touches après le lancement) n'est donc pas résolu ; sa cause n'a pas été trouvée. Le réglage `keyboard/warmup` éventuellement enregistré sur l'appareil devient sans effet.
+
 ## Non publié — révision entre parenthèses dans le champ « Version »
 - Paramètres > Version affiche désormais « FootCoach 0.10.0 (2eb040d) » : les 7 premiers caractères du SHA-1, « , modifié » si des fichiers suivis n'étaient pas commités à la compilation. Le SHA-1 complet est en sous-titre de la même ligne. La ligne séparée « Révision (SHA-1) » disparaît.
 

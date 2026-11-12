@@ -1,5 +1,4 @@
 import QtQuick
-import QtCore
 import QtQuick.Controls
 import QtQuick.Dialogs
 
@@ -163,47 +162,7 @@ Item {
                     }
                 }
             }
-
-            Card {
-                width: parent.width
-                Column {
-                    width: parent.width
-                    spacing: 10
-                    Icon { name: "tick"; color: Theme.accent; size: 28 }
-                    Text {
-                        width: parent.width
-                        text: "Clavier (essai)"
-                        font.pixelSize: 18
-                        font.weight: Font.Bold
-                        color: Theme.text
-                    }
-                    Text {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        font.pixelSize: 14
-                        color: Theme.textMuted
-                        text: "Au premier appui dans un champ après le lancement, le clavier peut s'ouvrir sans ses "
-                              + "touches. Contournement : l'application ouvre puis referme le clavier une fois, "
-                              + "tout de suite après son lancement (un bref clignotement est possible). "
-                              + "Prend effet au prochain lancement."
-                    }
-                    ChipRow {
-                        objectName: "warmupChoice"
-                        width: parent.width
-                        allowClear: false
-                        options: [ { id: "on", text: "Activé" }, { id: "off", text: "Désactivé" } ]
-                        value: warmSettings.warmup ? "on" : "off"
-                        onPicked: (id) => warmSettings.warmup = (id === "on")
-                    }
-                }
-            }
         }
-    }
-
-    Settings {
-        id: warmSettings
-        category: "keyboard"
-        property bool warmup: true
     }
 
     Toast { id: toast }
