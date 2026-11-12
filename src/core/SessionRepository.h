@@ -2,6 +2,7 @@
 
 #include "core/Models.h"
 
+#include <QHash>
 #include <QList>
 #include <QSet>
 #include <QSqlDatabase>
@@ -30,6 +31,16 @@ public:
     // Séances non annulées de l'équipe qui chevauchent [start, start + durationMin[.
     // excludeId : séance en cours d'édition, ignorée.
     QList<Session> conflicts(int teamId, const QDateTime &start, int durationMin, int excludeId = -1) const;
+
+    // Séances générées par un créneau (schéma 10), triées par date.
+    QList<Session> listBySlot(int slotId, QString *error = nullptr) const;
+    // Pour chaque séance du créneau : a-t-elle un appel enregistré, un plan d'exercices ?
+    struct Usage
+    {
+        bool attendance = false;
+        bool plan = false;
+    };
+    QHash<int, Usage> usageOfSlot(int slotId, QString *error = nullptr) const;
 
 private:
     bool insertOne(Session &session, QString *error);

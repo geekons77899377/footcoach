@@ -23,7 +23,8 @@
 namespace {
 
 const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("team"),
-                             QStringLiteral("player"),         QStringLiteral("training_session"),
+                             QStringLiteral("player"),         QStringLiteral("player_contact"),
+                             QStringLiteral("training_slot"),  QStringLiteral("training_session"),
                              QStringLiteral("attendance"),     QStringLiteral("football_match"),
                              QStringLiteral("match_player"),   QStringLiteral("exercise_category"), QStringLiteral("exercise"),
                              QStringLiteral("session_exercise"), QStringLiteral("tactical_board"),
@@ -32,6 +33,8 @@ const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("t
 // Tables présentes dans un fichier du schéma donné (le schéma 6 a ajouté club, football_match et match_player).
 bool tableExistsInSchema(const QString &t, int schema)
 {
+    if (t == QLatin1String("player_contact") || t == QLatin1String("training_slot"))   // schéma 10
+        return schema >= 10;
     if (t == QLatin1String("exercise_category"))       // schéma 9 : catégories d'exercices
         return schema >= 9;
     return schema >= 6 || !(t == QLatin1String("club") || t == QLatin1String("football_match")
@@ -367,7 +370,7 @@ private slots:
         QCOMPARE(now.keys(), ref.keys());
         QCOMPARE(now.value("format"), ref.value("format"));
         QCOMPARE(now.value("version"), ref.value("version"));
-        QCOMPARE(now.value("schema").toInt(), 9);                // 009 : table exercise_category + exercise.category_id
+        QCOMPARE(now.value("schema").toInt(), 10);               // 010 : créneaux, présence des convoqués, contacts
         for (const QString &t : kTables) {
             const QJsonArray cols = now.value("tables").toObject().value(t).toObject().value("columns").toArray();
             if (t == QLatin1String("exercise_category")) {      // table du schéma 9 : absente du fichier de référence (schéma 7)
@@ -375,9 +378,24 @@ private slots:
                 QCOMPARE(cols, (QJsonArray{"id", "name", "created_at"}));
                 continue;
             }
+            if (t == QLatin1String("training_slot")) {          // tables du schéma 10
+                QVERIFY(ref.value("tables").toObject().value(t).isUndefined());
+                QCOMPARE(cols, (QJsonArray{"id", "team_id", "weekdays", "start_time", "duration_min", "location", "theme",
+                                           "first_day", "last_day", "created_at"}));
+                continue;
+            }
+            if (t == QLatin1String("player_contact")) {
+                QVERIFY(ref.value("tables").toObject().value(t).isUndefined());
+                QCOMPARE(cols, (QJsonArray{"player_id", "rank", "label", "phone", "email"}));
+                continue;
+            }
             QJsonArray expected = ref.value("tables").toObject().value(t).toObject().value("columns").toArray();
             if (t == QLatin1String("exercise"))
                 expected.append(QStringLiteral("category_id"));  // 009 : colonne ajoutée à la fin
+            if (t == QLatin1String("training_session"))
+                expected.append(QStringLiteral("slot_id"));      // 010
+            if (t == QLatin1String("match_player"))
+                expected.append(QStringLiteral("presence"));     // 010
             QCOMPARE(cols, expected);
             // aucune colonne du schéma 4 n'a disparu, et les nouvelles viennent après
             const QJsonArray oldCols = old.value("tables").toObject().value(t).toObject().value("columns").toArray();
@@ -500,7 +518,7 @@ private slots:
         Database db;
         QString error;
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 9);
+        QCOMPARE(db.schemaVersion(), 10);
         QSqlQuery q(db.handle());
         auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
         QCOMPARE(count("SELECT COUNT(*) FROM team"), 2);
@@ -537,7 +555,7 @@ private slots:
         // Rouvrir ne rejoue rien.
         db.close();
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 9);
+        QCOMPARE(db.schemaVersion(), 10);
         QSqlQuery q2(db.handle());
         QVERIFY(q2.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board")) && q2.next());
         QCOMPARE(q2.value(0).toInt(), 28);
@@ -553,7 +571,7 @@ private slots:
         QVERIFY(b.saveExercise({{"title", "Passe longue"}, {"category", "technical"}, {"categoryId", cat}}).value("ok").toBool());
         const QString out = m_dir.filePath(QStringLiteral("cat.footcoach"));
         QVERIFY(b.exportDataFile(out).value("ok").toBool());
-        QCOMPARE(readJson(out).value("schema").toInt(), 9);
+        QCOMPARE(readJson(out).value("schema").toInt(), 10);
 
         // Autre base : l'import remplace tout et rétablit catégories et liens.
         QVERIFY(b.deleteCategory(cat).value("ok").toBool());
@@ -596,7 +614,7 @@ private slots:
     {
         Backend b(m_db.handle());
         QJsonObject root = readJson(fixturePath(7));
-        root["schema"] = 10;
+        root["schema"] = 11;
         const QVariantMap r = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r.value("ok").toBool());
         QVERIFY2(r.value("error").toString().contains(QStringLiteral("plus récente")), qPrintable(r.value("error").toString()));
@@ -621,7 +639,7 @@ private slots:
     {
         QTest::addColumn<QByteArray>("mutation");
         QTest::addColumn<QString>("messagePart");
-        QTest::newRow("schema plus récent") << QByteArray("schema=10") << QString("plus récente");
+        QTest::newRow("schema plus récent") << QByteArray("schema=11") << QString("plus récente");
         QTest::newRow("schema très grand") << QByteArray("schema=999") << QString("plus récente");
         QTest::newRow("schema absent") << QByteArray("schema=remove") << QString("");
         QTest::newRow("schema nul") << QByteArray("schema=0") << QString("");

@@ -21,7 +21,7 @@ QVariant nullIfEmpty(const QString &s)
 }
 
 const QString kSelect = QStringLiteral(
-    "SELECT id, team_id, start_at, duration_min, location, theme, notes, status FROM training_session");
+    "SELECT id, team_id, start_at, duration_min, location, theme, notes, status, slot_id FROM training_session");
 
 Session readSession(const QSqlQuery &q)
 {
@@ -34,6 +34,7 @@ Session readSession(const QSqlQuery &q)
     s.theme = q.value(5).toString();
     s.notes = q.value(6).toString();
     s.status = q.value(7).toString();
+    s.slotId = q.value(8).isNull() ? -1 : q.value(8).toInt();
     return s;
 }
 
@@ -90,8 +91,8 @@ bool SessionRepository::insertOne(Session &s, QString *error)
 {
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
-        "INSERT INTO training_session(team_id, start_at, duration_min, location, theme, notes, status) "
-        "VALUES(?, ?, ?, ?, ?, ?, ?)"));
+        "INSERT INTO training_session(team_id, start_at, duration_min, location, theme, notes, status, slot_id) "
+        "VALUES(?, ?, ?, ?, ?, ?, ?, ?)"));
     q.addBindValue(s.teamId);
     q.addBindValue(s.startAt.toString(kDateTimeFormat));
     q.addBindValue(s.durationMin);
@@ -99,6 +100,7 @@ bool SessionRepository::insertOne(Session &s, QString *error)
     q.addBindValue(nullIfEmpty(s.theme));
     q.addBindValue(nullIfEmpty(s.notes));
     q.addBindValue(s.status);
+    q.addBindValue(s.slotId > 0 ? QVariant(s.slotId) : QVariant(QMetaType::fromType<int>()));
     if (!q.exec()) {
         setError(error, q.lastError().text());
         return false;
@@ -137,7 +139,7 @@ bool SessionRepository::update(const Session &s, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "UPDATE training_session SET team_id = ?, start_at = ?, duration_min = ?, location = ?, "
-        "theme = ?, notes = ?, status = ? WHERE id = ?"));
+        "theme = ?, notes = ?, status = ?, slot_id = ? WHERE id = ?"));
     q.addBindValue(s.teamId);
     q.addBindValue(s.startAt.toString(kDateTimeFormat));
     q.addBindValue(s.durationMin);
@@ -145,6 +147,7 @@ bool SessionRepository::update(const Session &s, QString *error)
     q.addBindValue(nullIfEmpty(s.theme));
     q.addBindValue(nullIfEmpty(s.notes));
     q.addBindValue(s.status);
+    q.addBindValue(s.slotId > 0 ? QVariant(s.slotId) : QVariant(QMetaType::fromType<int>()));
     q.addBindValue(s.id);
     if (!q.exec()) {
         setError(error, q.lastError().text());
@@ -205,4 +208,38 @@ QList<Session> SessionRepository::conflicts(int teamId, const QDateTime &start, 
             result.append(other);
     }
     return result;
+}
+
+QList<Session> SessionRepository::listBySlot(int slotId, QString *error) const
+{
+    QList<Session> out;
+    QSqlQuery q(m_db);
+    q.prepare(kSelect + QStringLiteral(" WHERE slot_id = ? ORDER BY start_at"));
+    q.addBindValue(slotId);
+    if (!q.exec()) {
+        setError(error, q.lastError().text());
+        return out;
+    }
+    while (q.next())
+        out.append(readSession(q));
+    return out;
+}
+
+QHash<int, SessionRepository::Usage> SessionRepository::usageOfSlot(int slotId, QString *error) const
+{
+    QHash<int, Usage> out;
+    QSqlQuery q(m_db);
+    q.prepare(QStringLiteral(
+        "SELECT s.id, "
+        "EXISTS(SELECT 1 FROM attendance a WHERE a.session_id = s.id), "
+        "EXISTS(SELECT 1 FROM session_exercise e WHERE e.session_id = s.id) "
+        "FROM training_session s WHERE s.slot_id = ?"));
+    q.addBindValue(slotId);
+    if (!q.exec()) {
+        setError(error, q.lastError().text());
+        return out;
+    }
+    while (q.next())
+        out.insert(q.value(0).toInt(), Usage{q.value(1).toInt() != 0, q.value(2).toInt() != 0});
+    return out;
 }

@@ -2,6 +2,7 @@
 
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QStringList>
 #include <QVariant>
 
 namespace {
@@ -233,7 +234,7 @@ QList<MatchPlayer> MatchRepository::players(int matchId, QString *error) const
 {
     QList<MatchPlayer> list;
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("SELECT player_id, role FROM match_player WHERE match_id = ? "
+    q.prepare(QStringLiteral("SELECT player_id, role, presence FROM match_player WHERE match_id = ? "
                              "ORDER BY CASE role WHEN 'starter' THEN 0 ELSE 1 END, player_id"));
     q.addBindValue(matchId);
     if (!q.exec()) {
@@ -244,6 +245,7 @@ QList<MatchPlayer> MatchRepository::players(int matchId, QString *error) const
         MatchPlayer p;
         p.playerId = q.value(0).toInt();
         p.role = q.value(1).toString();
+        p.presence = q.value(2).toString();
         list.append(p);
     }
     return list;
@@ -291,8 +293,14 @@ bool MatchRepository::setPlayers(int matchId, const QList<MatchPlayer> &players,
     }
     bool ok = true;
     QString failure;
+    // Les convoqués gardés conservent leur présence (schéma 10) : on retire seulement les joueurs qui ne sont plus
+    // convoqués, puis on ajoute ou met à jour le rôle des autres.
+    QStringList keep;
+    for (const MatchPlayer &p : players)
+        keep << QString::number(p.playerId);
     QSqlQuery del(m_db);
-    del.prepare(QStringLiteral("DELETE FROM match_player WHERE match_id = ?"));
+    del.prepare(QStringLiteral("DELETE FROM match_player WHERE match_id = ?")
+                + (keep.isEmpty() ? QString() : QStringLiteral(" AND player_id NOT IN (%1)").arg(keep.join(QLatin1Char(',')))));
     del.addBindValue(matchId);
     if (!del.exec()) {
         ok = false;
@@ -302,7 +310,8 @@ bool MatchRepository::setPlayers(int matchId, const QList<MatchPlayer> &players,
         if (!ok)
             break;
         QSqlQuery ins(m_db);
-        ins.prepare(QStringLiteral("INSERT INTO match_player(match_id, player_id, role) VALUES(?, ?, ?)"));
+        ins.prepare(QStringLiteral("INSERT INTO match_player(match_id, player_id, role) VALUES(?, ?, ?) "
+                                   "ON CONFLICT(match_id, player_id) DO UPDATE SET role = excluded.role"));
         ins.addBindValue(matchId);
         ins.addBindValue(p.playerId);
         ins.addBindValue(p.role);

@@ -2,7 +2,9 @@
 
 #include <QDate>
 #include <QDateTime>
+#include <QList>
 #include <QString>
+#include <QTime>
 
 struct Club
 {
@@ -49,8 +51,23 @@ struct Session
     QString theme;
     QString notes;
     QString status = QStringLiteral("planned");   // "planned", "done", "cancelled"
+    int slotId = -1;            // créneau régulier qui a généré la séance, -1 = séance seule
 
     QDateTime endAt() const { return startAt.addSecs(qint64(durationMin) * 60); }
+};
+
+// Créneau régulier d'entraînement (schéma 10) : la règle qui génère les séances.
+struct TrainingSlot
+{
+    int id = -1;
+    int teamId = -1;
+    QList<int> weekdays;        // 1 = lundi … 7 = dimanche, triés
+    QTime startTime;
+    int durationMin = 90;
+    QString location;
+    QString theme;
+    QDate firstDay;
+    QDate lastDay;              // inclus
 };
 
 struct Exercise
@@ -109,4 +126,6 @@ struct MatchPlayer
 {
     int playerId = -1;
     QString role = QStringLiteral("starter");         // "starter" (titulaire), "substitute" (remplaçant)
+    // Schéma 10 : "unknown" (sans réponse), "present", "absent", "excused", "injured".
+    QString presence = QStringLiteral("unknown");
 };

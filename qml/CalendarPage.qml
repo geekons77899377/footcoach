@@ -15,7 +15,8 @@ Item {
     property var marks: []
     property var matches: []                     // matchs de la période (distincts des séances)
     property var matchMarks: []
-    property string mode: "browse"               // browse, session, recurrence, attendance
+    property string mode: "browse"               // browse, session, slots, recurrence, attendance
+    property string recurrenceBack: "browse"     // écran de retour du formulaire de créneau
     readonly property bool split: width >= 640
     readonly property int teamId: AppState.teamId
     readonly property int leftWidth: width >= 900 ? 380 : 330     // colonne du mois en mode deux colonnes
@@ -110,7 +111,7 @@ Item {
     function goBack() {
         if (mode === "browse")
             return false;
-        mode = "browse";
+        mode = mode === "recurrence" ? recurrenceBack : "browse";
         return true;
     }
 
@@ -125,6 +126,21 @@ Item {
     }
     function newRecurrence() {
         recurrenceForm.openNew(teamId, selected);
+        recurrenceBack = mode === "slots" ? "slots" : "browse";
+        mode = "recurrence";
+    }
+    function openSlots() {
+        slotsPanel.refresh();
+        mode = "slots";
+    }
+    function editSlot(slotId, back) {
+        var slot = backend.trainingSlot(slotId);
+        if (!slot.ok) {
+            toast.show(slot.error);
+            return;
+        }
+        recurrenceForm.openEdit(slot);
+        recurrenceBack = back;
         mode = "recurrence";
     }
     function openAttendance(id) {
@@ -196,6 +212,8 @@ Item {
             target = s;
             var m = [{ id: "attendance", text: "Faire l'appel", icon: "check" },
                      { id: "edit", text: "Modifier", icon: "edit" }];
+            if (s.slotId > 0)
+                m.push({ id: "slot", text: "Modifier le créneau régulier", icon: "repeat" });
             if (s.status !== "done")
                 m.push({ id: "done", text: "Marquer réalisée", icon: "check" });
             if (s.status !== "planned")
@@ -211,6 +229,8 @@ Item {
                 page.openAttendance(target.id);
             } else if (id === "edit") {
                 page.editSession(target);
+            } else if (id === "slot") {
+                page.editSlot(target.slotId, "browse");
             } else if (id === "delete") {
                 confirm.action = "delete";
                 confirm.targetId = target.id;
@@ -579,8 +599,8 @@ Item {
                 visible: page.teamId > 0
                 iconName: "repeat"
                 fillColor: Theme.surface
-                accessibleName: "Séances récurrentes"
-                onClicked: page.newRecurrence()
+                accessibleName: "Créneaux réguliers"
+                onClicked: page.openSlots()
             }
             IconButton {
                 visible: page.teamId > 0
@@ -814,11 +834,28 @@ Item {
         onAttendanceRequested: page.openAttendance(sessionForm.sessionId)
     }
 
+    SlotsPanel {
+        id: slotsPanel
+        anchors.fill: parent
+        visible: page.mode === "slots"
+        teamId: page.teamId
+        onCloseRequested: page.mode = "browse"
+        onNewRequested: page.newRecurrence()
+        onEditRequested: (slot) => page.editSlot(slot.id, "slots")
+    }
+
     RecurrenceForm {
         id: recurrenceForm
         anchors.fill: parent
         visible: page.mode === "recurrence"
-        onCloseRequested: page.mode = "browse"
+        onCloseRequested: page.mode = page.recurrenceBack
+        onSlotChanged: (message) => {
+            page.mode = page.recurrenceBack;
+            if (page.mode === "slots")
+                slotsPanel.refresh();
+            page.refresh();
+            toast.show(message);
+        }
         onCreated: (count, firstDay) => {
             page.mode = "browse";
             if (DateUtil.isIso(firstDay))

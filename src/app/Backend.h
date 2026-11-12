@@ -8,6 +8,7 @@
 #include "core/PlanRepository.h"
 #include "core/PlayerRepository.h"
 #include "core/SessionRepository.h"
+#include "core/TrainingSlotRepository.h"
 #include "core/TeamRepository.h"
 
 #include <QJsonObject>
@@ -96,7 +97,7 @@ public:
 
     // --- Séances (calendrier) ---------------------------------------------------------------------
     // Séances de l'équipe dont le jour est entre from et to (AAAA-MM-JJ, inclus), par date :
-    // [{id, teamId, date, time, endTime, durationMin, location, theme, notes, status, present, total}]
+    // [{id, teamId, date, time, endTime, durationMin, location, theme, notes, status, present, total, slotId}]
     // (present et total valent -1 tant qu'aucun appel n'est enregistré). status : planned, done, cancelled.
     Q_INVOKABLE QVariantList sessions(int teamId, const QString &from, const QString &to);
     // Jours (AAAA-MM-JJ) ayant au moins une séance.
@@ -111,7 +112,28 @@ public:
     // Aperçu : {ok, count, clashes, error}. Création : même résultat, avec needsConfirm si des séances en
     // chevauchent d'autres et que force est faux.
     Q_INVOKABLE QVariantMap previewRecurrence(const QVariantMap &rule);
+    // Depuis le schéma 10, createRecurring enregistre aussi un créneau régulier (résultat : slotId) et y relie
+    // les séances créées.
     Q_INVOKABLE QVariantMap createRecurring(const QVariantMap &rule, bool force);
+
+    // --- Créneaux réguliers (schéma 10) ---------------------------------------------------------------
+    // « À venir » = séance dont le jour est aujourd'hui ou plus tard. Une séance avec un appel enregistré n'est
+    // jamais modifiée ni supprimée par ces fonctions.
+    // Liste : [{id, teamId, weekdays [1..7], time, endTime, durationMin, location, theme, from, to,
+    //           total, upcoming, withAttendance}].
+    Q_INVOKABLE QVariantList trainingSlots(int teamId);
+    Q_INVOKABLE QVariantMap trainingSlot(int id);         // même contenu, plus ok/error
+    // Modification d'un créneau : la nouvelle règle (même forme que pour createRecurring) s'applique aux séances
+    // à venir. Jour gardé : heure, durée, lieu et thème mis à jour (sauf champ modifié à la main sur cette séance) ;
+    // jour retiré : séance supprimée ; jour nouveau : séance créée. Aperçu et application :
+    // {ok, error, updated, added, removed, removedWithPlan, kept, clashes, needsConfirm}.
+    Q_INVOKABLE QVariantMap previewSlotUpdate(int slotId, const QVariantMap &rule);
+    Q_INVOKABLE QVariantMap updateSlot(int slotId, const QVariantMap &rule, bool force);
+    // Déprogrammation : {ok, error, upcoming, past, kept, withPlan} (séances supprimables à venir, passées, gardées
+    // car elles ont un appel, supprimables ayant un plan). deleteSlot supprime les séances à venir sans appel (et
+    // les passées sans appel si includePast), puis le créneau ; les séances gardées deviennent des séances seules.
+    Q_INVOKABLE QVariantMap previewSlotDelete(int slotId);
+    Q_INVOKABLE QVariantMap deleteSlot(int slotId, bool includePast);
 
     // --- Matchs ----------------------------------------------------------------------------------------
     // Matchs de l'équipe dont le jour est entre from et to (AAAA-MM-JJ, inclus), par date : [{id, teamId, date, time,
@@ -213,6 +235,7 @@ private:
     bool createBlockBoardFor(int itemId, int exerciseId, const QString &title, QString *error);
     bool parseDataFile(const QString &url, QJsonObject *root, QString *error) const;
     QVariantMap countsOfDatabase();
+    QVariantMap planSlotUpdate(int slotId, const QVariantMap &rule, bool apply, bool force);
     bool find(int id, BoardRecord *out);
     void setError(const QString &message);
 
@@ -223,6 +246,7 @@ private:
     MatchRepository m_matches;
     PlayerRepository m_players;
     SessionRepository m_sessions;
+    TrainingSlotRepository m_slots;
     AttendanceRepository m_attendance;
     ExerciseRepository m_exercises;
     PlanRepository m_plan;

@@ -4,6 +4,10 @@
 #include "core/AttendanceStats.h"
 #include "core/Recurrence.h"
 
+#include <QHash>
+#include <QSqlError>
+#include <QSqlQuery>
+
 #include <QDate>
 #include <QDateTime>
 #include <QSet>
@@ -42,6 +46,7 @@ QVariantMap sessionMap(const Session &s, int present = -1, int total = -1)
     m.insert(QStringLiteral("status"), s.status);
     m.insert(QStringLiteral("present"), present);
     m.insert(QStringLiteral("total"), total);
+    m.insert(QStringLiteral("slotId"), s.slotId);
     return m;
 }
 
@@ -116,6 +121,15 @@ QVariantMap Backend::saveSession(const QVariantMap &in, bool force)
         return result(false, -1, problem);
     }
     s.startAt = QDateTime(date, time);
+    // Une séance modifiée garde son créneau (le formulaire ne le connaît pas).
+    if (s.id > 0) {
+        const Session old = m_sessions.get(s.id);
+        if (old.id < 0) {
+            setError(tr("Séance introuvable."));
+            return result(false, -1, m_lastError);
+        }
+        s.slotId = old.slotId;
+    }
 
     // Une séance annulée ne bloque personne : on ne contrôle que les autres statuts.
     if (!force && s.status != QLatin1String("cancelled")) {
@@ -163,50 +177,106 @@ QVariantMap Backend::deleteSession(int id)
 
 namespace {
 
-QList<Session> expand(const QVariantMap &rule, QString *problem)
+// Lit et contrôle une règle hebdomadaire {teamId, from, to, weekdays, time, durationMin, location, theme}.
+bool parseRule(const QVariantMap &rule, TrainingSlot *slot, QString *problem)
+{
+    TrainingSlot t;
+    t.teamId = rule.value(QStringLiteral("teamId"), -1).toInt();
+    t.firstDay = QDate::fromString(rule.value(QStringLiteral("from")).toString(), kDay);
+    t.lastDay = QDate::fromString(rule.value(QStringLiteral("to")).toString(), kDay);
+    t.startTime = QTime::fromString(rule.value(QStringLiteral("time")).toString(), QStringLiteral("HH:mm"));
+    QList<int> days;
+    for (const QVariant &v : rule.value(QStringLiteral("weekdays")).toList())
+        days.append(v.toInt());
+    t.weekdays = TrainingSlotRepository::weekdaysFromText(TrainingSlotRepository::weekdaysToText(days));
+    t.durationMin = rule.value(QStringLiteral("durationMin"), 90).toInt();
+    t.location = rule.value(QStringLiteral("location")).toString().trimmed();
+    t.theme = rule.value(QStringLiteral("theme")).toString().trimmed();
+    if (t.teamId <= 0)
+        *problem = QObject::tr("Aucune équipe sélectionnée.");
+    else if (t.weekdays.isEmpty())
+        *problem = QObject::tr("Cochez au moins un jour.");
+    else if (!t.firstDay.isValid() || !t.lastDay.isValid() || !t.startTime.isValid())
+        *problem = QObject::tr("Les dates et l'heure doivent être valides.");
+    else if (t.lastDay < t.firstDay)
+        *problem = QObject::tr("La date de fin précède la date de début.");
+    else if (t.durationMin < 15 || t.durationMin > 300)
+        *problem = QObject::tr("La durée doit être comprise entre 15 et 300 minutes.");
+    *slot = t;
+    return problem->isEmpty();
+}
+
+// Débuts des séances du créneau entre from et to (inclus). Erreur si trop nombreuses.
+QList<QDateTime> starts(const TrainingSlot &t, const QDate &from, const QDate &to, QString *problem)
+{
+    if (to < from)
+        return {};
+    const QSet<int> days(t.weekdays.begin(), t.weekdays.end());
+    const QList<QDateTime> list = Recurrence::occurrences(from, to, days, t.startTime);
+    if (list.size() > Recurrence::kMaxOccurrences) {
+        *problem = QObject::tr("Trop de séances (maximum %1) : raccourcissez la période.").arg(Recurrence::kMaxOccurrences);
+        return {};
+    }
+    return list;
+}
+
+Session sessionFrom(const TrainingSlot &t, const QDateTime &start)
+{
+    Session s;
+    s.teamId = t.teamId;
+    s.startAt = start;
+    s.durationMin = t.durationMin;
+    s.location = t.location;
+    s.theme = t.theme;
+    s.slotId = t.id;
+    return s;
+}
+
+QList<Session> expand(const QVariantMap &rule, TrainingSlot *slot, QString *problem)
 {
     QList<Session> out;
-    const QDate from = QDate::fromString(rule.value(QStringLiteral("from")).toString(), kDay);
-    const QDate to = QDate::fromString(rule.value(QStringLiteral("to")).toString(), kDay);
-    const QTime time = QTime::fromString(rule.value(QStringLiteral("time")).toString(), QStringLiteral("HH:mm"));
-    QSet<int> days;
-    for (const QVariant &v : rule.value(QStringLiteral("weekdays")).toList()) {
-        const int d = v.toInt();
-        if (d >= 1 && d <= 7)
-            days.insert(d);
-    }
-    const int duration = rule.value(QStringLiteral("durationMin"), 90).toInt();
-    if (rule.value(QStringLiteral("teamId"), -1).toInt() <= 0)
-        *problem = QObject::tr("Aucune équipe sélectionnée.");
-    else if (days.isEmpty())
-        *problem = QObject::tr("Cochez au moins un jour.");
-    else if (!from.isValid() || !to.isValid() || !time.isValid())
-        *problem = QObject::tr("Les dates et l'heure doivent être valides.");
-    else if (to < from)
-        *problem = QObject::tr("La date de fin précède la date de début.");
-    else if (duration < 15 || duration > 300)
-        *problem = QObject::tr("La durée doit être comprise entre 15 et 300 minutes.");
+    if (!parseRule(rule, slot, problem))
+        return out;
+    const QList<QDateTime> list = starts(*slot, slot->firstDay, slot->lastDay, problem);
     if (!problem->isEmpty())
         return out;
-    const QList<QDateTime> starts = Recurrence::occurrences(from, to, days, time);
-    if (starts.size() > Recurrence::kMaxOccurrences) {
-        *problem = QObject::tr("Trop de séances (maximum %1) : raccourcissez la période.").arg(Recurrence::kMaxOccurrences);
-        return out;
-    }
-    if (starts.isEmpty()) {
+    if (list.isEmpty()) {
         *problem = QObject::tr("Aucune séance sur cette période pour les jours choisis.");
         return out;
     }
-    for (const QDateTime &start : starts) {
-        Session s;
-        s.teamId = rule.value(QStringLiteral("teamId")).toInt();
-        s.startAt = start;
-        s.durationMin = duration;
-        s.location = rule.value(QStringLiteral("location")).toString().trimmed();
-        s.theme = rule.value(QStringLiteral("theme")).toString().trimmed();
-        out.append(s);
-    }
+    for (const QDateTime &start : list)
+        out.append(sessionFrom(*slot, start));
     return out;
+}
+
+QVariantMap slotMap(const TrainingSlot &t, const QList<Session> &sessions, const QHash<int, SessionRepository::Usage> &usage)
+{
+    QVariantMap m;
+    m.insert(QStringLiteral("id"), t.id);
+    m.insert(QStringLiteral("teamId"), t.teamId);
+    QVariantList days;
+    for (int d : t.weekdays)
+        days.append(d);
+    m.insert(QStringLiteral("weekdays"), days);
+    m.insert(QStringLiteral("time"), t.startTime.toString(QStringLiteral("HH:mm")));
+    m.insert(QStringLiteral("endTime"), t.startTime.addSecs(qint64(t.durationMin) * 60).toString(QStringLiteral("HH:mm")));
+    m.insert(QStringLiteral("durationMin"), t.durationMin);
+    m.insert(QStringLiteral("location"), t.location);
+    m.insert(QStringLiteral("theme"), t.theme);
+    m.insert(QStringLiteral("from"), t.firstDay.toString(kDay));
+    m.insert(QStringLiteral("to"), t.lastDay.toString(kDay));
+    const QDate today = QDate::currentDate();
+    int upcoming = 0, withAttendance = 0;
+    for (const Session &s : sessions) {
+        if (s.startAt.date() >= today)
+            ++upcoming;
+        if (usage.value(s.id).attendance)
+            ++withAttendance;
+    }
+    m.insert(QStringLiteral("total"), int(sessions.size()));
+    m.insert(QStringLiteral("upcoming"), upcoming);
+    m.insert(QStringLiteral("withAttendance"), withAttendance);
+    return m;
 }
 
 } // namespace
@@ -214,7 +284,8 @@ QList<Session> expand(const QVariantMap &rule, QString *problem)
 QVariantMap Backend::previewRecurrence(const QVariantMap &rule)
 {
     QString problem;
-    const QList<Session> list = expand(rule, &problem);
+    TrainingSlot slot;
+    const QList<Session> list = expand(rule, &slot, &problem);
     if (!problem.isEmpty()) {
         QVariantMap r = result(false, -1, problem);
         r.insert(QStringLiteral("count"), 0);
@@ -234,7 +305,8 @@ QVariantMap Backend::previewRecurrence(const QVariantMap &rule)
 QVariantMap Backend::createRecurring(const QVariantMap &rule, bool force)
 {
     QString problem;
-    QList<Session> list = expand(rule, &problem);
+    TrainingSlot slot;
+    QList<Session> list = expand(rule, &slot, &problem);
     if (!problem.isEmpty()) {
         setError(problem);
         QVariantMap r = result(false, -1, problem);
@@ -253,12 +325,30 @@ QVariantMap Backend::createRecurring(const QVariantMap &rule, bool force)
         r.insert(QStringLiteral("clashes"), clashes);
         return r;
     }
+    // Créneau et séances : tout ou rien.
     QString error;
-    const bool ok = m_sessions.insertMany(list, &error);
+    bool ok = m_db.transaction();
+    if (!ok)
+        error = m_db.lastError().text();
+    if (ok)
+        ok = m_slots.insert(slot, &error);
+    for (Session &s : list) {
+        if (!ok)
+            break;
+        s.slotId = slot.id;
+        ok = m_sessions.insert(s, &error);
+    }
+    if (ok && !m_db.commit()) {
+        ok = false;
+        error = m_db.lastError().text();
+    }
+    if (!ok)
+        m_db.rollback();
     setError(error);
     QVariantMap r = ok ? result(true, list.first().id) : result(false, -1, error);
     r.insert(QStringLiteral("count"), ok ? int(list.size()) : 0);
     r.insert(QStringLiteral("clashes"), clashes);
+    r.insert(QStringLiteral("slotId"), ok ? slot.id : -1);
     return r;
 }
 
@@ -382,4 +472,276 @@ QVariantMap Backend::attendanceStats(int teamId, const QString &from, const QStr
     out.insert(QStringLiteral("sessions"), sessions);
     out.insert(QStringLiteral("players"), players);
     return out;
+}
+
+// --- Créneaux réguliers (schéma 10) ------------------------------------------------------------------
+
+QVariantList Backend::trainingSlots(int teamId)
+{
+    QVariantList out;
+    QString error;
+    for (const TrainingSlot &t : m_slots.list(teamId, &error))
+        out.append(slotMap(t, m_sessions.listBySlot(t.id, &error), m_sessions.usageOfSlot(t.id, &error)));
+    setError(error);
+    return out;
+}
+
+QVariantMap Backend::trainingSlot(int id)
+{
+    QString error;
+    const TrainingSlot t = m_slots.get(id, &error);
+    if (t.id < 0) {
+        setError(error.isEmpty() ? tr("Créneau introuvable.") : error);
+        return result(false, id, m_lastError);
+    }
+    QVariantMap m = slotMap(t, m_sessions.listBySlot(id, &error), m_sessions.usageOfSlot(id, &error));
+    setError(error);
+    m.insert(QStringLiteral("ok"), error.isEmpty());
+    m.insert(QStringLiteral("error"), error);
+    return m;
+}
+
+QVariantMap Backend::planSlotUpdate(int slotId, const QVariantMap &rule, bool apply, bool force)
+{
+    auto fail = [&](const QString &message) {
+        if (apply)
+            setError(message);
+        QVariantMap r = result(false, slotId, message);
+        for (const char *k : {"updated", "added", "removed", "removedWithPlan", "kept", "clashes"})
+            r.insert(QLatin1String(k), 0);
+        return r;
+    };
+    QString error;
+    const TrainingSlot old = m_slots.get(slotId, &error);
+    if (old.id < 0)
+        return fail(error.isEmpty() ? tr("Créneau introuvable.") : error);
+    QVariantMap fixedRule = rule;
+    fixedRule.insert(QStringLiteral("teamId"), old.teamId);       // un créneau ne change pas d'équipe
+    TrainingSlot next;
+    QString problem;
+    if (!parseRule(fixedRule, &next, &problem))
+        return fail(problem);
+    next.id = old.id;
+
+    // Seules les séances à venir changent ; les séances passées restent telles quelles.
+    const QDate today = QDate::currentDate();
+    const QList<QDateTime> wanted = starts(next, std::max(today, next.firstDay), next.lastDay, &problem);
+    if (!problem.isEmpty())
+        return fail(problem);
+    QHash<QDate, QDateTime> wantedByDay;
+    for (const QDateTime &d : wanted)
+        wantedByDay.insert(d.date(), d);
+
+    const QList<Session> existing = m_sessions.listBySlot(slotId, &error);
+    const QHash<int, SessionRepository::Usage> usage = m_sessions.usageOfSlot(slotId, &error);
+    if (!error.isEmpty())
+        return fail(error);
+
+    QList<Session> toUpdate, toAdd;
+    QList<int> toRemove;
+    int removedWithPlan = 0, kept = 0;
+    QSet<QDate> covered;            // jours déjà occupés par une séance du créneau (gardée ou mise à jour)
+    for (const Session &e : existing) {
+        const QDate day = e.startAt.date();
+        if (day < today)
+            continue;
+        if (usage.value(e.id).attendance) {             // appel fait : on n'y touche jamais
+            ++kept;
+            covered.insert(day);
+            continue;
+        }
+        if (!wantedByDay.contains(day) || covered.contains(day)) {
+            toRemove.append(e.id);
+            if (usage.value(e.id).plan)
+                ++removedWithPlan;
+            continue;
+        }
+        covered.insert(day);
+        // Un champ modifié à la main sur cette séance (différent de l'ancien créneau) est respecté.
+        Session u = e;
+        if (e.startAt.time() == old.startTime)
+            u.startAt = QDateTime(day, next.startTime);
+        if (e.durationMin == old.durationMin)
+            u.durationMin = next.durationMin;
+        if (e.location == old.location)
+            u.location = next.location;
+        if (e.theme == old.theme)
+            u.theme = next.theme;
+        if (u.startAt != e.startAt || u.durationMin != e.durationMin || u.location != e.location || u.theme != e.theme)
+            toUpdate.append(u);
+    }
+    for (const QDateTime &d : wanted)
+        if (!covered.contains(d.date()))
+            toAdd.append(sessionFrom(next, d));
+
+    // Chevauchements avec les séances qui n'appartiennent pas à ce créneau.
+    int clashes = 0;
+    auto clashesWithOthers = [&](const Session &s) {
+        if (s.status == QLatin1String("cancelled"))
+            return false;
+        for (const Session &c : m_sessions.conflicts(s.teamId, s.startAt, s.durationMin, s.id))
+            if (c.slotId != slotId)
+                return true;
+        return false;
+    };
+    for (const Session &s : std::as_const(toUpdate))
+        clashes += clashesWithOthers(s) ? 1 : 0;
+    for (const Session &s : std::as_const(toAdd))
+        clashes += clashesWithOthers(s) ? 1 : 0;
+
+    QVariantMap r = result(true, slotId);
+    r.insert(QStringLiteral("updated"), int(toUpdate.size()));
+    r.insert(QStringLiteral("added"), int(toAdd.size()));
+    r.insert(QStringLiteral("removed"), int(toRemove.size()));
+    r.insert(QStringLiteral("removedWithPlan"), removedWithPlan);
+    r.insert(QStringLiteral("kept"), kept);
+    r.insert(QStringLiteral("clashes"), clashes);
+    if (!apply)
+        return r;
+    if (clashes > 0 && !force) {
+        r.insert(QStringLiteral("ok"), false);
+        r.insert(QStringLiteral("needsConfirm"), true);
+        r.insert(QStringLiteral("error"), tr("%n séance(s) chevaucheront une autre séance de l'équipe.", nullptr, clashes));
+        return r;
+    }
+
+    bool ok = m_db.transaction();
+    if (!ok)
+        error = m_db.lastError().text();
+    if (ok)
+        ok = m_slots.update(next, &error);
+    for (int id : std::as_const(toRemove)) {
+        if (!ok)
+            break;
+        ok = m_sessions.remove(id, &error);
+    }
+    for (const Session &s : std::as_const(toUpdate)) {
+        if (!ok)
+            break;
+        ok = m_sessions.update(s, &error);
+    }
+    for (Session &s : toAdd) {
+        if (!ok)
+            break;
+        ok = m_sessions.insert(s, &error);
+    }
+    if (ok && !m_db.commit()) {
+        ok = false;
+        error = m_db.lastError().text();
+    }
+    if (!ok) {
+        m_db.rollback();
+        return fail(error);
+    }
+    setError(QString());
+    return r;
+}
+
+QVariantMap Backend::previewSlotUpdate(int slotId, const QVariantMap &rule)
+{
+    return planSlotUpdate(slotId, rule, false, false);
+}
+
+QVariantMap Backend::updateSlot(int slotId, const QVariantMap &rule, bool force)
+{
+    return planSlotUpdate(slotId, rule, true, force);
+}
+
+namespace {
+
+struct SlotDeletion
+{
+    QList<int> upcoming, past;      // séances supprimables (sans appel)
+    int kept = 0;                   // séances avec appel, conservées
+    int withPlanUpcoming = 0, withPlanPast = 0;
+};
+
+SlotDeletion planDeletion(const QList<Session> &sessions, const QHash<int, SessionRepository::Usage> &usage)
+{
+    SlotDeletion d;
+    const QDate today = QDate::currentDate();
+    for (const Session &s : sessions) {
+        const SessionRepository::Usage u = usage.value(s.id);
+        if (u.attendance) {
+            ++d.kept;
+        } else if (s.startAt.date() >= today) {
+            d.upcoming.append(s.id);
+            d.withPlanUpcoming += u.plan ? 1 : 0;
+        } else {
+            d.past.append(s.id);
+            d.withPlanPast += u.plan ? 1 : 0;
+        }
+    }
+    return d;
+}
+
+} // namespace
+
+QVariantMap Backend::previewSlotDelete(int slotId)
+{
+    QString error;
+    const TrainingSlot t = m_slots.get(slotId, &error);
+    if (t.id < 0)
+        return result(false, slotId, error.isEmpty() ? tr("Créneau introuvable.") : error);
+    const SlotDeletion d = planDeletion(m_sessions.listBySlot(slotId, &error), m_sessions.usageOfSlot(slotId, &error));
+    if (!error.isEmpty())
+        return result(false, slotId, error);
+    QVariantMap r = result(true, slotId);
+    r.insert(QStringLiteral("upcoming"), int(d.upcoming.size()));
+    r.insert(QStringLiteral("past"), int(d.past.size()));
+    r.insert(QStringLiteral("kept"), d.kept);
+    r.insert(QStringLiteral("withPlan"), d.withPlanUpcoming);
+    r.insert(QStringLiteral("withPlanPast"), d.withPlanPast);
+    return r;
+}
+
+QVariantMap Backend::deleteSlot(int slotId, bool includePast)
+{
+    QString error;
+    const TrainingSlot t = m_slots.get(slotId, &error);
+    if (t.id < 0) {
+        setError(error.isEmpty() ? tr("Créneau introuvable.") : error);
+        return result(false, slotId, m_lastError);
+    }
+    const SlotDeletion d = planDeletion(m_sessions.listBySlot(slotId, &error), m_sessions.usageOfSlot(slotId, &error));
+    if (!error.isEmpty()) {
+        setError(error);
+        return result(false, slotId, error);
+    }
+    QList<int> ids = d.upcoming;
+    if (includePast)
+        ids += d.past;
+    bool ok = m_db.transaction();
+    if (!ok)
+        error = m_db.lastError().text();
+    for (int id : std::as_const(ids)) {
+        if (!ok)
+            break;
+        ok = m_sessions.remove(id, &error);
+    }
+    // Séances restantes : séances seules (la clé étrangère le fait aussi, on ne s'en remet pas qu'à elle).
+    if (ok) {
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral("UPDATE training_session SET slot_id = NULL WHERE slot_id = ?"));
+        q.addBindValue(slotId);
+        ok = q.exec();
+        if (!ok)
+            error = q.lastError().text();
+    }
+    if (ok)
+        ok = m_slots.remove(slotId, &error);
+    if (ok && !m_db.commit()) {
+        ok = false;
+        error = m_db.lastError().text();
+    }
+    if (!ok) {
+        m_db.rollback();
+        setError(error);
+        return result(false, slotId, error);
+    }
+    setError(QString());
+    QVariantMap r = result(true, slotId);
+    r.insert(QStringLiteral("removed"), int(ids.size()));
+    r.insert(QStringLiteral("kept"), int(d.kept + (includePast ? 0 : d.past.size())));
+    return r;
 }

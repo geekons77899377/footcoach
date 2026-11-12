@@ -2,22 +2,60 @@ import QtQuick
 import QtQuick.Controls
 import "DateUtil.js" as DateUtil
 
-// Séances récurrentes : jours de la semaine, heure, durée, période ; aperçu du nombre de séances créées.
+// Créneau régulier : jours de la semaine, heure, durée, période. Création : aperçu du nombre de séances créées.
+// Modification (slotId > 0) : aperçu des séances à venir modifiées, ajoutées, supprimées ; déprogrammation en bloc.
 Item {
     id: root
 
     property int teamId: -1
+    property int slotId: -1               // > 0 : modification d'un créneau existant
+    readonly property bool editing: slotId > 0
     property bool showBack: true
     property var weekdays: []             // 1 = lundi … 7 = dimanche
     property int durationMin: 90
     property string errorText: ""
     property var preview: ({ ok: false, count: 0, clashes: 0, error: "" })
+    property var deletion: null           // aperçu de la déprogrammation en cours
 
     signal closeRequested()
     signal created(int count, string firstDay)
+    signal slotChanged(string message)
+
+    function openEdit(slot) {
+        teamId = slot.teamId;
+        slotId = slot.id;
+        weekdays = slot.weekdays.slice();
+        durationMin = slot.durationMin;
+        errorText = "";
+        fromField.text = DateUtil.display(slot.from);
+        toField.text = DateUtil.display(slot.to);
+        timeField.text = slot.time;
+        theme.text = slot.theme;
+        location.text = slot.location;
+        scroll.contentY = 0;
+        refreshPreview();
+    }
+
+    function plural(n, one, many) { return n + " " + (n > 1 ? many : one); }
+
+    // Texte de l'aperçu d'une modification.
+    function changeText(p) {
+        var parts = [];
+        if (p.updated > 0) parts.push(plural(p.updated, "séance modifiée", "séances modifiées"));
+        if (p.added > 0) parts.push(plural(p.added, "séance ajoutée", "séances ajoutées"));
+        if (p.removed > 0) parts.push(plural(p.removed, "séance supprimée", "séances supprimées")
+                                      + (p.removedWithPlan > 0 ? " (dont " + p.removedWithPlan + " avec un plan d'exercices)" : ""));
+        var t = parts.length === 0 ? "Aucune séance à venir ne change." : parts.join(" · ");
+        if (p.kept > 0)
+            t += "\n" + plural(p.kept, "séance gardée telle quelle (appel déjà fait)", "séances gardées telles quelles (appel déjà fait)");
+        if (p.clashes > 0)
+            t += "\n" + plural(p.clashes, "séance chevauchera", "séances chevaucheront") + " une autre séance de l'équipe.";
+        return t;
+    }
 
     function openNew(team, day) {
         teamId = team;
+        slotId = -1;
         weekdays = [];
         durationMin = 90;
         errorText = "";
@@ -36,7 +74,7 @@ Item {
                  location: location.text, theme: theme.text };
     }
 
-    function refreshPreview() { preview = backend.previewRecurrence(rule()); }
+    function refreshPreview() { preview = editing ? backend.previewSlotUpdate(slotId, rule()) : backend.previewRecurrence(rule()); }
 
     function toggleDay(d) {
         var list = weekdays.slice();
@@ -54,6 +92,7 @@ Item {
         if (r.ok) {
             created(r.count, DateUtil.parse(fromField.text));
         } else if (r.needsConfirm) {
+            confirm.action = "create";
             confirm.confirm("Chevauchements", r.error + "\n\nCréer quand même toutes les séances ?", "Créer", false);
         } else {
             errorText = r.error;
@@ -61,11 +100,87 @@ Item {
         }
     }
 
+    function save(force, removalConfirmed) {
+        // Des séances vont disparaître : on demande d'abord confirmation.
+        if (!removalConfirmed && preview.ok && preview.removed > 0) {
+            confirm.action = "removal";
+            confirm.confirm("Modifier le créneau ?",
+                            plural(preview.removed, "séance à venir sera supprimée", "séances à venir seront supprimées")
+                            + (preview.removedWithPlan > 0 ? ", dont " + preview.removedWithPlan + " avec un plan d'exercices" : "")
+                            + ".", "Modifier", true);
+            return;
+        }
+        var r = backend.updateSlot(slotId, rule(), force === true);
+        if (r.ok) {
+            slotChanged("Créneau modifié");
+        } else if (r.needsConfirm) {
+            confirm.action = "clash";
+            confirm.confirm("Chevauchements", r.error + "\n\nModifier quand même ?", "Modifier", false);
+        } else {
+            errorText = r.error;
+            scroll.contentY = 0;
+        }
+    }
+
+    // Déprogrammation : choix de l'étendue s'il reste des séances passées sans appel, puis confirmation.
+    function askDelete() {
+        var d = backend.previewSlotDelete(slotId);
+        if (!d.ok) {
+            errorText = d.error;
+            return;
+        }
+        deletion = d;
+        if (d.past > 0) {
+            scopeSheet.model = [
+                { id: "upcoming", text: "Séances à venir (" + d.upcoming + ")", icon: "calendar" },
+                { id: "all", text: "À venir et passées sans appel (" + (d.upcoming + d.past) + ")", icon: "trash", danger: true }];
+            scopeSheet.open();
+        } else {
+            confirmDelete(false);
+        }
+    }
+
+    function confirmDelete(includePast) {
+        var d = deletion;
+        var n = d.upcoming + (includePast ? d.past : 0);
+        var kept = d.kept + (includePast ? 0 : d.past);
+        var withPlan = d.withPlan + (includePast ? d.withPlanPast : 0);
+        var msg = n === 0 ? "Aucune séance ne sera supprimée."
+                          : plural(n, "séance sera supprimée", "séances seront supprimées")
+                            + (withPlan > 0 ? ", dont " + withPlan + " avec un plan d'exercices" : "") + ".";
+        if (kept > 0)
+            msg += "\n" + plural(kept, "séance restera dans le calendrier", "séances resteront dans le calendrier")
+                   + " comme séance seule.";
+        confirm.action = includePast ? "deleteAll" : "deleteUpcoming";
+        confirm.confirm("Déprogrammer le créneau ?", msg, "Déprogrammer", true);
+    }
+
+    function doDelete(includePast) {
+        var r = backend.deleteSlot(slotId, includePast);
+        if (r.ok)
+            slotChanged(r.removed === 0 ? "Créneau déprogrammé"
+                                        : "Créneau déprogrammé : " + plural(r.removed, "séance supprimée", "séances supprimées"));
+        else
+            errorText = r.error;
+    }
+
     onDurationMinChanged: refreshPreview()
 
     PromptDialog {
         id: confirm
-        onAccepted: root.create(true)
+        property string action: "create"
+        onAccepted: {
+            if (action === "removal") root.save(false, true);
+            else if (action === "clash") root.save(true, true);
+            else if (action === "deleteUpcoming") root.doDelete(false);
+            else if (action === "deleteAll") root.doDelete(true);
+            else root.create(true);
+        }
+    }
+    ActionSheet {
+        id: scopeSheet
+        title: "Que faut-il supprimer ?"
+        onChosen: (id) => root.confirmDelete(id === "all")
     }
     DatePicker {
         id: datePicker
@@ -82,7 +197,7 @@ Item {
     PageHeader {
         id: header
         width: parent.width
-        title: "Séances récurrentes"
+        title: root.editing ? "Modifier le créneau" : "Nouveau créneau régulier"
         leftInset: root.showBack ? 40 : 0
     }
     IconButton {
@@ -265,25 +380,47 @@ Item {
             Card {
                 width: parent.width
                 padding: 14
-                Text {
+                Column {
                     width: parent.width
-                    wrapMode: Text.Wrap
-                    font.pixelSize: 14
-                    font.weight: Font.DemiBold
-                    color: root.preview.ok ? Theme.text : Theme.warn
-                    text: root.preview.ok
-                          ? root.preview.count + (root.preview.count > 1 ? " séances seront créées" : " séance sera créée")
-                            + (root.preview.clashes > 0 ? " (dont " + root.preview.clashes + " en chevauchement)" : "")
-                          : root.preview.error
+                    spacing: 6
+                    Text {
+                        objectName: "slotPreview"
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                        color: root.preview.ok ? Theme.text : Theme.warn
+                        text: !root.preview.ok ? root.preview.error
+                              : root.editing ? root.changeText(root.preview)
+                              : root.preview.count + (root.preview.count > 1 ? " séances seront créées" : " séance sera créée")
+                                + (root.preview.clashes > 0 ? " (dont " + root.preview.clashes + " en chevauchement)" : "")
+                    }
+                    Text {
+                        visible: root.editing
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        font.pixelSize: 12
+                        color: Theme.textMuted
+                        text: "Seules les séances à venir changent. Une séance avec un appel n'est jamais modifiée, "
+                              + "et un champ modifié à la main sur une séance est conservé."
+                    }
                 }
             }
             AppButton {
                 width: parent.width
                 kind: "primary"
-                text: "Créer les séances"
-                iconName: "repeat"
+                text: root.editing ? "Enregistrer les modifications" : "Créer les séances"
+                iconName: root.editing ? "check" : "repeat"
                 enabled: root.preview.ok
-                onClicked: root.create(false)
+                onClicked: root.editing ? root.save(false, false) : root.create(false)
+            }
+            AppButton {
+                visible: root.editing
+                width: parent.width
+                kind: "danger"
+                text: "Déprogrammer le créneau"
+                iconName: "trash"
+                onClicked: root.askDelete()
             }
         }
     }

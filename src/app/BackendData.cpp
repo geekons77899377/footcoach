@@ -25,7 +25,8 @@ constexpr int kMaxRows = 500000;
 
 // Ordre d'insertion (parents avant enfants) ; la suppression se fait dans l'ordre inverse.
 const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("team"),
-                             QStringLiteral("player"),         QStringLiteral("training_session"),
+                             QStringLiteral("player"),         QStringLiteral("player_contact"),
+                             QStringLiteral("training_slot"),  QStringLiteral("training_session"),
                              QStringLiteral("attendance"),     QStringLiteral("football_match"),
                              QStringLiteral("match_player"),   QStringLiteral("exercise_category"), QStringLiteral("exercise"),
                              QStringLiteral("session_exercise"), QStringLiteral("tactical_board"),
@@ -40,6 +41,8 @@ bool isSchema6Table(const QString &t)
 // Schéma de la première version qui contient la table (fichiers plus anciens : table absente, normal).
 int tableSince(const QString &t)
 {
+    if (t == QLatin1String("player_contact") || t == QLatin1String("training_slot"))
+        return 10;
     if (t == QLatin1String("exercise_category"))
         return 9;
     return isSchema6Table(t) ? 6 : 1;
@@ -395,6 +398,18 @@ QVariantMap Backend::importDataFile(const QString &url)
             if (!ok)
                 failure = c.lastError().text();
         }
+    }
+
+    // Contacts (schéma 10) : dans un fichier plus ancien, le téléphone et l'e-mail du joueur deviennent son contact 1,
+    // comme le fait la migration 010.
+    if (ok && root.value(QStringLiteral("schema")).toInt(-1) < 10) {
+        QSqlQuery c(m_db);
+        ok = c.exec(QStringLiteral(
+            "INSERT INTO player_contact(player_id, rank, phone, email) "
+            "SELECT id, 1, NULLIF(trim(phone), ''), NULLIF(trim(email), '') FROM player "
+            "WHERE NULLIF(trim(phone), '') IS NOT NULL OR NULLIF(trim(email), '') IS NOT NULL"));
+        if (!ok)
+            failure = c.lastError().text();
     }
 
     // Règles de liens des terrains (SDD 5.3, décision D18) : refus total, rien n'est réparé. Le contrôle se fait sur
