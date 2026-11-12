@@ -167,6 +167,59 @@ Item {
                         + "\n\nPour garder l'historique des présences, désactivez plutôt les joueurs qui ont quitté l'équipe.",
                         "Supprimer", true);
     }
+    // Déplacement vers une autre équipe : choix de l'équipe, confirmation, compte rendu.
+    readonly property var otherTeams: teams.filter(function (t) { return t.id !== teamId; })
+    function askMoveSelected() {
+        if (selectedCount === 0 || otherTeams.length === 0)
+            return;
+        var m = [];
+        for (var i = 0; i < otherTeams.length; ++i)
+            m.push({ id: "t" + otherTeams[i].id, icon: "users",
+                     text: otherTeams[i].name + (otherTeams[i].clubName ? " · " + otherTeams[i].clubName : "") });
+        moveSheet.model = m;
+        moveSheet.open();
+    }
+    function teamName(id) {
+        for (var i = 0; i < teams.length; ++i)
+            if (teams[i].id === id)
+                return teams[i].name;
+        return "";
+    }
+    function confirmMove(target) {
+        var n = selectedCount;
+        var name = teamName(target);
+        confirm.action = "movePlayers";
+        confirm.moveTarget = target;
+        confirm.confirm(n > 1 ? "Déplacer " + n + " joueurs ?" : "Déplacer 1 joueur ?",
+                        (n > 1 ? "Ces joueurs passeront" : "Ce joueur passera") + " dans l'équipe « " + name + " ». "
+                        + "Leurs présences, blessures, photos et contacts les suivent.\n\n"
+                        + "Un numéro de maillot déjà pris dans « " + name + " » sera retiré. Un joueur qui y existe déjà "
+                        + "(même nom ou même licence) ne sera pas déplacé.",
+                        "Déplacer", false);
+    }
+    function moveSelected(target) {
+        var ids = Object.keys(selected).map(function (k) { return parseInt(k); });
+        var r = backend.movePlayers(ids, target);
+        if (!r.ok) {
+            toast.show(r.error);
+            return;
+        }
+        clearSelection();
+        refreshTeams();
+        var name = teamName(target);
+        var msg = r.moved === 0 ? "Aucun joueur déplacé"
+                : (r.moved > 1 ? r.moved + " joueurs déplacés" : "1 joueur déplacé") + " vers " + name;
+        if (r.numbersCleared > 0)
+            msg += " · " + (r.numbersCleared > 1 ? r.numbersCleared + " numéros retirés" : "1 numéro retiré");
+        if (r.skipped.length > 0) {
+            info.confirm("Déplacement", msg + ".\n\nDéjà présents dans « " + name + " », non déplacés : "
+                         + r.skipped.join(", ") + ".", "OK", false);
+            info.cancelVisible = false;
+        } else {
+            toast.show(msg);
+        }
+    }
+
     function deleteSelected() {
         var ids = Object.keys(selected).map(function (k) { return parseInt(k); });
         var r = backend.deletePlayers(ids);
@@ -255,8 +308,11 @@ Item {
     PromptDialog {
         id: confirm
         property string action: ""
+        property int moveTarget: -1
         onAccepted: {
-            if (action === "deletePlayers") {
+            if (action === "movePlayers") {
+                page.moveSelected(moveTarget);
+            } else if (action === "deletePlayers") {
                 page.deleteSelected();
             } else if (action === "deletePlayer") {
                 var r = backend.deletePlayer(page.currentId);
@@ -286,6 +342,14 @@ Item {
                 }
             }
         }
+    }
+
+    PromptDialog { id: info; objectName: "squadInfo" }
+    ActionSheet {
+        id: moveSheet
+        objectName: "moveSheet"
+        title: "Déplacer vers…"
+        onChosen: (id) => page.confirmMove(parseInt(id.substring(1)))
     }
 
     PlayersImportDialog {
@@ -468,14 +532,14 @@ Item {
                     text: page.selectedCount === 0 ? "Aucun joueur"
                           : page.selectedCount + (page.selectedCount > 1 ? " sélectionnés" : " sélectionné")
                     font.family: Theme.fontHeading
-                    font.pixelSize: 22
+                    font.pixelSize: selectionBar.width < 480 ? 19 : 22
                     font.weight: Font.Bold
                     color: Theme.text
                 }
                 Text {
                     width: parent.width
                     elide: Text.ElideRight
-                    text: "Touchez les joueurs à supprimer"
+                    text: "Touchez pour cocher"
                     font.pixelSize: 12
                     color: Theme.textMuted
                 }
@@ -483,7 +547,7 @@ Item {
             Rectangle {
                 id: selAll
                 objectName: "selectAllButton"
-                anchors.right: trashButton.left
+                anchors.right: moveButton.visible ? moveButton.left : trashButton.left
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 height: 36
@@ -507,6 +571,20 @@ Item {
                     anchors.fill: parent
                     onClicked: page.selectAllShown(!page.allShownSelected)
                 }
+            }
+            IconButton {
+                id: moveButton
+                objectName: "moveSelectedButton"
+                visible: page.otherTeams.length > 0
+                anchors.right: trashButton.left
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                enabled: page.selectedCount > 0
+                iconName: "move"
+                fillColor: Theme.surface
+                borderColor: Theme.border
+                accessibleName: "Déplacer vers une autre équipe"
+                onClicked: page.askMoveSelected()
             }
             IconButton {
                 id: trashButton

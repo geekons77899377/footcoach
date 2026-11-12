@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## Non publié — déplacer des joueurs vers une autre équipe
+- **Effectif, mode sélection** : nouveau bouton **« Déplacer »** (flèche) entre « Tous » et la poubelle, visible s'il existe une autre équipe. On choisit l'équipe d'arrivée (nom et club), on confirme, puis un compte rendu s'affiche.
+- Règles (`Backend::movePlayers`) : présences, blessures, photo, contacts et convocations passées suivent le joueur. Un **numéro de maillot** déjà pris dans l'équipe d'arrivée par un joueur actif est retiré. Un joueur qui y existe déjà (**même nom** ou **même licence**, casse ignorée) n'est pas déplacé : il est nommé dans le compte rendu. Tout ou rien pour les autres.
+- `PromptDialog` : propriété `cancelVisible` pour un simple message avec un bouton OK.
+- Correction : les icônes des boutons « Importer une liste de joueurs » et « Importer des photos » de l'Effectif étaient vides (glyphes `text` et `photo` absents de `Icon.qml`). Ajout aussi du glyphe `move`.
+- Tests : `tst_reset::movePlayersToAnotherTeam` (numéro gardé ou retiré, nom ou licence en double, historique conservé, cas d'erreur) ; `t_select.py` étendu (déplacement, compte rendu, bouton masqué avec une seule équipe ; backend **simulé**).
+
 ## Non publié — suppression groupée dans l'Effectif et « Tout effacer »
 - **Effectif, sélection multiple** : un **appui long** sur un joueur (liste ou cartes) passe en mode sélection. Chaque joueur a une case à cocher ronde ; toucher un joueur le coche ou le décoche (sans ouvrir sa fiche). L'en-tête devient une barre « N sélectionnés » avec une croix (annuler), **« Tous » / « Aucun »** (joueurs affichés, donc selon les filtres et « Afficher les joueurs inactifs ») et une **poubelle rouge**. Confirmation avant suppression, qui rappelle de plutôt désactiver un joueur parti pour garder l'historique. Le bouton retour d'Android annule la sélection ; changer d'équipe aussi.
 - Suppression **tout ou rien** (`Backend::deletePlayers`) : présences, blessures, photos, convocations et contacts des joueurs supprimés partent avec eux.

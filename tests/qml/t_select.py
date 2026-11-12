@@ -8,8 +8,18 @@ from PySide6.QtCore import QMetaObject, Q_ARG, QPointF, Qt
 from PySide6.QtTest import QTest
 
 class B7(B4):
+    two_teams = True
     def __init__(self):
         super().__init__(); self.calls = []
+    @Slot(result="QVariantList")
+    def teams(self):
+        t = [{"id": 1, "name": "Senior A", "category": "Seniors", "playerCount": 4, "clubName": "Mon club"}]
+        if B7.two_teams: t.append({"id": 2, "name": "U13", "category": "U13", "playerCount": 12, "clubName": "Mon club"})
+        return t
+    @Slot("QVariantList", int, result="QVariantMap")
+    def movePlayers(self, ids, team):
+        self.calls.append(("movePlayers", sorted(int(i) for i in ids), team))
+        return {"ok": True, "error": "", "moved": len(ids) - 1, "numbersCleared": 1, "skipped": ["Yann Portier"]}
     @Slot("QVariantList", result="QVariantMap")
     def deletePlayers(self, ids):
         self.calls.append(("deletePlayers", sorted(int(i) for i in ids)))
@@ -23,7 +33,8 @@ class B7(B4):
     @Slot(result=str)
     def suggestedExportName(self): return "footcoach.footcoach"
 
-def make7(w, hh, where="squad"):
+def make7(w, hh, where="squad", two=True):
+    B7.two_teams = two
     B4.empty = False; B4.noteam = False
     b = B7(); b.keep = []
     h = Harness(w, hh, backend=b)
@@ -133,6 +144,39 @@ for name, w, hh, rowname in [("telephone", 412, 892, "playerRow"), ("tablette", 
     # Un toucher simple ouvre toujours la fiche.
     click_item(h, rows(h, rowname)[0])
     check(pg.property("editing"), f"{name} : toucher simple hors sélection -> fiche")
+
+# Déplacer vers une autre équipe.
+def jsval(v): return v.toVariant() if hasattr(v, "toVariant") else v
+for name, w, hh, rowname in [("telephone", 412, 892, "playerRow"), ("bureau", 1280, 800, "playerRow")]:
+    h, b = make7(w, hh); pg = squad_page(h)
+    long_press(h, rows(h, rowname)[0]); click_item(h, rows(h, rowname)[3])
+    mv = F(h, "moveSelectedButton"); bar = F(h, "selectionBar")
+    check(mv.isVisible() and mv.property("enabled"), f"{name} : bouton Déplacer visible et actif")
+    xs = [F(h, n).mapToScene(QPointF(0, 0)).x() for n in ("selectAllButton", "moveSelectedButton", "deleteSelectedButton")]
+    check(xs == sorted(xs) and F(h, "deleteSelectedButton").mapToScene(QPointF(48, 0)).x() <= w, f"{name} : Tous, Déplacer, poubelle alignés dans la barre {xs}")
+    cnt = F(h, "selectionCount")
+    check(cnt.property("truncated") is False, f"{name} : compteur lisible en entier ({cnt.property('text')!r})")
+    shot(h, f"move_{name}_barre")
+    click_item(h, mv); h.spin(300)
+    sh = F(h, "moveSheet") or [o for o in objs(h, lambda o: o.objectName() == "moveSheet")][0]
+    labels = [m["text"] for m in jsval(sh.property("model"))]
+    check(labels == ["U13 · Mon club"], f"{name} : équipes proposées (sans l'équipe actuelle) : {labels}")
+    QMetaObject.invokeMethod(sh, "close"); QMetaObject.invokeMethod(sh, "chosen", Q_ARG("QString", "t2")); h.spin(400)
+    d = open_dialog(h)
+    check(d is not None and d.property("title") == "Déplacer 2 joueurs ?" and "« U13 »" in d.property("message"), f"{name} : confirmation du déplacement")
+    check(not b.calls, f"{name} : rien déplacé avant confirmation")
+    shot(h, f"move_{name}_confirmation")
+    accept(h, d)
+    check(b.calls == [("movePlayers", [1, 4], 2)], f"{name} : movePlayers([1, 4], 2) : {b.calls}")
+    check(not pg.property("selecting"), f"{name} : sélection terminée")
+    i = open_dialog(h)
+    m = i.property("message") if i else ""
+    check(i is not None and "1 joueur déplacé vers U13 · 1 numéro retiré" in m and "Yann Portier" in m and not i.property("cancelVisible"), f"{name} : compte rendu avec les joueurs non déplacés : {m!r}")
+    shot(h, f"move_{name}_compte_rendu")
+# Une seule équipe : pas de bouton Déplacer.
+h, b = make7(412, 892, two=False)
+long_press(h, rows(h, "playerRow")[0])
+check(not F(h, "moveSelectedButton").isVisible(), "une seule équipe : bouton Déplacer masqué")
 
 # Données : tout effacer.
 for name, w, hh in [("telephone", 412, 892), ("bureau", 1280, 800)]:

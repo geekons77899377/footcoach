@@ -15,6 +15,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QSqlError>
+#include <QSqlQuery>
 #ifdef Q_OS_ANDROID
 #include <QCoreApplication>
 #include <QJniObject>
@@ -705,6 +706,88 @@ QVariantMap Backend::deletePlayers(const QVariantList &ids)
     QVariantMap r = result(ok, -1, error);
     r.insert(QStringLiteral("removed"), ok ? int(list.size()) : 0);
     return r;
+}
+
+QVariantMap Backend::movePlayers(const QVariantList &ids, int teamId)
+{
+    QVariantMap out;
+    out.insert(QStringLiteral("moved"), 0);
+    out.insert(QStringLiteral("numbersCleared"), 0);
+    out.insert(QStringLiteral("skipped"), QStringList());
+    auto fail = [&](const QString &message) {
+        setError(message);
+        out.insert(QStringLiteral("ok"), false);
+        out.insert(QStringLiteral("error"), message);
+        return out;
+    };
+    QString error;
+    bool teamFound = false;
+    for (const Team &t : m_teams.all(&error))
+        teamFound = teamFound || t.id == teamId;
+    if (!teamFound)
+        return fail(error.isEmpty() ? tr("Équipe d'arrivée introuvable.") : error);
+    QList<int> list;
+    for (const QVariant &v : ids)
+        if (v.toInt() > 0 && !list.contains(v.toInt()))
+            list.append(v.toInt());
+    if (list.isEmpty())
+        return fail(tr("Aucun joueur sélectionné."));
+
+    int moved = 0, cleared = 0;
+    QStringList skipped;
+    bool ok = m_db.transaction();
+    if (!ok)
+        error = m_db.lastError().text();
+    for (int id : std::as_const(list)) {
+        if (!ok)
+            break;
+        QSqlQuery q(m_db);
+        q.prepare(QStringLiteral("SELECT team_id, first_name, last_name, IFNULL(licence, ''), IFNULL(jersey_number, 0), active "
+                                 "FROM player WHERE id = ?"));
+        q.addBindValue(id);
+        if (!q.exec()) {
+            ok = false;
+            error = q.lastError().text();
+            break;
+        }
+        if (!q.next() || q.value(0).toInt() == teamId)
+            continue;                                   // introuvable ou déjà dans l'équipe : rien à faire
+        const QString first = q.value(1).toString(), last = q.value(2).toString(), licence = q.value(3).toString();
+        const int number = q.value(4).toInt();
+        const bool active = q.value(5).toInt() != 0;
+        if (m_players.nameTaken(teamId, first, last, id) || (!licence.isEmpty() && m_players.licenceTaken(teamId, licence, id))) {
+            skipped << QStringLiteral("%1 %2").arg(first, last).trimmed();
+            continue;
+        }
+        const bool clear = active && number > 0 && m_players.jerseyTaken(teamId, number, id);
+        QSqlQuery u(m_db);
+        u.prepare(clear ? QStringLiteral("UPDATE player SET team_id = ?, jersey_number = NULL WHERE id = ?")
+                        : QStringLiteral("UPDATE player SET team_id = ? WHERE id = ?"));
+        u.addBindValue(teamId);
+        u.addBindValue(id);
+        if (!u.exec()) {
+            ok = false;
+            error = u.lastError().text();
+            break;
+        }
+        ++moved;
+        cleared += clear ? 1 : 0;
+    }
+    if (ok && !m_db.commit()) {
+        ok = false;
+        error = m_db.lastError().text();
+    }
+    if (!ok) {
+        m_db.rollback();
+        return fail(error);
+    }
+    setError(QString());
+    out.insert(QStringLiteral("ok"), true);
+    out.insert(QStringLiteral("error"), QString());
+    out.insert(QStringLiteral("moved"), moved);
+    out.insert(QStringLiteral("numbersCleared"), cleared);
+    out.insert(QStringLiteral("skipped"), skipped);
+    return out;
 }
 
 QVariantMap Backend::importPlayers(int teamId, const QString &text)

@@ -1,4 +1,5 @@
-// Effacement de toutes les données (retour à une première installation) et suppression de plusieurs joueurs.
+// Effacement de toutes les données (retour à une première installation), suppression et déplacement de plusieurs
+// joueurs.
 #include "app/Backend.h"
 #include "core/Database.h"
 
@@ -144,6 +145,49 @@ private slots:
         QVERIFY(!empty.value("ok").toBool());
         QCOMPARE(empty.value("removed").toInt(), 0);
         QCOMPARE(count(db.handle(), "SELECT COUNT(*) FROM player"), 2);
+    }
+
+    void movePlayersToAnotherTeam()
+    {
+        Database db(QStringLiteral("move"));
+        QVERIFY(db.open(m_dir.filePath("move.db")));
+        Backend b(db.handle());
+        const int u11 = b.saveTeam({{"name", "U11"}}).value("id").toInt();
+        const int u13 = b.saveTeam({{"name", "U13"}}).value("id").toInt();
+        auto add = [&](int team, const char *first, int number, const char *licence) {
+            const QVariantMap r = b.savePlayer({{"teamId", team}, {"firstName", first}, {"lastName", "X"},
+                                                {"jerseyNumber", number}, {"licence", licence}});
+            if (!r.value("ok").toBool())
+                qWarning() << r.value("error");
+            return r.value("id").toInt();
+        };
+        const int ana = add(u11, "Ana", 9, "");          // n° 9 libre en U13 : gardé
+        const int bob = add(u11, "Bob", 10, "");         // n° 10 pris en U13 : retiré
+        const int leo = add(u11, "Léo", 0, "");          // même nom qu'un joueur de U13 : pas déplacé
+        const int max = add(u11, "Max", 0, "AB123");     // même licence qu'un joueur de U13 : pas déplacé
+        add(u13, "Zoé", 10, "");
+        add(u13, "Léo", 0, "");
+        add(u13, "Tom", 0, "ab123");
+        QVERIFY(ana > 0 && bob > 0 && leo > 0 && max > 0);
+        const int session = b.saveSession({{"teamId", u11}, {"date", QDate::currentDate().toString("yyyy-MM-dd")},
+                                           {"time", "18:00"}, {"durationMin", 60}}, true).value("id").toInt();
+        QVERIFY(b.saveAttendance(session, {QVariantMap{{"playerId", ana}, {"status", "present"}}}, false).value("ok").toBool());
+
+        const QVariantMap r = b.movePlayers({ana, bob, leo, max}, u13);
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(r.value("moved").toInt(), 2);
+        QCOMPARE(r.value("numbersCleared").toInt(), 1);
+        QCOMPARE(r.value("skipped").toStringList(), (QStringList{"Léo X", "Max X"}));
+        QCOMPARE(column(db.handle(), QString("SELECT first_name || ':' || IFNULL(jersey_number, '-') FROM player "
+                                             "WHERE team_id = %1 ORDER BY first_name").arg(u13)),
+                 (QStringList{"Ana:9", "Bob:-", "Léo:-", "Tom:-", "Zoé:10"}));
+        QCOMPARE(column(db.handle(), QString("SELECT first_name FROM player WHERE team_id = %1 ORDER BY first_name").arg(u11)),
+                 (QStringList{"Léo", "Max"}));
+        QCOMPARE(count(db.handle(), QString("SELECT COUNT(*) FROM attendance WHERE player_id = %1").arg(ana)), 1);   // historique gardé
+
+        QVERIFY(b.movePlayers({ana}, u13).value("moved").toInt() == 0);            // déjà dans l'équipe
+        QVERIFY(!b.movePlayers({ana}, 9999).value("ok").toBool());
+        QVERIFY(!b.movePlayers({}, u11).value("ok").toBool());
     }
 };
 

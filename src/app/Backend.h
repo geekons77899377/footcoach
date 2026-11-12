@@ -96,6 +96,11 @@ public:
     Q_INVOKABLE QVariantMap deletePlayer(int id);                   // définitif (présences et blessures aussi)
     // Suppression définitive de plusieurs joueurs, tout ou rien : {ok, error, removed}.
     Q_INVOKABLE QVariantMap deletePlayers(const QVariantList &ids);
+    // Déplace des joueurs vers une autre équipe, tout ou rien pour ceux qui peuvent l'être. Un joueur dont le nom ou
+    // la licence existe déjà dans l'équipe d'arrivée n'est pas déplacé (skipped : ses nom et prénom) ; un numéro de
+    // maillot déjà pris là-bas par un joueur actif est retiré (numbersCleared). Présences, blessures, photo, contacts
+    // et convocations passées restent attachés au joueur. {ok, error, moved, numbersCleared, skipped}.
+    Q_INVOKABLE QVariantMap movePlayers(const QVariantList &ids, int teamId);
 
     // --- Séances (calendrier) ---------------------------------------------------------------------
     // Séances de l'équipe dont le jour est entre from et to (AAAA-MM-JJ, inclus), par date :

@@ -13,9 +13,11 @@ Popup {
     property int maxLength: 100
     property string okText: "Valider"
     property bool danger: false
+    property bool cancelVisible: true     // false : simple information (bouton OK seul)
     signal accepted(string text)
 
     function ask(titleText, initial, isMultiline, limit) {
+        cancelVisible = true;
         title = titleText;
         message = "";
         value = initial;
@@ -28,6 +30,7 @@ Popup {
     }
 
     function confirm(titleText, text, ok, isDanger) {
+        cancelVisible = true;
         title = titleText;
         message = text;
         fieldVisible = false;
@@ -130,6 +133,7 @@ Popup {
                 }
             }
             AppButton {
+                visible: root.cancelVisible
                 kind: "ghost"
                 text: "Annuler"
                 onClicked: root.close()
