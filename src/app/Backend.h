@@ -124,6 +124,9 @@ public:
     // content:// (sélecteur de fichiers Android).
     Q_INVOKABLE QString suggestedExportName() const;
     Q_INVOKABLE QVariantMap exportDataFile(const QString &url);
+    // Écrit l'export dans le dossier privé « exports/ » puis ouvre la feuille de partage Android (ShareBridge).
+    // Ailleurs : fichier écrit, chemin renvoyé dans « message ». {ok, error, message, path}.
+    Q_INVOKABLE QVariantMap partagerDonnees();
     // Lit un fichier sans rien modifier : {ok, error, exportedAt, appVersion, counts: {teams, players, sessions,
     // exercises, boards}, current: {…mêmes clés pour la base actuelle}}.
     Q_INVOKABLE QVariantMap inspectDataFile(const QString &url);

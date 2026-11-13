@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dossier exposé au partage : uniquement exports/ dans le stockage privé de l'appli. -->
+<paths>
+    <files-path name="exports" path="exports/" />
+</paths>

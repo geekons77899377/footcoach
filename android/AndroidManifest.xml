@@ -22,6 +22,13 @@
         android:largeScreens="true"
         android:normalScreens="true"
         android:smallScreens="true" />
+    <!-- Visibilité des applications qui peuvent recevoir un fichier .footcoach (Android 11+). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="application/json" />
+        </intent>
+    </queries>
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true"
@@ -50,6 +57,16 @@
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
         </activity>
 
+        <!-- Fichier .footcoach partagé par la feuille Android : seul le dossier exports/ est exposé. -->
+        <provider
+            android:name="org.footcoach.app.ExportFileProvider"
+            android:authorities="${applicationId}.exports"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/footcoach_exports_paths" />
+        </provider>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.qtprovider"
