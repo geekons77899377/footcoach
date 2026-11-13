@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## Non publié — formations à 8 et adversaires en même nombre
+- **Feuille « Formation » du terrain** : choix du format **À 11** ou **À 8**. À 8 (gardien + 7) : **3-3-1, 2-3-2, 3-2-2, 2-4-1**. Pour un match, le format est d'office « À 8 » quand 8 titulaires au plus sont convoqués, sinon « À 11 » ; on le change d'un appui.
+- **Adversaires** : l'interrupteur devient « Avec adversaires (autant de joueurs) » : ils sont toujours aussi nombreux que l'équipe (8 contre 8, 11 contre 11), placés avec la même formation en miroir. Avant, 11 adversaires étaient posés même pour une équipe à 8.
+- `Tactics::formationNames(int perSide)` et `Backend::formationNamesFor(int)` ; le placement des titulaires par poste (`SquadFormation.js`) fonctionne tel quel avec ces noms.
+- Pas de réglage « format » enregistré par équipe ou par match (le choix n'est pas mémorisé) ; les noms de formation à 8 sont des systèmes courants, non vérifiés dans un document de la FFF.
+- Tests : `tst_board::eightASideFormationsHaveEightPlayersAndEqualOpponents`, `tst_backend::formationsAndPalette` étendu, `t_squadboard.py` étendu (backend **simulé**).
+
 ## Non publié — feuille de partage pour la feuille de challenge
 - **Match > « Créer la feuille »** : sur Android, le PDF est d'abord proposé via la **feuille de partage** du système (imprimer, enregistrer, envoyer) au lieu de l'ouverture directe d'un fichier du cache, que beaucoup d'appareils refusent (le sélecteur « Enregistrer » s'affichait alors). Si le partage est impossible, l'ancien parcours reste (ouverture externe, puis sélecteur de dossier).
 - `Backend::shareFile(url, mime, titre)` (partage d'un fichier local) ; `ShareBridge.partager` reçoit le type MIME ; `footcoach_exports_paths.xml` expose aussi le cache (droit donné URI par URI) ; `<queries>` pour `application/pdf`.

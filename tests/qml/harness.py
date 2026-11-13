@@ -191,6 +191,8 @@ class Backend(QObject):
         return {"ok": True, "id": mid, "error": "", "boardId": self._match_board[mid], "created": created}
     @Slot(result="QStringList")
     def formationNames(self): return FORM["_names"]
+    @Slot(int, result="QStringList")
+    def formationNamesFor(self, n): return FORM["_names8"] if n == 8 else FORM["_names"] if n == 11 else []
     @Slot(str, bool, result=str)
     def formationJson(self, n, opp):
         f = FORM.get(n); return (f["opp"] if opp else f["plain"]) if f else ""

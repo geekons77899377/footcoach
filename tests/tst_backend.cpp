@@ -305,6 +305,15 @@ private slots:
     {
         Backend b(m_db.handle());
         QVERIFY(b.formationNames().contains(QStringLiteral("4-4-2")));
+        QVERIFY(b.formationNamesFor(8).contains(QStringLiteral("3-3-1")));
+        QVERIFY(!b.formationNamesFor(8).contains(QStringLiteral("4-4-2")));
+        Tactics::Board eight;
+        QVERIFY(Tactics::fromJson(b.formationJson(QStringLiteral("3-3-1"), true), &eight));
+        int own = 0, opp = 0;
+        for (const Tactics::Item &it : eight.items)
+            (it.kind == Tactics::Kind::Player ? own : opp)++;
+        QCOMPARE(own, 8);
+        QCOMPARE(opp, 8);
 
         Tactics::Board board;
         QVERIFY(Tactics::fromJson(b.formationJson(QStringLiteral("4-4-2"), false), &board));

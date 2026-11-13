@@ -173,6 +173,19 @@ check(pos["C"][0] < 0.3, "le défenseur reste en défense")
 pos = formation_labels([P("G1", "GK"), P("G2", "GK"), P("D", "DEF")])
 check(set(pos) == {"G1", "D"}, f"deux gardiens : un seul placé : {sorted(pos)}")
 
+# Foot à 8 : formations à 8 joueurs (gardien + 7) et autant d'adversaires que de joueurs, jamais 11.
+check(list(fs.property("names")) == ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"], f"par défaut : formations à 11 : {list(fs.property('names'))}")
+fs.setProperty("perSide", 8); h.spin(100)
+check(list(fs.property("names")) == ["3-3-1", "2-3-2", "3-2-2", "2-4-1"], f"foot à 8 : formations à 8 : {list(fs.property('names'))}")
+eight = [P("Gar", "GK"), P("D1", "DEF"), P("D2", "DEF"), P("D3", "DEF"), P("M1", "MID"), P("M2", "MID"), P("M3", "MID"), P("A1", "FWD")]
+be.setProperty("squad", [dict(p, id=i + 1) for i, p in enumerate(eight)]); h.spin(100)
+QMetaObject.invokeMethod(fs, "picked", Q_ARG("QString", "3-3-1"), Q_ARG("bool", True)); h.spin(400)
+own = [i for i in board_items() if i["kind"] == "player"]; opp = [i for i in board_items() if i["kind"] == "opponent"]
+check(len(own) == 8 and len(opp) == 8, f"3-3-1 avec adversaires : 8 joueurs et 8 adversaires ({len(own)} / {len(opp)})")
+pos8 = {i["label"]: i["x"] for i in own}
+check(pos8["Gar"] < 0.1 and pos8["A1"] > 0.6 and all(pos8[n] < 0.3 for n in ("D1", "D2", "D3")), f"3-3-1 : gardien, 3 défenseurs, attaquant seul : {pos8}")
+fs.setProperty("perSide", 11); h.spin(100)
+
 # Aucun convoqué : message, pas de liste, pas de rond.
 call(page, "closeEditor") if False else None
 h2, b2 = make()

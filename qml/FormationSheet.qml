@@ -5,7 +5,16 @@ import QtQuick.Controls
 Popup {
     id: root
 
-    property var names: []
+    // Formats de jeu : [{ n: joueurs par équipe, label, names: formations }]. Les adversaires ont toujours autant de
+    // joueurs que l'équipe (formation du même nom placée en miroir).
+    property var formats: []
+    property int perSide: 11
+    readonly property var names: {
+        for (var i = 0; i < formats.length; ++i)
+            if (formats[i].n === perSide)
+                return formats[i].names;
+        return formats.length > 0 ? formats[0].names : [];
+    }
     property bool withOpponents: false
     signal picked(string name, bool withOpponents)
 
@@ -43,6 +52,35 @@ Popup {
             color: Theme.textMuted
         }
         Row {
+            objectName: "formatRow"
+            spacing: 10
+            Repeater {
+                model: root.formats
+                delegate: Rectangle {
+                    id: fchip
+                    required property var modelData
+                    objectName: "format" + modelData.n
+                    width: 84
+                    height: 40
+                    radius: 20
+                    color: root.perSide === modelData.n ? Theme.accent : Theme.bg
+                    border.width: 1
+                    border.color: Theme.border
+                    Text {
+                        anchors.centerIn: parent
+                        text: fchip.modelData.label
+                        font.pixelSize: 15
+                        font.weight: Font.Bold
+                        color: root.perSide === fchip.modelData.n ? Theme.textOnAccent : Theme.text
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.perSide = fchip.modelData.n
+                    }
+                }
+            }
+        }
+        Row {
             width: parent.width
             spacing: 12
             Switch {
@@ -51,7 +89,7 @@ Popup {
                 onToggled: root.withOpponents = checked
             }
             Text {
-                text: "Avec adversaires en miroir"
+                text: "Avec adversaires (autant de joueurs)"
                 anchors.verticalCenter: parent.verticalCenter
                 font.pixelSize: 16
                 color: Theme.text

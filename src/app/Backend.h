@@ -56,7 +56,8 @@ public:
 
     // Formations de départ : noms, et JSON {"items": [...]} au format du schéma (joueurs numérotés,
     // adversaires en miroir si demandé). Chaîne vide si le nom est inconnu.
-    Q_INVOKABLE QStringList formationNames() const;
+    Q_INVOKABLE QStringList formationNames() const;                 // à 11
+    Q_INVOKABLE QStringList formationNamesFor(int perSide) const;   // 11 ou 8 joueurs par équipe (gardien compris)
     Q_INVOKABLE QString formationJson(const QString &name, bool withOpponents) const;
     // Couleurs proposées : [{name, color}].
     Q_INVOKABLE QVariantList palette() const;

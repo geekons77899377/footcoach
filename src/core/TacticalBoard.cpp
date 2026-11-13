@@ -221,8 +221,12 @@ QList<QPair<QString, QString>> colorPalette()
             {QStringLiteral("Noir"), QStringLiteral("#212121")}};
 }
 
-QStringList formationNames()
+QStringList formationNames(int perSide)
 {
+    if (perSide == 8)
+        return {QStringLiteral("3-3-1"), QStringLiteral("2-3-2"), QStringLiteral("3-2-2"), QStringLiteral("2-4-1")};
+    if (perSide != 11)
+        return {};
     return {QStringLiteral("4-4-2"), QStringLiteral("4-3-3"), QStringLiteral("3-5-2"), QStringLiteral("4-2-3-1")};
 }
 
@@ -253,6 +257,31 @@ QList<Item> formation(const QString &name)
                 player(6, 0.38, 0.62), player(8, 0.38, 0.38),
                 player(7, 0.58, 0.85), player(10, 0.58, 0.50), player(11, 0.58, 0.15),
                 player(9, 0.76, 0.50)};
+    }
+    // Foot à 8 (gardien + 7) : mêmes conventions, numéros 1 à 11 non consécutifs gardés comme au foot à 11.
+    if (name == QLatin1String("3-3-1")) {
+        return {player(1, 0.06, 0.50),
+                player(2, 0.22, 0.82), player(4, 0.20, 0.50), player(3, 0.22, 0.18),
+                player(7, 0.44, 0.85), player(8, 0.42, 0.50), player(11, 0.44, 0.15),
+                player(9, 0.70, 0.50)};
+    }
+    if (name == QLatin1String("2-3-2")) {
+        return {player(1, 0.06, 0.50),
+                player(5, 0.20, 0.68), player(4, 0.20, 0.32),
+                player(7, 0.44, 0.85), player(8, 0.42, 0.50), player(11, 0.44, 0.15),
+                player(9, 0.70, 0.65), player(10, 0.70, 0.35)};
+    }
+    if (name == QLatin1String("3-2-2")) {
+        return {player(1, 0.06, 0.50),
+                player(2, 0.22, 0.82), player(4, 0.20, 0.50), player(3, 0.22, 0.18),
+                player(6, 0.42, 0.65), player(8, 0.42, 0.35),
+                player(9, 0.70, 0.65), player(10, 0.70, 0.35)};
+    }
+    if (name == QLatin1String("2-4-1")) {
+        return {player(1, 0.06, 0.50),
+                player(5, 0.20, 0.68), player(4, 0.20, 0.32),
+                player(7, 0.44, 0.88), player(6, 0.42, 0.62), player(8, 0.42, 0.38), player(11, 0.44, 0.12),
+                player(9, 0.70, 0.50)};
     }
     return {};
 }

@@ -273,8 +273,16 @@ Item {
             } else if (id === "formation") {
                 if (board.pitch !== "full")
                     toast.show("Les formations se placent sur le terrain entier.");
-                else
+                else {
+                    // Match : au plus 8 titulaires convoqués = foot à 8 d'office (modifiable dans la feuille).
+                    var nStart = 0;
+                    if (editor.squadMode)
+                        for (var q = 0; q < editor.squad.length; ++q)
+                            if (editor.squad[q].role === "starter")
+                                ++nStart;
+                    formationSheet.perSide = (nStart > 0 && nStart <= 8) ? 8 : 11;
                     formationSheet.open();
+                }
             } else if (id === "rename") {
                 editor.purpose = "rename";
                 prompt.ask("Titre du schéma", editor.title, false, 80);
@@ -329,7 +337,8 @@ Item {
 
     FormationSheet {
         id: formationSheet
-        names: backend.formationNames()
+        formats: [{ n: 11, label: "À 11", names: backend.formationNamesFor(11) },
+                  { n: 8, label: "À 8", names: backend.formationNamesFor(8) }]
         onPicked: (name, withOpp) => {
             if (!editor.squadMode) {
                 board.applyFormation(backend.formationJson(name, withOpp), withOpp);

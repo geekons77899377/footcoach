@@ -66,7 +66,7 @@ QString toJson(const Board &board);
 bool fromJson(const QString &json, Board *board, QString *error = nullptr);
 
 // Formations de départ (équipe qui attaque vers la droite, gardien à gauche, numéros 1 à 11).
-QStringList formationNames();                       // "4-4-2", "4-3-3", "3-5-2", "4-2-3-1"
+QStringList formationNames(int perSide = 11);       // à 11 : "4-4-2", "4-3-3", "3-5-2", "4-2-3-1" ; à 8 : "3-3-1", "2-3-2", "3-2-2", "2-4-1"
 QList<Item> formation(const QString &name);         // vide si le nom est inconnu
 // Même placement vu de l'autre côté du terrain (x et y inversés), type Opponent.
 QList<Item> mirroredAsOpponent(const QList<Item> &players);

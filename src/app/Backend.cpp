@@ -248,6 +248,11 @@ QStringList Backend::formationNames() const
     return Tactics::formationNames();
 }
 
+QStringList Backend::formationNamesFor(int perSide) const
+{
+    return Tactics::formationNames(perSide);
+}
+
 QString Backend::formationJson(const QString &name, bool withOpponents) const
 {
     const QList<Tactics::Item> players = Tactics::formation(name);

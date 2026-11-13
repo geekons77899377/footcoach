@@ -161,6 +161,26 @@ private slots:
         QVERIFY(formation(QStringLiteral("9-9-9")).isEmpty());
     }
 
+    void eightASideFormationsHaveEightPlayersAndEqualOpponents()
+    {
+        QCOMPARE(formationNames(8).size(), 4);
+        QVERIFY(formationNames(7).isEmpty());
+        for (const QString &name : formationNames(8)) {
+            const QList<Item> players = formation(name);
+            QCOMPARE(players.size(), 8);                              // gardien + 7
+            QCOMPARE(players.first().label, QStringLiteral("1"));
+            QSet<int> numbers;
+            for (const Item &p : players)
+                numbers.insert(p.label.toInt());
+            QCOMPARE(numbers.size(), 8);
+            int outfield = 0;
+            for (const QString &part : name.split(QLatin1Char('-')))
+                outfield += part.toInt();
+            QCOMPARE(outfield, 7);                                    // le nom décrit bien les 7 joueurs de champ
+            QCOMPARE(mirroredAsOpponent(players).size(), 8);          // autant d'adversaires que de joueurs
+        }
+    }
+
     void formationLinesHaveTheRightSizes()
     {
         // 4-4-2 : 4 défenseurs (x ≈ 0.2), 4 milieux (x ≈ 0.45), 2 attaquants (x ≈ 0.7).
