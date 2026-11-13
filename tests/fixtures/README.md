@@ -21,3 +21,9 @@ La commande écrit les fichiers 1 à 5 dans le dossier indiqué (hors du dépôt
 que le nouveau ; les fichiers existants ne sont pas remplacés.
 
 Voir `docs/versionnage.md`.
+
+## Données Data ES
+
+| Fichier | Origine |
+|---|---|
+| `data-es-oise-extrait.json` | 6 terrains de football **réels** (Lagny-le-Sec, Le Plessis-Belleville, Nanteuil-le-Haudouin, Silly-le-Long) extraits le 13/11/2026 de la réponse de `…/datasets/data-es/exports/json` (Data ES, ministère des Sports, Licence Ouverte), réduits aux champs que lit FootCoach. Sert à `tst_venues`. |

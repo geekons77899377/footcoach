@@ -1,5 +1,16 @@
 # Journal des modifications
 
+## Non publié — stades des matchs (schéma 11)
+- **Paramètres > Stades des matchs** : département du club (« 60 », « 2A »…) et bouton **« Mettre à jour les stades »**, qui télécharge les terrains de football du département depuis Data ES (recensement des équipements sportifs du ministère des Sports, `…/datasets/data-es/exports/json`). Un seul appel, seulement à la demande ; seul le numéro du département est envoyé. Bilan affiché (reçus, nouveaux, retirés, hors service), bouton Annuler.
+- **Rien n'est supprimé par une mise à jour** : un terrain absent de la réponse devient « retiré de la liste officielle », un terrain noté hors service par Data ES devient « hors service » ; ils ne sont plus proposés pour les nouveaux matchs, les matchs existants les gardent. Une réponse vide ou illisible ne change rien.
+- Sur chaque stade : **stade du club** (matchs à domicile, un seul par club), **marquer indisponible** (jamais annulé par une mise à jour), et **lieux saisis à la main** (modifiables, supprimables ; les terrains Data ES ne se modifient pas). Recherche sans accents ni majuscules, filtres « Proposés », « Non proposés », « Tous ».
+- **Fiche du match** : à domicile, le stade du club est proposé ; à l'extérieur, le dernier stade choisi contre cet adversaire (« U.S. Nanteuil » = « us nanteuil »). Bouton du champ « Stade ou adresse » : choix dans la liste du club. Un lieu tapé à la main n'est jamais remplacé ; le modifier retire le lien avec le stade. L'adresse reste copiée en texte dans le match. Le champ passe sur deux lignes.
+- **Migration 011** (schéma 10 → 11) : `club.department`, tables `venue` et `opponent_venue`, `football_match.venue_id` (ON DELETE SET NULL). Export/import `.footcoach` : `schema = 11`, lieux et adversaires inclus.
+- HTTP/1.1 pour cet appel : en HTTP/2 la connexion était coupée derrière le proxy de la machine de test ; **non vérifié sur téléphone**. HTTPS sur Android : même OpenSSL que les signalements.
+- `EnsureVisible` gère aussi une `ListView` avec en-tête (`originY` négatif). Icône « pin ». Politique de confidentialité : nouvelle section « Liste des stades ».
+- Tests : `tst_venues` (14 cas sur un extrait réel de Data ES, `tests/fixtures/data-es-oise-extrait.json` ; plus `realDataEsDownload`, vrai appel, lancé seulement avec `FOOTCOACH_NETWORK_TESTS=1` : 681 terrains pour l'Oise le 13/11/2026), `tst_dataformat` et `tst_slots` adaptés au schéma 11, `t_venues.py` et `t_fields.py` étendus (backend **simulé**).
+- Non vérifié : Qt 6.9, Android (clavier, réseau mobile), fiche Play Store (« aucune connexion Internet » y était déjà inexact depuis les signalements).
+
 ## Non publié — clavier Android : nouvelle demande d'affichage après le toucher
 - **Constat (captures sur appareil, formulaire Exercice)** : le 1er toucher dans un champ lui donne le focus (bordure verte) sans clavier ; le 2e affiche le clavier.
 - **Code de Qt 6.9 lu** (`qquicktextedit.cpp`) : l'affichage est demandé à l'entrée du focus, puis, si le champ a déjà le focus, à chaque appui. Seule la 2e demande aboutit chez vous. **Hypothèse non vérifiée** : la 1re part trop tôt, avant que Android ait rattaché le champ à la saisie.

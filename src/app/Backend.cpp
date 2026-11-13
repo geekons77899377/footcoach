@@ -27,7 +27,7 @@
 #include <QJsonObject>
 
 Backend::Backend(const QSqlDatabase &db, QObject *parent)
-    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_clubs(db), m_matches(db), m_players(db), m_sessions(db), m_slots(db), m_attendance(db), m_exercises(db), m_plan(db)
+    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_clubs(db), m_matches(db), m_players(db), m_sessions(db), m_slots(db), m_attendance(db), m_exercises(db), m_plan(db), m_venues(db)
 {
 }
 
@@ -493,6 +493,7 @@ QVariantList Backend::clubs()
         QVariantMap m;
         m.insert(QStringLiteral("id"), c.id);
         m.insert(QStringLiteral("name"), c.name);
+        m.insert(QStringLiteral("department"), c.department);
         m.insert(QStringLiteral("teamCount"), m_clubs.teamCount(c.id));
         list.append(m);
     }

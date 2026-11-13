@@ -39,6 +39,7 @@ QVariantMap matchMap(const Match &m, int convoked = 0, bool hasBoard = false)
     r.insert(QStringLiteral("scoreFor"), m.scoreFor);
     r.insert(QStringLiteral("scoreAgainst"), m.scoreAgainst);
     r.insert(QStringLiteral("notes"), m.notes);
+    r.insert(QStringLiteral("venueId"), m.venueId);
     r.insert(QStringLiteral("convoked"), convoked);
     r.insert(QStringLiteral("hasBoard"), hasBoard);
     return r;
@@ -123,10 +124,37 @@ QVariantMap Backend::saveMatch(const QVariantMap &in)
     m.scoreFor = in.value(QStringLiteral("scoreFor"), -1).toInt();
     m.scoreAgainst = in.value(QStringLiteral("scoreAgainst"), -1).toInt();
     m.notes = in.value(QStringLiteral("notes")).toString().trimmed();
+    m.venueId = in.value(QStringLiteral("venueId"), -1).toInt();
     QString error;
+    // Schéma 11 : le lieu choisi doit être un lieu du club de l'équipe ; son adresse est recopiée si le texte manque.
+    int clubId = -1;
+    if (m.venueId > 0) {
+        int teamId = m.teamId;
+        if (m.id > 0) {
+            const Match old = m_matches.get(m.id);
+            if (old.id > 0)
+                teamId = old.teamId;
+        }
+        clubId = m_clubs.clubOfTeam(teamId);
+        Venue v;
+        if (!m_venues.get(m.venueId, &v, &error) || v.clubId != clubId) {
+            error = tr("Ce lieu n'appartient pas au club de l'équipe.");
+            setError(error);
+            return result(false, -1, error);
+        }
+        if (m.location.isEmpty())
+            m.location = v.label();
+    }
     const bool ok = m.id > 0 ? m_matches.update(m, &error) : m_matches.insert(m, &error);
     setError(error);
-    return ok ? result(true, m.id) : result(false, -1, error);
+    if (!ok)
+        return result(false, -1, error);
+    // À l'extérieur, le lieu choisi devient le stade retenu pour cet adversaire (proposé au prochain match).
+    if (m.venueId > 0 && m.homeAway == QLatin1String("away")) {
+        QString rememberError;
+        m_venues.rememberOpponentVenue(clubId, m.opponent, m.venueId, &rememberError);
+    }
+    return result(true, m.id);
 }
 
 QVariantMap Backend::deleteMatch(int id)

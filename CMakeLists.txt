@@ -44,6 +44,8 @@ set(CORE_SOURCES
     src/core/TeamRepository.cpp
     src/core/ClubRepository.h
     src/core/ClubRepository.cpp
+    src/core/VenueRepository.h
+    src/core/VenueRepository.cpp
     src/core/MatchRepository.h
     src/core/MatchRepository.cpp
     src/core/PlayerRepository.h
@@ -84,6 +86,7 @@ set(SQL_MIGRATIONS
     sql/008_seed_u10_u11_exercises.sql
     sql/009_exercise_category.sql
     sql/010_slot_presence_contact.sql
+    sql/011_venue.sql
 )
 
 qt_add_executable(FootCoachWidgets WIN32
@@ -161,7 +164,7 @@ if(FOOTCOACH_HAVE_QML)
         src/app/BackendSessions.cpp
         src/app/BackendMatches.cpp
         src/app/BackendPlan.cpp
-        src/app/BackendData.cpp
+        src/app/BackendData.cpp src/app/BackendVenues.cpp
         src/app/IssueReporter.h
         src/app/IssueReporter.cpp
         src/app/ChallengeSheet.h
@@ -182,7 +185,7 @@ if(FOOTCOACH_HAVE_QML)
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
         CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml SlotsPanel.qml SelectMark.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerAvatar.qml ChallengeProblems.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml KeyboardRetry.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml PrivacyPage.qml PrivacyText.js Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
-        BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
+        BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml VenueSheet.qml VenuesPage.qml
     )
     set(QML_FILES_PATHS)
     foreach(f ${QML_FILES})
@@ -257,8 +260,8 @@ if(FOOTCOACH_BUILD_TESTS)
     enable_testing()
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
-    foreach(test_name repositories sessions attendance plan board backend dataformat matches issuereporter slots reset)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp src/app/ChallengeSheet.h src/app/ChallengeSheet.cpp)
+    foreach(test_name repositories sessions attendance plan board backend dataformat matches issuereporter slots reset venues)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/BackendVenues.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp src/app/ChallengeSheet.h src/app/ChallengeSheet.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"

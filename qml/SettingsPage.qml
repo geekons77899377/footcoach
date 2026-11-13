@@ -5,7 +5,8 @@ import "SupportLink.js" as Link
 Item {
     id: page
 
-    property string mode: "browse"            // browse, support, privacy
+    property string mode: "browse"            // browse, support, privacy, venues
+    property var venueInfo: ({})              // résumé de la liste des stades du club courant (schéma 11)
     property bool dryRun: false               // tests : ne pas ouvrir le navigateur
     readonly property bool wide: width >= 760
     signal navigate(string section)
@@ -32,7 +33,27 @@ Item {
         mode = "privacy";
     }
 
-    onVisibleChanged: if (!visible) mode = "browse"
+    function openVenues() {
+        venues.openFor(AppState.teamId);
+        mode = "venues";
+    }
+
+    function refreshVenueInfo() {
+        var c = backend.clubOfTeam(AppState.teamId);
+        if (c <= 0) {
+            var all = backend.clubs();
+            c = all.length > 0 ? all[0].id : -1;
+        }
+        venueInfo = c > 0 ? backend.venueSummary(c) : ({});
+    }
+
+    onVisibleChanged: {
+        if (!visible)
+            mode = "browse";
+        else
+            refreshVenueInfo();
+    }
+    onModeChanged: if (mode === "browse") refreshVenueInfo()
 
     component SettingRow: Item {
         id: row
@@ -182,6 +203,37 @@ Item {
                 }
 
                 Text {
+                    text: "MATCHS"
+                    font.pixelSize: 12
+                    font.weight: Font.Bold
+                    font.letterSpacing: 1.4
+                    color: Theme.text
+                }
+                Card {
+                    objectName: "matchesCard"
+                    width: parent.width
+                    height: matchesCol.height + 2 * padding
+                    padding: 14
+                    radius: Theme.radiusLg
+                    Column {
+                        id: matchesCol
+                        width: parent.width
+                        SettingRow {
+                            objectName: "rowVenues"
+                            icon: "pin"; title: "Stades des matchs"
+                            subtitle: {
+                                var s = page.venueInfo;
+                                if (!s.ok || s.total === 0)
+                                    return "Charger et mettre à jour la liste des stades";
+                                return s.selectable + (s.selectable > 1 ? " stades proposés" : " stade proposé")
+                                       + (s.department ? " · département " + s.department : "");
+                            }
+                            onActivated: page.openVenues()
+                        }
+                    }
+                }
+
+                Text {
                     text: "INFORMATIONS"
                     font.pixelSize: 12
                     font.weight: Font.Bold
@@ -230,6 +282,15 @@ Item {
         objectName: "privacyPage"
         anchors.fill: parent
         visible: page.mode === "privacy"
+        showBack: true
+        onCloseRequested: page.mode = "browse"
+    }
+
+    VenuesPage {
+        id: venues
+        objectName: "venuesPage"
+        anchors.fill: parent
+        visible: page.mode === "venues"
         showBack: true
         onCloseRequested: page.mode = "browse"
     }

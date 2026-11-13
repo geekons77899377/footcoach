@@ -31,13 +31,15 @@ Item {
             block = block.parent;
         var top = block.mapToItem(content, 0, 0).y;
         var bottom = top + block.height;
-        var maxY = Math.max(0, flick.contentHeight - flick.height);
+        // originY : 0 pour une Flickable, négatif pour une ListView dont l'en-tête (header) est au-dessus du contenu.
+        var minY = flick.originY;
+        var maxY = Math.max(minY, minY + flick.contentHeight - flick.height);
         var y = flick.contentY;
         if (bottom + margin > y + flick.height)
             y = bottom + margin - flick.height;
         if (top - margin < y)
             y = top - margin;
-        y = Math.max(0, Math.min(maxY, y));
+        y = Math.max(minY, Math.min(maxY, y));
         if (Math.abs(y - flick.contentY) > 0.5)
             flick.contentY = y;
     }

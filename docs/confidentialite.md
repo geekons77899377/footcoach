@@ -1,7 +1,7 @@
 # Politique de confidentialité — FootCoach
 
 *Brouillon, à publier sur une page web publique (par ex. GitHub Pages) puis à renseigner dans Play Console.
-Dernière mise à jour : 4 novembre 2026.*
+Dernière mise à jour : 13 novembre 2026.*
 
 **FootCoach** est une application d'organisation d'entraînements de football. Cette politique explique quelles
 données elle traite.
@@ -16,9 +16,12 @@ vous choisissez vous-même dans vos fichiers, y est enregistrée **réduite** (4
 d'origine n'est ni copiée ni modifiée. L'éditeur de l'application ne reçoit, ne collecte et ne consulte aucune de ces données.
 
 ## Partage et collecte
-- L'application n'utilise Internet que pour une seule chose : envoyer un signalement d'assistance, **uniquement lorsque vous touchez « Envoyer le signalement »** (voir « Assistance » ci-dessous). Aucune autre donnée n'est transmise, et rien n'est envoyé en arrière-plan.
+- L'application n'utilise Internet que dans deux cas, toujours à votre demande, jamais en arrière-plan :
+  - envoyer un signalement d'assistance, **uniquement lorsque vous touchez « Envoyer le signalement »** (voir « Assistance » ci-dessous) ;
+  - mettre à jour la liste des stades, **uniquement lorsque vous touchez « Mettre à jour les stades »** (voir « Liste des stades » ci-dessous).
+  Aucune autre donnée n'est transmise.
 - Aucune publicité, aucun outil de mesure d'audience, aucun service tiers.
-- Une seule permission Android : « Internet », nécessaire à cet envoi. Aucun accès aux contacts, à la position, au micro ni à l'appareil photo ; l'application ne lit pas votre galerie : elle ne reçoit que l'image que vous choisissez pour un joueur.
+- Une seule permission Android : « Internet », nécessaire à ces deux usages. Aucun accès aux contacts, à la position, au micro ni à l'appareil photo ; l'application ne lit pas votre galerie : elle ne reçoit que l'image que vous choisissez pour un joueur.
 
 ## Export et import volontaires
 La page « Données » permet de créer un fichier contenant toutes vos données, que vous envoyez vous-même (par exemple
@@ -29,6 +32,13 @@ les noms, dates de naissance, numéros de licence, photos, téléphones et adres
 Depuis la fiche d'un match, l'application peut aussi créer la « feuille de challenge » en PDF (nom de l'équipe, noms, prénoms
 et numéros de licence des joueurs convoqués). Le fichier est enregistré à l'endroit que vous choisissez, sur votre appareil ;
 l'application ne l'envoie nulle part. À vous de décider à qui vous le transmettez ou si vous l'imprimez.
+
+## Liste des stades
+Dans « Paramètres > Stades des matchs », le bouton « Mettre à jour les stades » télécharge la liste publique des terrains
+de football du département indiqué, depuis le recensement des équipements sportifs du ministère chargé des sports
+(service « Data ES », equipements.sports.gouv.fr). La seule information envoyée est le numéro du département (par exemple
+« 60 ») ; le service voit l'adresse IP de votre appareil, comme pour toute connexion Internet. Aucune donnée de vos
+joueurs, équipes ou matchs n'est envoyée. La liste reçue est enregistrée sur votre appareil.
 
 ## Assistance (signalement, e-mail)
 Le menu « Paramètres » permet de signaler un problème, de proposer une amélioration ou de contacter le support. Si vous

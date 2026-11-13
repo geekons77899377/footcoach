@@ -1,0 +1,80 @@
+[
+ {
+  "equip_numero": "E001I603410001",
+  "inst_nom": "COMPLEXE SPORTIF",
+  "equip_nom": "Terrain de football",
+  "inst_adresse": "Rue de Mareuil",
+  "inst_cp": "60330",
+  "new_name": "Lagny-le-Sec",
+  "equip_coordonnees": {
+   "lon": 2.74982,
+   "lat": 49.08513
+  },
+  "inst_hs_bool": "Non"
+ },
+ {
+  "equip_numero": "E002I604460005",
+  "inst_nom": "STADE CHAPELLE DES MARAIS",
+  "equip_nom": "Terrain de football annexe",
+  "inst_adresse": "Route de Crépy",
+  "inst_cp": "60440",
+  "new_name": "Nanteuil-le-Haudouin",
+  "equip_coordonnees": {
+   "lon": 2.80897,
+   "lat": 49.1489
+  },
+  "inst_hs_bool": "Non"
+ },
+ {
+  "equip_numero": "E001I604460005",
+  "inst_nom": "STADE CHAPELLE DES MARAIS",
+  "equip_nom": "Terrain d'honneur de football",
+  "inst_adresse": "Route de Crépy",
+  "inst_cp": "60440",
+  "new_name": "Nanteuil-le-Haudouin",
+  "equip_coordonnees": {
+   "lon": 2.80956,
+   "lat": 49.15002
+  },
+  "inst_hs_bool": "Non"
+ },
+ {
+  "equip_numero": "E001I604460006",
+  "inst_nom": "PLAINE DE JEUX DU MOULIN FERRY",
+  "equip_nom": "Terrain d'évolution Mini Foot",
+  "inst_adresse": "rue Moulin Ferry",
+  "inst_cp": "60440",
+  "new_name": "Nanteuil-le-Haudouin",
+  "equip_coordonnees": {
+   "lon": 2.8151,
+   "lat": 49.13808
+  },
+  "inst_hs_bool": "Non"
+ },
+ {
+  "equip_numero": "E004I605000003",
+  "inst_nom": "COMPLEXE SPORTIF",
+  "equip_nom": "Terrain de football",
+  "inst_adresse": "rue de Verdun",
+  "inst_cp": "60330",
+  "new_name": "Le Plessis-Belleville",
+  "equip_coordonnees": {
+   "lon": 2.75961,
+   "lat": 49.09635
+  },
+  "inst_hs_bool": "Non"
+ },
+ {
+  "equip_numero": "E001I606190003",
+  "inst_nom": "TERRAIN DE FOOTBALL",
+  "equip_nom": "TERRAIN DE FOOTBALL",
+  "inst_adresse": "RUE DU STADE",
+  "inst_cp": "60330",
+  "new_name": "Silly-le-Long",
+  "equip_coordonnees": {
+   "lon": 2.7904,
+   "lat": 49.10927
+  },
+  "inst_hs_bool": "Non"
+ }
+]

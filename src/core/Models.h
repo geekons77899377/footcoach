@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDate>
+#include <QtNumeric>
 #include <QDateTime>
 #include <QList>
 #include <QString>
@@ -10,6 +11,30 @@ struct Club
 {
     int id = -1;
     QString name;
+    QString department;     // schéma 11 : code du département (« 60 », « 2A »), vide si non renseigné
+};
+
+// Schéma 11 : lieu de match (stade) d'un club.
+struct Venue
+{
+    int id = -1;
+    int clubId = -1;
+    QString name;           // nom de l'installation (ex. « Complexe sportif »)
+    QString field;          // nom du terrain (ex. « Terrain d'honneur »), peut être vide
+    QString address;
+    QString postcode;
+    QString city;
+    double lat = qQNaN();   // NaN : inconnu
+    double lon = qQNaN();
+    QString source = QStringLiteral("manual");    // "manual", "data_es"
+    QString sourceId;       // Data ES : equip_numero
+    QString esStatus = QStringLiteral("ok");      // "ok", "removed" (absent de Data ES), "closed" (hors service)
+    bool unavailable = false;                     // marqué indisponible par l'entraîneur
+    bool isHome = false;                          // stade du club (matchs à domicile)
+
+    bool selectable() const { return !unavailable && esStatus == QLatin1String("ok"); }
+    // Texte recopié dans le lieu du match : « Nom (terrain), adresse, code postal commune ».
+    QString label() const;
 };
 
 struct Team
@@ -119,6 +144,7 @@ struct Match
     int scoreFor = -1;          // -1 : score inconnu (les deux scores vont ensemble)
     int scoreAgainst = -1;
     QString notes;
+    int venueId = -1;           // schéma 11 : lieu choisi dans la liste du club, -1 : saisie libre
 };
 
 // Un joueur convoqué pour un match.

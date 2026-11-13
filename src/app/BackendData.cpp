@@ -31,7 +31,8 @@ constexpr qint64 kMaxBytes = 64LL * 1024 * 1024;
 constexpr int kMaxRows = 500000;
 
 // Ordre d'insertion (parents avant enfants) ; la suppression se fait dans l'ordre inverse.
-const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("team"),
+const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("venue"),
+                             QStringLiteral("opponent_venue"), QStringLiteral("team"),
                              QStringLiteral("player"),         QStringLiteral("player_contact"),
                              QStringLiteral("training_slot"),  QStringLiteral("training_session"),
                              QStringLiteral("attendance"),     QStringLiteral("football_match"),
@@ -48,6 +49,8 @@ bool isSchema6Table(const QString &t)
 // Schéma de la première version qui contient la table (fichiers plus anciens : table absente, normal).
 int tableSince(const QString &t)
 {
+    if (t == QLatin1String("venue") || t == QLatin1String("opponent_venue"))
+        return 11;
     if (t == QLatin1String("player_contact") || t == QLatin1String("training_slot"))
         return 10;
     if (t == QLatin1String("exercise_category"))

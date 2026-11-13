@@ -19,6 +19,11 @@ Item {
     property var roles: ({})                   // playerId -> "starter" | "substitute" ; absent = non convoqué
     property int boardId: -1
     property string savedState: ""               // état enregistré, pour savoir s'il reste des modifications
+    // Schéma 11 : stade choisi dans la liste du club (-1 : lieu tapé à la main). venueText : texte mis par ce choix ;
+    // si on modifie le champ à la main, le lien avec le stade est retiré. venueHint : origine affichée sous le champ.
+    property int venueId: -1
+    property string venueText: ""
+    property string venueHint: ""
 
     property bool boardOpen: false
     property int openBoardId: -1
@@ -59,8 +64,39 @@ Item {
 
     function formState() {
         return JSON.stringify([dateField.text, timeField.text, opponent.text, location.text, place.value, status.value,
-                               scoreFor.text, scoreAgainst.text, notes.text, roles]);
+                               scoreFor.text, scoreAgainst.text, notes.text, roles, venueId]);
     }
+
+    // --- Lieu du match : stade de la liste du club -------------------------------------------------------------
+    function setVenue(v, hint) {
+        venueId = v.id;
+        venueText = v.label;
+        location.text = v.label;
+        venueHint = hint;
+    }
+
+    function clearVenue() {
+        venueId = -1;
+        venueText = "";
+        venueHint = "";
+    }
+
+    // Propose le stade du club (domicile) ou celui retenu pour l'adversaire (extérieur), seulement si le champ est vide
+    // ou rempli par une proposition précédente : un lieu tapé à la main n'est jamais remplacé.
+    function suggestVenue() {
+        var auto = location.text.trim() === "" || (venueId > 0 && location.text === venueText);
+        if (!auto || teamId <= 0)
+            return;
+        var away = place.value === "away";
+        var v = backend.suggestedVenue(teamId, away ? "away" : "home", opponent.text);
+        if (v && v.id > 0) {
+            setVenue(v, away ? "Stade retenu pour cet adversaire" : "Stade du club");
+        } else if (venueId > 0) {
+            location.text = "";
+            clearVenue();
+        }
+    }
+
 
     function loadRoster() {
         roster = teamId > 0 ? backend.players(teamId, false) : [];
@@ -83,8 +119,10 @@ Item {
         scoreFor.text = "";
         scoreAgainst.text = "";
         notes.text = "";
+        clearVenue();
         roles = ({});
         loadRoster();
+        suggestVenue();
         savedState = formState();
         scroll.contentY = 0;
     }
@@ -107,6 +145,9 @@ Item {
         timeField.text = m.time;
         opponent.text = m.opponent;
         location.text = m.location;
+        venueId = m.venueId > 0 ? m.venueId : -1;
+        venueText = venueId > 0 ? m.location : "";
+        venueHint = venueId > 0 ? "Stade de la liste" : "";
         place.value = m.homeAway;
         status.value = m.status;
         scoreFor.text = m.scoreFor >= 0 ? String(m.scoreFor) : "";
@@ -146,7 +187,7 @@ Item {
         var r = backend.saveMatch({ id: matchId, teamId: teamId, date: day, time: time, opponent: opponent.text,
                                     location: location.text, homeAway: place.value || "home",
                                     status: status.value || "planned", scoreFor: sf, scoreAgainst: sa,
-                                    notes: notes.text });
+                                    notes: notes.text, venueId: venueId });
         if (!r.ok) {
             errorText = r.error;
             scroll.contentY = 0;
@@ -457,7 +498,11 @@ Item {
                 font.weight: Font.DemiBold
                 color: Theme.danger
             }
-            FormField { id: opponent; objectName: "opponentField"; width: parent.width; label: "Adversaire"; required: true; placeholder: "Ex. FC Rivière"; maxLength: 80 }
+            FormField {
+                id: opponent; objectName: "opponentField"; width: parent.width; label: "Adversaire"; required: true
+                placeholder: "Ex. FC Rivière"; maxLength: 80
+                onEditingFinished: if (place.value === "away") root.suggestVenue()
+            }
             Row {
                 width: parent.width
                 spacing: 12
@@ -496,8 +541,28 @@ Item {
                     }
                 }
             }
-            ChipRow { id: place; width: parent.width; label: "Lieu du match"; options: root.places; allowClear: false; value: "home" }
-            FormField { id: location; width: parent.width; label: "Stade ou adresse"; placeholder: "Ex. Stade municipal"; maxLength: 120 }
+            ChipRow {
+                id: place; objectName: "placeChips"; width: parent.width; label: "Lieu du match"; options: root.places
+                allowClear: false; value: "home"
+                onPicked: Qt.callLater(root.suggestVenue)
+            }
+            FormField {
+                id: location; objectName: "locationField"; width: parent.width; label: "Stade ou adresse"
+                placeholder: "Ex. Stade municipal"; maxLength: 160
+                multiline: true; multilineHeight: 76      // une adresse complète tient sur deux lignes
+                actionIcon: "pin"; actionName: "Choisir dans la liste des stades"
+                onActionClicked: venueSheet.openFor(backend.clubOfTeam(root.teamId))
+                onTextChanged: if (root.venueId > 0 && text !== root.venueText) root.clearVenue()
+            }
+            Text {
+                objectName: "venueHint"
+                visible: root.venueHint !== ""
+                width: parent.width
+                topPadding: -6
+                text: root.venueHint
+                font.pixelSize: 12
+                color: Theme.accent
+            }
             ChipRow { id: status; width: parent.width; label: "Statut"; options: root.statuses; allowClear: false; value: "planned" }
             Row {
                 width: parent.width
@@ -712,6 +777,12 @@ Item {
             else
                 toast.show(r.error);
         }
+    }
+
+    VenueSheet {
+        id: venueSheet
+        objectName: "venueSheet"
+        onPicked: (v) => root.setVenue(v, "Stade de la liste")
     }
 
     ChallengeProblems {

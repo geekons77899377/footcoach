@@ -103,6 +103,28 @@ test_popup("Saisie texte (une ligne)","PromptDialog",lambda p: QMetaObject.invok
 test_popup("Saisie texte (plusieurs lignes)","PromptDialog",lambda p: QMetaObject.invokeMethod(p,"ask",Q_ARG("QVariant","Notes"),Q_ARG("QVariant","abc"),Q_ARG("QVariant",True),Q_ARG("QVariant",1000)))
 sec("sessions")
 test_popup("Sélecteur d'exercices (recherche)","ExercisePicker",lambda p: QMetaObject.invokeMethod(p,"pick"))
+# Lieux de match (schéma 11) : choix d'un stade, page Stades des matchs, lieu saisi à la main
+b._venue_init()
+for r in DATA_ES[:3]:
+    b._add_venue(1, source="data_es", sourceId=r["equip_numero"], name=r["inst_nom"], field=r["equip_nom"], city=r["new_name"])
+sec("matches")
+test_popup("Choix d'un stade (recherche)","VenueSheet",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",1)))
+test_form("Stades des matchs", lambda: (sec("settings"), QMetaObject.invokeMethod(target("SettingsPage","mode"),"openVenues")))
+def manual_popup():
+    global total
+    kb(False); sec("settings"); QMetaObject.invokeMethod(target("SettingsPage","mode"),"openVenues"); h.spin(400)
+    p=h.win.findChild(QObject,"manualVenueForm"); QMetaObject.invokeMethod(p,"openNew"); h.spin(500)
+    fs=popup_inputs(p)
+    print(f"-- Lieu saisi à la main : {len(fs)} champ(s)")
+    for f in fs:
+        total+=1; kb(True); f.forceActiveFocus(); h.spin(450)
+        pos=f.mapToScene(QPointF(0,0)); top=pos.y(); bottom=top+min(f.height(),50)
+        ok = top>=0 and bottom<=H-KB+1 and f.property("activeFocus")
+        print(f"   {'OK ' if ok else 'KO '}{fieldname(f)!s:28s} haut={top:.0f} bas={bottom:.0f} (visible entre 0 et {H-KB})")
+        if not ok: fails.append(f"Lieu saisi à la main/{fieldname(f)}")
+    kb(False); QMetaObject.invokeMethod(p,"close"); h.spin(300)
+manual_popup()
+sec("home")
 # champs de recherche des listes
 for nm,s_ in [("Recherche exercices","exercises"),("Recherche effectif","squad")]:
     kb(False); sec(s_); h.spin(300)

@@ -30,9 +30,35 @@ def prepare():
         q.write("singleton Theme 1.0 Theme.qml\nsingleton AppState 1.0 AppState.qml\n")
     os.makedirs(OUT, exist_ok=True)
 
+# Extrait de Data ES (6 terrains réels, mêmes clés que la réponse lue par VenueRepository::applyDataEs).
+DATA_ES = json.load(open(os.path.join(HERE, "..", "fixtures", "data-es-oise-extrait.json"), encoding="utf-8"))
+
+def _venue_label(v):
+    head = v["name"]
+    f = v.get("field") or ""
+    if f and f.lower() != "terrain de football" and f.lower() != head.lower():
+        head += " (%s)" % f
+    town = ("%s %s" % (v.get("postcode") or "", v.get("city") or "")).strip()
+    return ", ".join([x for x in (head, v.get("address") or "", town) if x])
+
+def _tidy(s):
+    s = " ".join((s or "").split())
+    if not s or s != s.upper(): return s
+    small = {"de", "du", "des", "la", "le", "les", "et", "en", "sur", "aux", "au"}
+    out = []
+    for i, w in enumerate(s.lower().split(" ")):
+        if i > 0 and w in small: out.append(w); continue
+        w = list(w)
+        for k in range(len(w)):
+            if k == 0 or w[k - 1] in "-'": w[k] = w[k].upper()
+        out.append("".join(w))
+    return " ".join(out)
+
 class Backend(QObject):
     lastErrorChanged = Signal()
     dataReplaced = Signal()
+    venuesBusyChanged = Signal()
+    venuesRefreshed = Signal("QVariantMap")
     def __init__(self):
         super().__init__()
         self._boards = {}
@@ -41,6 +67,176 @@ class Backend(QObject):
         self.saves = 0
     @Property(str, notify=lastErrorChanged)
     def lastError(self): return self._err
+    # --- Lieux de match (schéma 11, simulés : mêmes clés que src/app/BackendVenues.cpp) ---------------------------
+    def _venue_init(self):
+        if not hasattr(self, "_venues"):
+            self._venues = {}            # id -> lieu
+            self._next_venue = 1
+            self._dept = {}              # clubId -> département
+            self._opp_venue = {}         # (clubId, clé) -> venueId
+            self._venue_busy = False
+            self.venue_refresh_answer = DATA_ES     # réponse simulée de Data ES (liste), ou "error"
+            self.venue_refresh_delay = 300
+    def _venue_out(self, v):
+        d = dict(v)
+        d["label"] = _venue_label(v)
+        d["selectable"] = not v["unavailable"] and v["esStatus"] == "ok"
+        return d
+    @Property(bool, notify=venuesBusyChanged)
+    def venuesBusy(self):
+        self._venue_init(); return self._venue_busy
+    @Slot(int, result=int)
+    def clubOfTeam(self, team):
+        for t in self.teams() if hasattr(self, "teams") else []:
+            if t.get("id") == team: return int(t.get("clubId", 1))
+        return 1 if team > 0 else -1
+    @Slot(int, result="QVariantMap")
+    def venueSummary(self, club):
+        self._venue_init(); self._club_init()
+        c = next((x for x in self._clubs if x["id"] == club), None)
+        if not c: return {"ok": False, "error": "Club introuvable.", "id": -1}
+        vs = [self._venue_out(v) for v in self._venues.values() if v["clubId"] == club]
+        home = next((v for v in vs if v["isHome"]), None)
+        return {"ok": True, "error": "", "id": club, "clubId": club, "clubName": c["name"], "department": self._dept.get(club, ""),
+                "lastRefresh": getattr(self, "_last_refresh", {}).get(club, ""), "total": len(vs),
+                "selectable": sum(1 for v in vs if v["selectable"]), "unavailable": sum(1 for v in vs if v["unavailable"]),
+                "removed": sum(1 for v in vs if v["esStatus"] == "removed"), "closed": sum(1 for v in vs if v["esStatus"] == "closed"),
+                "manual": sum(1 for v in vs if v["source"] == "manual"),
+                "homeVenueId": home["id"] if home else -1, "homeLabel": home["label"] if home else ""}
+    @Slot(int, str, result="QVariantMap")
+    def setClubDepartment(self, club, d):
+        self._venue_init()
+        import re
+        d = d.strip().upper()
+        if d and not re.match(r"^(0[1-9]|1[0-9]|[3-8][0-9]|9[0-5]|2[1-9]|2A|2B|97[1-6])$", d):
+            return {"ok": False, "error": "Numéro de département inconnu : tapez par exemple 60, 2A ou 974.", "id": -1}
+        self._dept[club] = d
+        return {"ok": True, "error": "", "id": club}
+    @Slot(int, bool, result="QVariantList")
+    def venues(self, club, include_all):
+        self._venue_init()
+        vs = [self._venue_out(v) for v in self._venues.values() if v["clubId"] == club]
+        if not include_all: vs = [v for v in vs if v["selectable"]]
+        return sorted(vs, key=lambda v: (not v["isHome"], v["city"].lower(), v["name"].lower(), (v["field"] or "").lower(), v["id"]))
+    def _add_venue(self, club, **kw):
+        self._venue_init()
+        i = self._next_venue; self._next_venue += 1
+        v = {"id": i, "clubId": club, "name": "", "field": "", "address": "", "postcode": "", "city": "", "source": "manual",
+             "sourceId": "", "esStatus": "ok", "unavailable": False, "isHome": False, "lat": None, "lon": None}
+        v.update(kw); self._venues[i] = v
+        return i
+    @Slot("QVariantMap", result="QVariantMap")
+    def saveVenue(self, m):
+        self._venue_init()
+        name = str(m.get("name", "")).strip()
+        if not name: return {"ok": False, "error": "Le nom du lieu est obligatoire.", "id": -1}
+        vid = int(m.get("id", -1))
+        vals = {k: str(m.get(k, "")).strip() for k in ("field", "address", "postcode", "city")}
+        if vid > 0:
+            v = self._venues.get(vid)
+            if not v or v["source"] != "manual": return {"ok": False, "error": "Un terrain de la liste officielle ne se modifie pas.", "id": -1}
+            v.update(vals); v["name"] = name
+        else:
+            vid = self._add_venue(int(m.get("clubId", -1)), name=name, **vals)
+        return {"ok": True, "error": "", "id": vid, "venue": self._venue_out(self._venues[vid])}
+    @Slot(int, result="QVariantMap")
+    def deleteVenue(self, vid):
+        self._venue_init()
+        v = self._venues.get(vid)
+        if not v or v["source"] != "manual": return {"ok": False, "error": "Un terrain de la liste officielle ne se supprime pas.", "id": vid}
+        del self._venues[vid]
+        for m in getattr(self, "_matches", {}).values():
+            if m.get("venueId") == vid: m["venueId"] = -1
+        return {"ok": True, "error": "", "id": vid}
+    @Slot(int, bool, result="QVariantMap")
+    def setVenueUnavailable(self, vid, u):
+        self._venue_init()
+        if vid not in self._venues: return {"ok": False, "error": "Lieu introuvable.", "id": vid}
+        self._venues[vid]["unavailable"] = bool(u)
+        return {"ok": True, "error": "", "id": vid}
+    @Slot(int, int, result="QVariantMap")
+    def setHomeVenue(self, club, vid):
+        self._venue_init()
+        for v in self._venues.values():
+            if v["clubId"] == club: v["isHome"] = (v["id"] == vid)
+        return {"ok": True, "error": "", "id": vid}
+    def _apply_data_es(self, club, recs):
+        known = {v["sourceId"]: v for v in self._venues.values() if v["clubId"] == club and v["source"] == "data_es"}
+        st = {"total": 0, "added": 0, "updated": 0, "closed": 0, "removed": 0, "reopened": 0}
+        seen = set()
+        if not recs:
+            return {"ok": False, "error": "Data ES n'a renvoyé aucun terrain de football pour ce département : la liste n'a pas été modifiée.", "clubId": club}
+        for r in recs:
+            sid = r["equip_numero"]; seen.add(sid)
+            closed = (r.get("inst_hs_bool") or "").lower() == "oui"
+            vals = dict(name=_tidy(r.get("inst_nom")), field=_tidy(r.get("equip_nom")), address=_tidy(r.get("inst_adresse")),
+                        postcode=r.get("inst_cp") or "", city=r.get("new_name") or "", esStatus="closed" if closed else "ok")
+            if sid in known:
+                before = known[sid]["esStatus"]; known[sid].update(vals)
+                st["closed" if closed else ("reopened" if before != "ok" else "updated")] += 1
+            else:
+                self._add_venue(club, source="data_es", sourceId=sid, **vals)
+                st["closed" if closed else "added"] += 1
+        for sid, v in known.items():
+            if sid not in seen and v["esStatus"] != "removed":
+                v["esStatus"] = "removed"; st["removed"] += 1
+        st["total"] = len(seen)
+        if not hasattr(self, "_last_refresh"): self._last_refresh = {}
+        self._last_refresh[club] = "2026-11-13 21:40"
+        return dict(st, ok=True, error="", clubId=club)
+    @Slot(int, result=bool)
+    def refreshVenues(self, club):
+        self._venue_init()
+        if self._venue_busy:
+            self._err = "Une mise à jour des stades est déjà en cours."; self.lastErrorChanged.emit(); return False
+        if not self._dept.get(club):
+            self._err = "Indiquez d'abord le département du club."; self.lastErrorChanged.emit(); return False
+        self.refresh_calls = getattr(self, "refresh_calls", 0) + 1
+        self._venue_busy = True; self.venuesBusyChanged.emit()
+        self._refresh_club = club
+        self._refresh_timer = QTimer(self); self._refresh_timer.setSingleShot(True)
+        self._refresh_timer.timeout.connect(self._finish_refresh)
+        self._refresh_timer.start(self.venue_refresh_delay)
+        return True
+    def _finish_refresh(self, cancelled=False):
+        club = self._refresh_club
+        if cancelled:
+            r = {"ok": False, "error": "Mise à jour annulée : la liste n'a pas été modifiée.", "clubId": club, "cancelled": True}
+        elif self.venue_refresh_answer == "error":
+            r = {"ok": False, "error": "Impossible de joindre Data ES (vérifiez la connexion Internet) : la liste n'a pas été modifiée.", "clubId": club}
+        else:
+            r = self._apply_data_es(club, self.venue_refresh_answer)
+        self._venue_busy = False; self.venuesBusyChanged.emit()
+        self.venuesRefreshed.emit(r)
+    @Slot()
+    def cancelVenueRefresh(self):
+        self._venue_init()
+        if self._venue_busy:
+            self._refresh_timer.stop(); self._finish_refresh(cancelled=True)
+    @staticmethod
+    def _opp_key(s):
+        import unicodedata, re
+        s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn").lower()
+        words = re.sub(r"[^0-9a-z]+", " ", s).split()
+        out = []; last_init = False
+        for w in words:
+            init = len(w) == 1 and w.isalpha()
+            if init and last_init: out[-1] += w
+            else: out.append(w)
+            last_init = init
+        return " ".join(out)
+    @Slot(int, str, str, result="QVariantMap")
+    def suggestedVenue(self, team, home_away, opponent):
+        self._venue_init()
+        club = self.clubOfTeam(team)
+        if home_away == "home":
+            v = next((v for v in self._venues.values() if v["clubId"] == club and v["isHome"]), None)
+        else:
+            vid = self._opp_venue.get((club, self._opp_key(opponent)), -1)
+            v = self._venues.get(vid)
+        if not v: return {}
+        v = self._venue_out(v)
+        return v if v["selectable"] else {}
     def add(self, title, js="{}"):
         i = self._next; self._next += 1
         self._boards[i] = {"id": i, "title": title, "json": js, "updatedAt": "2026-10-29 10:00:00"}
@@ -133,7 +329,7 @@ class Backend(QObject):
         return {"ok": True, "id": cid, "error": ""}
     def _match_map(self, m):
         mid = m["id"]
-        return dict(m, convoked=len(self._match_players.get(mid, [])), hasBoard=mid in self._match_board)
+        return dict(m, venueId=m.get("venueId", -1), convoked=len(self._match_players.get(mid, [])), hasBoard=mid in self._match_board)
     @Slot(int, str, str, result="QVariantList")
     def matches(self, team, a, b):
         self._club_init()
@@ -165,7 +361,16 @@ class Backend(QObject):
             mid = self._next_match; self._next_match += 1
         self._matches[mid] = {"id": mid, "teamId": int(m["teamId"]), "date": m["date"], "time": m["time"],
                               "opponent": m["opponent"].strip(), "location": m.get("location", ""), "homeAway": m.get("homeAway", "home"),
-                              "status": m.get("status", "planned"), "scoreFor": sf, "scoreAgainst": sa, "notes": m.get("notes", "")}
+                              "status": m.get("status", "planned"), "scoreFor": sf, "scoreAgainst": sa, "notes": m.get("notes", ""),
+                              "venueId": int(m.get("venueId", -1))}
+        vid = int(m.get("venueId", -1))
+        if vid > 0:
+            self._venue_init()
+            v = self._venues.get(vid)
+            if not self._matches[mid]["location"] and v: self._matches[mid]["location"] = _venue_label(v)
+            if m.get("homeAway") == "away":
+                self._opp_venue[(self.clubOfTeam(int(m["teamId"])), self._opp_key(m["opponent"]))] = vid
+        self.last_match_saved = dict(self._matches[mid])
         return {"ok": True, "id": mid, "error": ""}
     @Slot(int, result="QVariantMap")
     def deleteMatch(self, mid):

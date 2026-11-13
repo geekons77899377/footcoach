@@ -27,7 +27,7 @@ QVariant nullIfNegative(int v)
 }
 
 const QString kSelect = QStringLiteral(
-    "SELECT id, team_id, start_at, opponent, location, home_away, status, score_for, score_against, notes "
+    "SELECT id, team_id, start_at, opponent, location, home_away, status, score_for, score_against, notes, venue_id "
     "FROM football_match");
 
 Match readMatch(const QSqlQuery &q)
@@ -43,6 +43,7 @@ Match readMatch(const QSqlQuery &q)
     m.scoreFor = q.value(7).isNull() ? -1 : q.value(7).toInt();
     m.scoreAgainst = q.value(8).isNull() ? -1 : q.value(8).toInt();
     m.notes = q.value(9).toString();
+    m.venueId = q.value(10).isNull() ? -1 : q.value(10).toInt();
     return m;
 }
 
@@ -153,7 +154,7 @@ bool MatchRepository::insert(Match &match, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "INSERT INTO football_match(team_id, start_at, opponent, location, home_away, status, score_for, "
-        "score_against, notes) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "score_against, notes, venue_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     q.addBindValue(match.teamId);
     q.addBindValue(match.startAt.toString(kDateTimeFormat));
     q.addBindValue(match.opponent.trimmed());
@@ -163,6 +164,7 @@ bool MatchRepository::insert(Match &match, QString *error)
     q.addBindValue(nullIfNegative(match.scoreFor));
     q.addBindValue(nullIfNegative(match.scoreAgainst));
     q.addBindValue(nullIfEmpty(match.notes));
+    q.addBindValue(match.venueId > 0 ? QVariant(match.venueId) : QVariant(QMetaType::fromType<int>()));
     if (!q.exec()) {
         // La clé étrangère refuse une équipe inexistante.
         setError(error, q.lastError().text().contains(QLatin1String("FOREIGN KEY"), Qt::CaseInsensitive)
@@ -193,7 +195,7 @@ bool MatchRepository::update(const Match &match, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "UPDATE football_match SET start_at = ?, opponent = ?, location = ?, home_away = ?, status = ?, "
-        "score_for = ?, score_against = ?, notes = ? WHERE id = ?"));
+        "score_for = ?, score_against = ?, notes = ?, venue_id = ? WHERE id = ?"));
     q.addBindValue(match.startAt.toString(kDateTimeFormat));
     q.addBindValue(match.opponent.trimmed());
     q.addBindValue(nullIfEmpty(match.location));
@@ -202,6 +204,7 @@ bool MatchRepository::update(const Match &match, QString *error)
     q.addBindValue(nullIfNegative(match.scoreFor));
     q.addBindValue(nullIfNegative(match.scoreAgainst));
     q.addBindValue(nullIfEmpty(match.notes));
+    q.addBindValue(match.venueId > 0 ? QVariant(match.venueId) : QVariant(QMetaType::fromType<int>()));
     q.addBindValue(match.id);
     if (!q.exec()) {
         setError(error, q.lastError().text());

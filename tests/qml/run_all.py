@@ -5,7 +5,7 @@ Usage : python3 tests/qml/run_all.py   (PySide6 et un affichage « offscreen » 
 import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py", "t_blockboard.py", "t_home.py", "t_exgrid.py", "t_squad.py", "t_calendar.py", "t_support.py", "t_nav.py", "t_l0a.py", "t_l0c.py", "t_ux1.py", "t_ux2.py", "t_club.py", "t_match.py", "t_privacy.py", "t_import.py", "t_caption.py", "t_squadboard.py", "t_ctxbar.py", "t_photo.py", "t_challenge.py", "t_exboard.py", "t_category.py", "t_slots.py", "t_select.py"]
+TESTS = ["t_live.py", "t_live2.py", "t_live3.py", "t_back.py", "t_fields.py", "t_blockboard.py", "t_home.py", "t_exgrid.py", "t_squad.py", "t_calendar.py", "t_support.py", "t_nav.py", "t_l0a.py", "t_l0c.py", "t_ux1.py", "t_ux2.py", "t_club.py", "t_match.py", "t_privacy.py", "t_import.py", "t_caption.py", "t_squadboard.py", "t_ctxbar.py", "t_photo.py", "t_challenge.py", "t_exboard.py", "t_category.py", "t_slots.py", "t_select.py", "t_venues.py"]
 env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
 bad = []
 for t in TESTS:

@@ -14,7 +14,10 @@ public:
     QList<Club> all(QString *error = nullptr) const;
     bool get(int id, Club *out, QString *error = nullptr) const;
     bool insert(Club &club, QString *error = nullptr);       // renseigne club.id ; refus si le nom est vide
-    bool update(const Club &club, QString *error = nullptr);
+    bool update(const Club &club, QString *error = nullptr);   // nom seulement
+    // Schéma 11 : département du club (vide : aucun). Le contrôle du code est fait par l'appelant.
+    bool setDepartment(int id, const QString &department, QString *error = nullptr);
+    int clubOfTeam(int teamId) const;                          // -1 si l'équipe n'existe pas
     // Supprime le club ET (par cascade) ses équipes, joueurs, séances, matchs et présences. Refusé s'il n'existe
     // pas, ou s'il est le dernier club (l'application a toujours au moins un club).
     bool remove(int id, QString *error = nullptr);

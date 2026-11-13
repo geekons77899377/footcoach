@@ -10,8 +10,11 @@
 #include "core/SessionRepository.h"
 #include "core/TrainingSlotRepository.h"
 #include "core/TeamRepository.h"
+#include "core/VenueRepository.h"
 
 #include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QObject>
 #include <QSqlDatabase>
 #include <QString>
@@ -28,11 +31,13 @@ class Backend : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    Q_PROPERTY(bool venuesBusy READ venuesBusy NOTIFY venuesBusyChanged)
 
 public:
     explicit Backend(const QSqlDatabase &db, QObject *parent = nullptr);
 
     QString lastError() const { return m_lastError; }
+    bool venuesBusy() const { return m_venueReply != nullptr; }
 
     // Liste des schémas, triés par titre : {id, title, updatedAt, exerciseId, sessionId, sessionExerciseId, readable, itemCount, json}.
     // Les terrains des blocs de séance n'y figurent pas (voir plan() : boardId, boardJson).
@@ -248,7 +253,36 @@ public:
     // sauvegardes (avant-effacement-AAAAMMJJ-HHMMSS-NNN.footcoach, 3 gardées) : {ok, error, backupName}.
     Q_INVOKABLE QVariantMap resetAllData();
 
+    // --- Lieux de match (schéma 11) ---------------------------------------------------------------------------
+    // Département du club et état de sa liste : {ok, error, clubId, clubName, department, lastRefresh, total,
+    // selectable, unavailable, removed, closed, manual, homeVenueId, homeLabel}.
+    Q_INVOKABLE QVariantMap venueSummary(int clubId);
+    Q_INVOKABLE int clubOfTeam(int teamId) { return m_clubs.clubOfTeam(teamId); }
+    // Code « 60 », « 2A »… ; vide efface le département. {ok, error}.
+    Q_INVOKABLE QVariantMap setClubDepartment(int clubId, const QString &department);
+    // Lieux du club : {id, name, field, address, postcode, city, label, source, esStatus, unavailable, isHome,
+    // selectable, lat, lon}. includeUnselectable = false : seulement ceux proposés pour un nouveau match.
+    Q_INVOKABLE QVariantList venues(int clubId, bool includeUnselectable);
+    // Lieu saisi à la main (id < 0 : création) : {ok, error, id}.
+    Q_INVOKABLE QVariantMap saveVenue(const QVariantMap &venue);
+    Q_INVOKABLE QVariantMap deleteVenue(int id);                       // lieux saisis à la main seulement
+    Q_INVOKABLE QVariantMap setVenueUnavailable(int id, bool unavailable);
+    Q_INVOKABLE QVariantMap setHomeVenue(int clubId, int venueId);     // venueId <= 0 : aucun stade du club
+    // Télécharge les terrains de football du département du club depuis Data ES (ministère des Sports) et met la
+    // liste à jour. Asynchrone : le résultat arrive par venuesRefreshed. false si un téléchargement est déjà en
+    // cours ou si le département manque (lastError).
+    Q_INVOKABLE bool refreshVenues(int clubId);
+    Q_INVOKABLE void cancelVenueRefresh();
+    // Applique une réponse Data ES (JSON de /exports/json) : utilisé par refreshVenues, et par les tests.
+    // {ok, error, clubId, total, added, updated, closed, removed, reopened}.
+    Q_INVOKABLE QVariantMap applyVenueData(int clubId, const QByteArray &json);
+    // Lieu proposé pour un match de l'équipe : à domicile le stade du club, à l'extérieur le stade retenu pour cet
+    // adversaire. {} (map vide) s'il n'y en a pas ou si le lieu n'est plus disponible.
+    Q_INVOKABLE QVariantMap suggestedVenue(int teamId, const QString &homeAway, const QString &opponent);
+
 signals:
+    void venuesBusyChanged();
+    void venuesRefreshed(const QVariantMap &result);
     void lastErrorChanged();
     void dataReplaced();               // les données ont été remplacées par un import : relire les listes
 
@@ -273,5 +307,8 @@ private:
     AttendanceRepository m_attendance;
     ExerciseRepository m_exercises;
     PlanRepository m_plan;
+    VenueRepository m_venues;
+    QNetworkAccessManager *m_net = nullptr;     // créé au premier téléchargement des stades
+    QNetworkReply *m_venueReply = nullptr;
     QString m_lastError;
 };

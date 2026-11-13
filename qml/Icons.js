@@ -48,6 +48,9 @@ function draw(c, name) {
     case "close": line(c, 6, 6, 18, 18); line(c, 18, 6, 6, 18); break;
     case "tick": poly(c, [[5, 12.5], [10, 17.5], [19, 7]]); break;
     case "search": circle(c, 11, 11, 6.5); line(c, 16, 16, 21, 21); break;
+    case "pin": c.beginPath(); c.moveTo(12, 21.5); c.bezierCurveTo(7, 15.5, 5, 12.5, 5, 9.5);
+        c.arc(12, 9.5, 7, Math.PI, 0); c.bezierCurveTo(19, 12.5, 17, 15.5, 12, 21.5); c.closePath(); c.stroke();
+        circle(c, 12, 9.5, 2.6); break;
     case "back": poly(c, [[15, 5], [8, 12], [15, 19]]); break;
     case "chevron": poly(c, [[9, 5], [16, 12], [9, 19]]); break;
     case "undo": undo(c); break;
