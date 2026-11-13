@@ -230,7 +230,25 @@ QStringList formationNames(int perSide)
     return {QStringLiteral("4-4-2"), QStringLiteral("4-3-3"), QStringLiteral("3-5-2"), QStringLiteral("4-2-3-1")};
 }
 
+QList<Item> formation11(const QString &name);
+QList<Item> formation8(const QString &name);
+
+// Une équipe posée par une formation reste dans sa moitié de terrain (x < 0,5), comme au coup d'envoi : l'adversaire,
+// posé en miroir, occupe l'autre moitié et les deux équipes ne se mélangent pas (demande de l'entraîneur, 13/11/2026).
+// Foot à 11 : les positions d'origine (attaquants jusqu'à x = 0,76) sont ramenées dans la moitié en gardant les lignes,
+// gardien au but, défenseurs devant la surface de réparation (x ≈ 0,20) pour que leurs noms ne croisent pas ses lignes.
 QList<Item> formation(const QString &name)
+{
+    QList<Item> eleven = formation11(name);
+    if (!eleven.isEmpty()) {
+        for (Item &p : eleven)
+            p.pos.setX(p.pos.x() < 0.1 ? 0.05 : 0.19 + (p.pos.x() - 0.18) * (0.24 / 0.58));
+        return eleven;
+    }
+    return formation8(name);
+}
+
+QList<Item> formation11(const QString &name)
 {
     // x : profondeur (0 = but défendu), y : largeur (0 = haut). Numéros classiques.
     if (name == QLatin1String("4-4-2")) {
@@ -258,30 +276,38 @@ QList<Item> formation(const QString &name)
                 player(7, 0.58, 0.85), player(10, 0.58, 0.50), player(11, 0.58, 0.15),
                 player(9, 0.76, 0.50)};
     }
-    // Foot à 8 (gardien + 7) : mêmes conventions, numéros 1 à 11 non consécutifs gardés comme au foot à 11.
+    return {};
+}
+
+QList<Item> formation8(const QString &name)
+{
+    // Foot à 8 (gardien + 7) : d'après les 4 schémas fournis par l'entraîneur le 13/11/2026 (2-3-2, 2-4-1, 3-2-2,
+    // 3-3-1). Numéros 1 à 11 non consécutifs gardés comme au foot à 11. Tout le monde reste dans sa moitié (x < 0,5) :
+    // avec l'adversaire en miroir, les deux équipes ne se mélangent pas.
     if (name == QLatin1String("3-3-1")) {
-        return {player(1, 0.06, 0.50),
-                player(2, 0.22, 0.82), player(4, 0.20, 0.50), player(3, 0.22, 0.18),
-                player(7, 0.44, 0.85), player(8, 0.42, 0.50), player(11, 0.44, 0.15),
-                player(9, 0.70, 0.50)};
+        return {player(1, 0.05, 0.50),
+                player(2, 0.20, 0.82), player(4, 0.19, 0.50), player(3, 0.20, 0.18),
+                player(7, 0.30, 0.85), player(8, 0.29, 0.50), player(11, 0.30, 0.15),
+                player(9, 0.42, 0.50)};
     }
     if (name == QLatin1String("2-3-2")) {
-        return {player(1, 0.06, 0.50),
+        return {player(1, 0.05, 0.50),
                 player(5, 0.20, 0.68), player(4, 0.20, 0.32),
-                player(7, 0.44, 0.85), player(8, 0.42, 0.50), player(11, 0.44, 0.15),
-                player(9, 0.70, 0.65), player(10, 0.70, 0.35)};
+                player(7, 0.30, 0.85), player(8, 0.29, 0.50), player(11, 0.30, 0.15),
+                player(9, 0.42, 0.65), player(10, 0.42, 0.35)};
     }
     if (name == QLatin1String("3-2-2")) {
-        return {player(1, 0.06, 0.50),
-                player(2, 0.22, 0.82), player(4, 0.20, 0.50), player(3, 0.22, 0.18),
-                player(6, 0.42, 0.65), player(8, 0.42, 0.35),
-                player(9, 0.70, 0.65), player(10, 0.70, 0.35)};
+        return {player(1, 0.05, 0.50),
+                player(2, 0.20, 0.82), player(4, 0.19, 0.50), player(3, 0.20, 0.18),
+                player(6, 0.30, 0.65), player(8, 0.30, 0.35),
+                player(9, 0.42, 0.65), player(10, 0.42, 0.35)};
     }
     if (name == QLatin1String("2-4-1")) {
-        return {player(1, 0.06, 0.50),
+        // Milieu en losange aplati : un milieu plus bas (6), un plus haut (8), deux excentrés.
+        return {player(1, 0.05, 0.50),
                 player(5, 0.20, 0.68), player(4, 0.20, 0.32),
-                player(7, 0.44, 0.88), player(6, 0.42, 0.62), player(8, 0.42, 0.38), player(11, 0.44, 0.12),
-                player(9, 0.70, 0.50)};
+                player(7, 0.31, 0.88), player(6, 0.27, 0.58), player(8, 0.34, 0.42), player(11, 0.31, 0.12),
+                player(9, 0.43, 0.50)};
     }
     return {};
 }

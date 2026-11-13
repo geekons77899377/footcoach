@@ -134,9 +134,9 @@ full = [P("Att1", "FWD"), P("Def1", "DEF"), P("Mil1", "MID"), P("Gar", "GK"), P(
 pos = formation_labels(full)
 check(len(pos) == 11, f"11 titulaires, 11 joueurs posés : {len(pos)}")
 check(pos["Gar"][0] < 0.1, f"le gardien est au but : {pos['Gar']}")
-check(all(pos[n][0] < 0.3 for n in ("Def1", "Def2", "Def3", "Def4")), "les défenseurs sont dans la ligne défensive")
-check(all(0.3 < pos[n][0] < 0.55 for n in ("Mil1", "Mil2", "Mil3", "Mil4")), "les milieux sont dans la ligne du milieu")
-check(all(pos[n][0] > 0.6 for n in ("Att1", "Att2")), "les attaquants sont en pointe")
+check(all(pos[n][0] < 0.24 for n in ("Def1", "Def2", "Def3", "Def4")), "les défenseurs sont dans la ligne défensive")
+check(all(0.19 < pos[n][0] < 0.36 for n in ("Mil1", "Mil2", "Mil3", "Mil4")), "les milieux sont dans la ligne du milieu")
+check(all(pos[n][0] > 0.38 for n in ("Att1", "Att2")), "les attaquants sont en pointe")
 # Remplaçants : jamais placés, même au bon poste et même s'il manque un titulaire.
 sq = [P("Gar", "GK"), P("Def1", "DEF"), P("Remp", "DEF", role="substitute"), P("Remp2", "GK", role="substitute")]
 pos = formation_labels(sq)
@@ -144,31 +144,31 @@ check(set(pos) == {"Gar", "Def1"}, f"les remplaçants ne sont pas placés : {sor
 # Plusieurs titulaires au même poste : le pied fort décide (droitier à droite, gaucher à gauche), puis le prénom.
 defs = [P("Zoe", "DEF", "R"), P("Yan", "DEF", "L"), P("Xav", "DEF", "R"), P("Wil", "DEF", "L"), P("Vic", "DEF", "B"), P("Gar", "GK")]
 pos = formation_labels(defs)
-right_back = [n for n, p in pos.items() if p[1] > 0.8 and p[0] < 0.3]
-left_back = [n for n, p in pos.items() if p[1] < 0.2 and p[0] < 0.3]
+right_back = [n for n, p in pos.items() if p[1] > 0.8 and p[0] < 0.24]
+left_back = [n for n, p in pos.items() if p[1] < 0.2 and p[0] < 0.24]
 check(right_back == ["Xav"], f"latéral droit : un droitier, le premier par prénom (Xav avant Zoe) : {right_back}")
 check(left_back == ["Wil"], f"latéral gauche : un gaucher, le premier par prénom (Wil avant Yan) : {left_back}")
-line = lambda p_: sorted(n for n, q in p_.items() if q[0] < 0.3 and n != "Gar")
+line = lambda p_: sorted(n for n, q in p_.items() if q[0] < 0.24 and n != "Gar")
 check(line(pos) == ["Wil", "Xav", "Yan", "Zoe"], f"défense : latéraux Xav (D) et Wil (G), axe droit Zoe (D) et axe gauche Yan (G) : {line(pos)}")
 check(pos["Zoe"][1] > 0.5 and pos["Yan"][1] < 0.5, "axe : le droitier côté droit, le gaucher côté gauche")
-check(pos["Vic"][0] > 0.3, f"Vic (« les deux », 5e défenseur) occupe une case libre hors de la défense : {pos['Vic']}")
+check(pos["Vic"][0] > 0.24, f"Vic (« les deux », 5e défenseur) occupe une case libre hors de la défense : {pos['Vic']}")
 # À pied fort identique ou inconnu : ordre alphabétique des prénoms (accents ignorés), pas l'ordre de la liste.
 same = [P("Léo", "DEF"), P("Éric", "DEF"), P("Adam", "DEF"), P("Zack", "DEF"), P("Bob", "DEF"), P("Gar", "GK")]
 pos = formation_labels(same)
 check(line(pos) == ["Adam", "Bob", "Léo", "Éric"], f"pieds inconnus : défense = Adam, Bob, Éric, Léo (prénom, accents ignorés) : {line(pos)}")
-check(pos["Zack"][0] > 0.3, "pieds inconnus : Zack, dernier par prénom, hors de la défense")
+check(pos["Zack"][0] > 0.24, "pieds inconnus : Zack, dernier par prénom, hors de la défense")
 # Un « les deux pieds » joue des deux côtés, mais après le pied adapté.
 mix = [P("Bi", "DEF", "B"), P("Dr", "DEF", "R"), P("Ga", "DEF", "L"), P("Ax", "DEF", "B"), P("Gar", "GK")]
 pos = formation_labels(mix)
-check([n for n, p in pos.items() if p[1] > 0.8 and p[0] < 0.3] == ["Dr"] and [n for n, p in pos.items() if p[1] < 0.2 and p[0] < 0.3] == ["Ga"], "pied adapté d'abord, « les deux » ensuite")
+check([n for n, p in pos.items() if p[1] > 0.8 and p[0] < 0.24] == ["Dr"] and [n for n, p in pos.items() if p[1] < 0.2 and p[0] < 0.24] == ["Ga"], "pied adapté d'abord, « les deux » ensuite")
 # 4-2-3-1 : 1 seul attaquant ; le second attaquant (poste sans place) prend un poste restant.
 pos = formation_labels(full, "4-2-3-1")
-check(pos["Gar"][0] < 0.1 and pos["Att1"][0] > 0.7, f"4-2-3-1 : gardien au but, premier attaquant en pointe : {pos.get('Att1')}")
-check(len(pos) == 11 and 0.3 < pos["Att2"][0] < 0.65, f"4-2-3-1 : le 2e attaquant (poste sans place) prend un poste restant : {pos.get('Att2')}")
+check(pos["Gar"][0] < 0.1 and pos["Att1"][0] > 0.38, f"4-2-3-1 : gardien au but, premier attaquant en pointe : {pos.get('Att1')}")
+check(len(pos) == 11 and 0.19 < pos["Att2"][0] < 0.44, f"4-2-3-1 : le 2e attaquant (poste sans place) prend un poste restant : {pos.get('Att2')}")
 # Postes absents : joueurs sans poste placés dans les cases libres, jamais au but ; gardien absent : but vide.
 pos = formation_labels([P("A", ""), P("B", ""), P("C", "DEF")])
 check(len(pos) == 3 and all(p[0] > 0.1 for p in pos.values()), f"sans poste ni gardien : placés dans le champ, but vide : {pos}")
-check(pos["C"][0] < 0.3, "le défenseur reste en défense")
+check(pos["C"][0] < 0.24, "le défenseur reste en défense")
 # Deux gardiens : le second ne va pas dans le champ.
 pos = formation_labels([P("G1", "GK"), P("G2", "GK"), P("D", "DEF")])
 check(set(pos) == {"G1", "D"}, f"deux gardiens : un seul placé : {sorted(pos)}")
@@ -183,7 +183,36 @@ QMetaObject.invokeMethod(fs, "picked", Q_ARG("QString", "3-3-1"), Q_ARG("bool", 
 own = [i for i in board_items() if i["kind"] == "player"]; opp = [i for i in board_items() if i["kind"] == "opponent"]
 check(len(own) == 8 and len(opp) == 8, f"3-3-1 avec adversaires : 8 joueurs et 8 adversaires ({len(own)} / {len(opp)})")
 pos8 = {i["label"]: i["x"] for i in own}
-check(pos8["Gar"] < 0.1 and pos8["A1"] > 0.6 and all(pos8[n] < 0.3 for n in ("D1", "D2", "D3")), f"3-3-1 : gardien, 3 défenseurs, attaquant seul : {pos8}")
+check(pos8["Gar"] < 0.1 and pos8["A1"] > 0.38 and all(pos8[n] < 0.24 for n in ("D1", "D2", "D3")), f"3-3-1 : gardien, 3 défenseurs, attaquant seul : {pos8}")
+# Chaque équipe dans sa moitié (13/11/2026) : aucun joueur ni adversaire de l'autre côté de la ligne médiane, captures.
+real = [("Milan", "ALLUARD", "GK"), ("Ilyan", "ALIOUA", "DEF"), ("Alessio", "FREBOURG", "DEF"), ("Yassine", "DIJA", "DEF"),
+        ("Zakaria", "ZANANE", "MID"), ("Maissa", "NDOUR", "MID"), ("Adam", "ALIOUA", "MID"), ("Mathéo", "SAYON", "FWD"),
+        ("Mathis", "LEGRAND", "FWD")]
+need = {"3-3-1": (3, 3, 1), "2-3-2": (2, 3, 2), "3-2-2": (3, 2, 2), "2-4-1": (2, 4, 1)}
+# Fenêtre neuve (aucune feuille ouverte par les étapes précédentes) pour des captures lisibles.
+h3, b3 = make()
+go(h3, "matches"); page3 = cls(h3, "MatchesPage"); ed3 = cls(h3, "MatchEditor")
+call(page3, "newMatch", D(6)); h3.spin(300)
+field(h3, "opponentField").setProperty("text", "Rivaux"); call(ed3, "save"); h3.spin(300)
+call(ed3, "openBoard"); h3.spin(700)
+be3 = find(h3, lambda o: o.metaObject().className().startswith("BoardEditor")); bm3 = be3.findChild(QObject, "board")
+fs3 = find(h3, lambda o: o.metaObject().className().startswith("FormationSheet"))
+fs3.setProperty("perSide", 8); h3.spin(100)
+def items3():
+    return json.loads(str(QMetaObject.invokeMethod(bm3, "toJson", Qt.DirectConnection, Q_RETURN_ARG("QVariant"))))["items"]
+for fname, (nd, nm, na) in need.items():
+    gk = [r for r in real if r[2] == "GK"]
+    pool_d = [r for r in real if r[2] == "DEF"] + [r for r in real if r[2] == "MID"]
+    sq = gk + [(f, l, "DEF") for f, l, _ in pool_d[:nd]]
+    rest = [r for r in real if r not in gk and (r[0], r[1]) not in [(x[0], x[1]) for x in sq]]
+    sq += [(f, l, "MID") for f, l, _ in rest[:nm]] + [(f, l, "FWD") for f, l, _ in rest[nm:nm + na]]
+    be3.setProperty("squad", [{"id": i + 1, "name": f + " " + l, "firstName": f, "lastName": l, "position": pos, "foot": "",
+                              "role": "starter"} for i, (f, l, pos) in enumerate(sq)]); h3.spin(100)
+    QMetaObject.invokeMethod(fs3, "picked", Q_ARG("QString", fname), Q_ARG("bool", True)); h3.spin(400)
+    own = [i for i in items3() if i["kind"] == "player"]; opp = [i for i in items3() if i["kind"] == "opponent"]
+    check(len(own) == 8 and max(i["x"] for i in own) < 0.5 and min(i["x"] for i in opp) > 0.5,
+          f"{fname} : chaque équipe dans sa moitié (joueurs x max {max(i['x'] for i in own):.2f}, adversaires x min {min(i['x'] for i in opp):.2f})")
+    h3.shot("moitie_" + fname)
 fs.setProperty("perSide", 11); h.spin(100)
 
 # Aucun convoqué : message, pas de liste, pas de rond.

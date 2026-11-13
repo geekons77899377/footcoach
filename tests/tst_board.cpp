@@ -7,6 +7,9 @@
 #include "core/TacticalBoard.h"
 #include "core/TeamRepository.h"
 
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSqlQuery>
 #include <QtTest>
 
@@ -183,17 +186,64 @@ private slots:
 
     void formationLinesHaveTheRightSizes()
     {
-        // 4-4-2 : 4 défenseurs (x ≈ 0.2), 4 milieux (x ≈ 0.45), 2 attaquants (x ≈ 0.7).
+        // 4-4-2 ramené dans sa moitié : 4 défenseurs (x ≈ 0,20), 4 milieux (x ≈ 0,29), 2 attaquants (x ≈ 0,40).
         int back = 0, mid = 0, fwd = 0;
         for (const Item &p : formation(QStringLiteral("4-4-2"))) {
-            if (p.pos.x() < 0.1) continue;
-            if (p.pos.x() < 0.3) ++back;
-            else if (p.pos.x() < 0.6) ++mid;
+            if (p.pos.x() < 0.06) continue;
+            if (p.pos.x() < 0.24) ++back;
+            else if (p.pos.x() < 0.37) ++mid;
             else ++fwd;
         }
         QCOMPARE(back, 4);
         QCOMPARE(mid, 4);
         QCOMPARE(fwd, 2);
+    }
+
+    // Chaque équipe reste dans sa moitié (demande de l'entraîneur du 13/11/2026) : aucun joueur posé par une formation ne
+    // dépasse la ligne médiane, l'adversaire en miroir occupe l'autre moitié, avec un écart pour les étiquettes.
+    void everyFormationStaysInItsOwnHalf()
+    {
+        QStringList names = formationNames(11) + formationNames(8);
+        QCOMPARE(names.size(), 8);
+        for (const QString &name : names) {
+            const QList<Item> team = formation(name);
+            QVERIFY2(!team.isEmpty(), qPrintable(name));
+            double maxX = 0;
+            for (const Item &p : team) {
+                QVERIFY2(p.pos.x() > 0.0 && p.pos.y() > 0.0 && p.pos.y() < 1.0, qPrintable(name));
+                maxX = qMax(maxX, p.pos.x());
+            }
+            QVERIFY2(maxX <= 0.44, qPrintable(QStringLiteral("%1 : x max %2").arg(name).arg(maxX)));
+            for (const Item &o : mirroredAsOpponent(team))
+                QVERIFY2(o.pos.x() >= 0.56, qPrintable(name));
+            // Gardien au but ; joueurs de champ devant la surface de réparation (leurs noms ne croisent pas ses lignes).
+            QVERIFY2(team.first().pos.x() < 0.06, qPrintable(name));
+            for (int i = 1; i < team.size(); ++i)
+                QVERIFY2(team.at(i).pos.x() >= 0.19, qPrintable(QStringLiteral("%1 : n°%2 dans la surface").arg(name, team.at(i).label)));
+        }
+    }
+
+    // Recrée tests/qml/formations.json (données des tests QML) depuis ce code : action volontaire.
+    void writeQmlFormationsFixture()
+    {
+        const QString out = qEnvironmentVariable("FOOTCOACH_WRITE_QML_FORMATIONS");
+        if (out.isEmpty())
+            QSKIP("Définir FOOTCOACH_WRITE_QML_FORMATIONS=<fichier> pour recréer tests/qml/formations.json");
+        QFile f(out);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QJsonObject root = QJsonDocument::fromJson(f.readAll()).object();
+        f.close();
+        for (const QString &name : formationNames(11) + formationNames(8)) {
+            Board plain, opp;
+            plain.items = formation(name);
+            opp.items = plain.items + mirroredAsOpponent(plain.items);
+            QJsonObject e;
+            e.insert(QStringLiteral("plain"), toJson(plain));
+            e.insert(QStringLiteral("opp"), toJson(opp));
+            root.insert(name, e);
+        }
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        f.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
     }
 
     void mirroredOpponentsFaceTheTeam()

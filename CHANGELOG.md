@@ -1,5 +1,12 @@
 # Journal des modifications
 
+## Non publié — formations : chaque équipe dans sa moitié
+- **Demande de l'entraîneur (13/11/2026)** : avec les adversaires, les deux équipes se mélangeaient (attaquant collé au défenseur central adverse, milieux nez à nez, noms illisibles). Désormais **aucun joueur posé par une formation ne dépasse la ligne médiane** ; l'adversaire, toujours en miroir, occupe l'autre moitié.
+- **Foot à 8** : positions refaites d'après les 4 schémas fournis par l'entraîneur (2-3-2, 2-4-1, 3-2-2, 3-3-1) : gardien au but, défenseurs devant la surface (x ≈ 0,20), milieux (x ≈ 0,30), attaquants près de la ligne médiane (x ≈ 0,42). L'ancienne version était une estimation sans source.
+- **Foot à 11** : mêmes formations, ramenées dans la moitié en gardant l'ordre des lignes (pas de document fourni pour le foot à 11).
+- Tests : `tst_board::everyFormationStaysInItsOwnHalf` (8 formations, adversaires au-delà de 0,56, joueurs de champ hors de la surface), `formationLinesHaveTheRightSizes` adapté, `writeQmlFormationsFixture` (recrée `tests/qml/formations.json`, action volontaire), `t_squadboard.py` adapté avec captures `moitie_<formation>.png` (backend **simulé**).
+- Non vérifié : Qt 6.9, Android.
+
 ## Non publié — stades des matchs (schéma 11)
 - **Paramètres > Stades des matchs** : département du club (« 60 », « 2A »…) et bouton **« Mettre à jour les stades »**, qui télécharge les terrains de football du département depuis Data ES (recensement des équipements sportifs du ministère des Sports, `…/datasets/data-es/exports/json`). Un seul appel, seulement à la demande ; seul le numéro du département est envoyé. Bilan affiché (reçus, nouveaux, retirés, hors service), bouton Annuler.
 - **Rien n'est supprimé par une mise à jour** : un terrain absent de la réponse devient « retiré de la liste officielle », un terrain noté hors service par Data ES devient « hors service » ; ils ne sont plus proposés pour les nouveaux matchs, les matchs existants les gardent. Une réponse vide ou illisible ne change rien.
