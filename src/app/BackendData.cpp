@@ -15,7 +15,13 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QStandardPaths>
 #include <QUrl>
+
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#include <jni.h>
+#endif
 
 namespace {
 
@@ -199,6 +205,53 @@ QVariantMap Backend::countsOfDatabase()
         tables.insert(table, t);
     }
     return countsOf(tables);
+}
+
+QVariantMap Backend::partagerDonnees()
+{
+    const QByteArray data = buildExport();
+    if (data.isEmpty())
+        return done(false, m_lastError.isEmpty() ? tr("Export impossible.") : m_lastError);
+    const QString dossier = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                            + QStringLiteral("/exports");
+    if (!QDir().mkpath(dossier))
+        return done(false, tr("Impossible de créer le dossier d'export."));
+    const QString chemin = dossier + QStringLiteral("/footcoach-")
+                           + QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))
+                           + QStringLiteral(".footcoach");
+    QFile f(chemin);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate) || f.write(data) != data.size()) {
+        const QString e = tr("Écriture de l'export impossible.");
+        setError(e);
+        return done(false, e);
+    }
+    f.close();
+    setError(QString());
+#ifdef Q_OS_ANDROID
+    QJniObject activite = QJniObject::callStaticObjectMethod("org/qtproject/qt/android/QtNative", "activity",
+                                                             "()Landroid/app/Activity;");
+    // ShareBridge.partager renvoie null en cas de succès, sinon le motif de l'échec.
+    QJniObject erreur = QJniObject::callStaticObjectMethod(
+        "org/footcoach/app/ShareBridge", "partager",
+        "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        activite.object(),
+        QJniObject::fromString(chemin).object<jstring>(),
+        QJniObject::fromString(tr("Envoyer mes données")).object<jstring>());
+    if (erreur.isValid()) {
+        const QString e = erreur.toString();
+        setError(e);
+        return done(false, e);
+    }
+    QVariantMap m = done(true);
+    m.insert(QStringLiteral("message"), tr("Choisissez où envoyer le fichier."));
+    m.insert(QStringLiteral("path"), chemin);
+    return m;
+#else
+    QVariantMap m = done(true);
+    m.insert(QStringLiteral("message"), tr("Fichier enregistré : %1").arg(chemin));
+    m.insert(QStringLiteral("path"), chemin);
+    return m;
+#endif
 }
 
 QVariantMap Backend::exportDataFile(const QString &url)

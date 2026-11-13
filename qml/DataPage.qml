@@ -167,6 +167,15 @@ Item {
                             saveDialog.open();
                         }
                     }
+                    AppButton {
+                        kind: "outline"
+                        iconName: "copy"
+                        text: "Partager le fichier"
+                        onClicked: {
+                            var r = backend.partagerDonnees();
+                            toast.show(r.ok ? r.message : r.error);
+                        }
+                    }
                 }
             }
 
