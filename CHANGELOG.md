@@ -1,5 +1,9 @@
 # Journal des modifications
 
+## Non publié — épingle du champ « Stade ou adresse » invisible
+- **Constat (capture sur appareil)** : pas d'épingle à droite du champ, donc pas d'accès à la liste des stades. Cause : l'icône avait été ajoutée à `Icons.js` (dessins du terrain) au lieu de `Icon.qml` (icônes de l'interface) ; le bouton était là mais vide. Même défaut pour l'icône du bouton « Mettre à jour les stades » (`rotateR` inexistante, remplacée par `repeat`).
+- `t_venues.py` vérifie maintenant que l'épingle et les icônes des stades existent dans `Icon.qml` (backend **simulé**).
+
 ## Non publié — formations : chaque équipe dans sa moitié
 - **Demande de l'entraîneur (13/11/2026)** : avec les adversaires, les deux équipes se mélangeaient (attaquant collé au défenseur central adverse, milieux nez à nez, noms illisibles). Désormais **aucun joueur posé par une formation ne dépasse la ligne médiane** ; l'adversaire, toujours en miroir, occupe l'autre moitié.
 - **Foot à 8** : positions refaites d'après les 4 schémas fournis par l'entraîneur (2-3-2, 2-4-1, 3-2-2, 3-3-1) : gardien au but, défenseurs devant la surface (x ≈ 0,20), milieux (x ≈ 0,30), attaquants près de la ligne médiane (x ≈ 0,42). L'ancienne version était une estimation sans source.

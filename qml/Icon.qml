@@ -22,6 +22,7 @@ Item {
         "plus": '<path d="M12 5v14M5 12h14"/>',
         "minus": '<path d="M5 12h14"/>',
         "search": '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+        "pin": '<path d="M12 21.5c-4.5-5.2-7-8.7-7-12a7 7 0 0 1 14 0c0 3.3-2.5 6.8-7 12z"/><circle cx="12" cy="9.5" r="2.6"/>',
         "back": '<path d="M15 5l-7 7 7 7"/>',
         "chevron": '<path d="M9 5l7 7-7 7"/>',
         "undo": '<path d="M9 7 4 12l5 5"/><path d="M4 12h10a5 5 0 0 1 0 10h-3"/>',

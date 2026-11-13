@@ -215,7 +215,7 @@ Item {
                         objectName: "refreshButton"
                         width: parent.width
                         kind: "primary"
-                        iconName: page.busy ? "" : "rotateR"
+                        iconName: page.busy ? "" : "repeat"
                         text: page.busy ? "Téléchargement…" : "Mettre à jour les stades"
                         enabled: !page.busy && page.clubId > 0
                         onClicked: page.startRefresh()

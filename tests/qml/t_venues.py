@@ -157,6 +157,14 @@ named(h, "opponentField").setProperty("text", "US Nanteuil")
 sig(named(h, "placeChips"), "picked", "away"); named(h, "placeChips").setProperty("value", "away"); h.spin(300)
 check(loc.property("text") == "" and ed.property("venueId") == -1, "extérieur, adversaire inconnu : le stade du club est retiré")
 
+# L'épingle du champ est bien dessinée (Icon.qml : l'icône doit exister dans ses glyphes, sinon le bouton est vide).
+icon = find(h, lambda o: o.metaObject().className().startswith("Icon_") and o.property("name") == "pin")
+glyphs = jv(icon.property("glyphs")) if icon is not None else {}
+check(icon is not None and "pin" in glyphs and icon.property("visible") is True, "le champ « Stade ou adresse » montre l'épingle")
+for nm in ("repeat", "home", "tick", "close", "edit", "trash", "plus", "search"):
+    check(nm in glyphs, f"icône « {nm} » utilisée par les stades : présente")
+h.shot("venues_6b_epingle")
+
 sheet = named(h, "venueSheet")
 call(loc, "actionClicked"); h.spin(400)
 check(sheet.property("visible") is True and len(jv(sheet.property("allVenues"))) == 5, "le bouton du champ ouvre la liste des stades proposés")
