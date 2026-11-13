@@ -16,6 +16,12 @@ class B7(B4):
         t = [{"id": 1, "name": "Senior A", "category": "Seniors", "playerCount": 4, "clubName": "Mon club"}]
         if B7.two_teams: t.append({"id": 2, "name": "U13", "category": "U13", "playerCount": 12, "clubName": "Mon club"})
         return t
+    @Slot(bool, result="QVariantList")
+    def allPlayers(self, inactive):
+        self.calls.append(("allPlayers", inactive))
+        a = [dict(p, teamId=1, teamName="Senior A") for p in B4.players(self, 1, inactive)]
+        b = [dict(a[0], id=50, fullName="Zoé Perdue", firstName="Zoé", lastName="Perdue", teamId=2, teamName="U13")]
+        return a + b
     @Slot("QVariantList", int, result="QVariantMap")
     def movePlayers(self, ids, team):
         self.calls.append(("movePlayers", sorted(int(i) for i in ids), team))
@@ -173,6 +179,37 @@ for name, w, hh, rowname in [("telephone", 412, 892, "playerRow"), ("bureau", 12
     m = i.property("message") if i else ""
     check(i is not None and "1 joueur déplacé vers U13 · 1 numéro retiré" in m and "Yann Portier" in m and not i.property("cancelVisible"), f"{name} : compte rendu avec les joueurs non déplacés : {m!r}")
     shot(h, f"move_{name}_compte_rendu")
+# Vue « Tous les joueurs » : joueurs de toutes les équipes, avec leur équipe, à répartir par le bouton Déplacer.
+h, b = make7(412, 892); pg = squad_page(h)
+sheets = [o for o in objs(h, lambda o: o.objectName() == "teamSheet")]
+check(len(sheets) >= 1, "feuille « Équipe » trouvée")
+ts = sheets[0]
+QMetaObject.invokeMethod(ts, "rebuild"); h.spin(100)
+labels = [m["text"] for m in jsval(ts.property("model"))]
+check(labels[0] == "Tous les joueurs (toutes les équipes)", f"première entrée de la liste des équipes : {labels[:2]}")
+QMetaObject.invokeMethod(ts, "chosen", Q_ARG("QString", "all")); h.spin(500)
+check(pg.property("allMode") is True and ("allPlayers", False) in b.calls, f"vue « Tous les joueurs » active : {b.calls}")
+rs = rows(h, "playerRow")
+metas = []
+for r in rs: texts(r, metas)
+check(any("U13" in t for t in metas) and any("Senior A" in t for t in metas), f"chaque joueur affiche son équipe : {[t for t in metas if 'U13' in t or 'Senior A' in t][:3]}")
+check(not F(h, "importButton").isVisible(), "vue « Tous les joueurs » : pas d'import (il faut une équipe)")
+long_press(h, rs[-1]); h.spin(200)
+mv = F(h, "moveSelectedButton")
+check(mv.isVisible() and mv.property("enabled"), "vue « Tous les joueurs » : Déplacer disponible")
+click_item(h, mv); h.spin(300)
+msh = [o for o in objs(h, lambda o: o.objectName() == "moveSheet")][0]
+labels = [m["text"] for m in jsval(msh.property("model"))]
+check(labels == ["Senior A · Mon club", "U13 · Mon club"], f"toutes les équipes proposées comme destination : {labels}")
+QMetaObject.invokeMethod(msh, "close"); QMetaObject.invokeMethod(msh, "chosen", Q_ARG("QString", "t1")); h.spin(400)
+d = open_dialog(h); accept(h, d)
+mp = [c for c in b.calls if c[0] == "movePlayers"]
+check(len(mp) == 1 and mp[0][2] == 1, f"movePlayers vers Senior A : {mp}")
+# Retour à une équipe : la vue normale revient.
+QMetaObject.invokeMethod(ts, "rebuild"); h.spin(100)
+QMetaObject.invokeMethod(ts, "chosen", Q_ARG("QString", "t2")); h.spin(300)
+check(pg.property("allMode") is False and pg.property("teamId") == 2, "choisir une équipe quitte la vue « Tous les joueurs »")
+
 # Une seule équipe : pas de bouton Déplacer.
 h, b = make7(412, 892, two=False)
 long_press(h, rows(h, "playerRow")[0])

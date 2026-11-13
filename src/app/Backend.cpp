@@ -1,5 +1,7 @@
 #include "Backend.h"
 
+#include <algorithm>
+
 #include "core/TacticalBoard.h"
 
 #include <QBuffer>
@@ -577,6 +579,25 @@ QVariantList Backend::players(int teamId, bool includeInactive)
     setError(error);
     for (const Player &p : all)
         list.append(toMap(p));
+    return list;
+}
+
+QVariantList Backend::allPlayers(bool includeInactive)
+{
+    QString error;
+    QList<QPair<QString, QVariantMap>> rows;
+    for (const Team &t : m_teams.all(&error)) {
+        for (const Player &p : m_players.list(t.id, includeInactive, &error)) {
+            QVariantMap m = toMap(p);
+            m.insert(QStringLiteral("teamName"), t.name);
+            rows.append({p.lastName.toLower() + QLatin1Char('\x01') + p.firstName.toLower(), m});
+        }
+    }
+    setError(error);
+    std::stable_sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) { return a.first.localeAwareCompare(b.first) < 0; });
+    QVariantList list;
+    for (const auto &r : std::as_const(rows))
+        list.append(r.second);
     return list;
 }
 

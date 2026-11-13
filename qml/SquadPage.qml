@@ -31,6 +31,7 @@ Item {
     property string query: ""
     property string positionFilter: ""
     property bool showInactive: false
+    property bool allMode: false          // « Tous les joueurs » : toutes les équipes, pour les répartir (déplacement)
     property int currentId: -1            // joueur ouvert (-1 : aucun)
     property bool editing: false          // fiche ouverte (joueur existant ou nouveau)
     // Sélection multiple (appui long sur un joueur) : cases à cocher puis suppression groupée.
@@ -69,7 +70,8 @@ Item {
             var p = players[i];
             if (positionFilter !== "" && p.position !== positionFilter)
                 continue;
-            if (q !== "" && (p.fullName.toLowerCase().indexOf(q) < 0 && String(p.jerseyNumber) !== q))
+            if (q !== "" && (p.fullName.toLowerCase().indexOf(q) < 0 && String(p.jerseyNumber) !== q
+                         && !(allMode && String(p.teamName).toLowerCase().indexOf(q) >= 0)))
                 continue;
             out.push(p);
         }
@@ -88,8 +90,9 @@ Item {
     }
 
     function refreshPlayers() {
-        players = teamId > 0 ? backend.players(teamId, showInactive) : [];
-        loadOverview();
+        players = allMode ? backend.allPlayers(showInactive) : (teamId > 0 ? backend.players(teamId, showInactive) : []);
+        if (!allMode)
+            loadOverview();
     }
 
     function loadOverview() {
@@ -168,7 +171,7 @@ Item {
                         "Supprimer", true);
     }
     // Déplacement vers une autre équipe : choix de l'équipe, confirmation, compte rendu.
-    readonly property var otherTeams: teams.filter(function (t) { return t.id !== teamId; })
+    readonly property var otherTeams: teams.filter(function (t) { return allMode || t.id !== teamId; })
     function askMoveSelected() {
         if (selectedCount === 0 || otherTeams.length === 0)
             return;
@@ -194,7 +197,7 @@ Item {
                         (n > 1 ? "Ces joueurs passeront" : "Ce joueur passera") + " dans l'équipe « " + name + " ». "
                         + "Leurs présences, blessures, photos et contacts les suivent.\n\n"
                         + "Un numéro de maillot déjà pris dans « " + name + " » sera retiré. Un joueur qui y existe déjà "
-                        + "(même nom ou même licence) ne sera pas déplacé.",
+                        + "(même nom, même avec prénom et nom inversés, ou même licence) ne sera pas déplacé.",
                         "Déplacer", false);
     }
     function moveSelected(target) {
@@ -233,6 +236,11 @@ Item {
     }
 
     function openPlayer(p) {
+        if (allMode) {                              // la fiche s'ouvre dans l'équipe du joueur
+            allMode = false;
+            teamId = p.teamId;
+            refreshPlayers();
+        }
         currentId = p.id;
         form.openPlayer(p);
         editing = true;
@@ -266,6 +274,8 @@ Item {
             return "Aucune équipe";
         var n = players.length;
         var count = n === 0 ? "aucun joueur" : n === 1 ? "1 joueur" : n + " joueurs";
+        if (allMode)
+            return "Toutes les équipes · " + count;
         return team.name + " · " + count;
     }
 
@@ -391,17 +401,19 @@ Item {
 
     ActionSheet {
         id: teamSheet
+        objectName: "teamSheet"
         title: "Équipe"
         function rebuild() {
             var m = [];
             var several = backend.clubs().length > 1;
+            m.push({ id: "all", text: "Tous les joueurs (toutes les équipes)", icon: "users", checked: page.allMode });
             for (var i = 0; i < page.teams.length; ++i)
                 m.push({ id: "t" + page.teams[i].id, text: page.teams[i].name
                          + (page.teams[i].category ? " · " + page.teams[i].category : "")
                          + (several ? " — " + page.teams[i].clubName : ""),
-                         icon: "users", checked: page.teams[i].id === page.teamId });
+                         icon: "users", checked: !page.allMode && page.teams[i].id === page.teamId });
             m.push({ id: "new", text: "Nouvelle équipe", icon: "plus" });
-            if (page.team) {
+            if (page.team && !page.allMode) {
                 m.push({ id: "edit", text: "Modifier l'équipe", icon: "edit" });
                 m.push({ id: "delete", text: "Supprimer l'équipe", icon: "trash", danger: true });
             }
@@ -414,7 +426,12 @@ Item {
             model = m;
         }
         onChosen: (id) => {
-            if (id === "new") {
+            if (id === "all") {
+                page.clearSelection();
+                page.closeForm();
+                page.allMode = true;
+                page.refreshPlayers();
+            } else if (id === "new") {
                 teamDialog.openFor(null, page.team ? page.team.clubId : -1);
             } else if (id === "newClub") {
                 clubPrompt.clubId = -1;
@@ -436,6 +453,8 @@ Item {
                                 + page.team.playerCount + " joueur(s), ses séances et ses présences. "
                                 + "Cette action est définitive.", "Supprimer", true);
             } else if (id.charAt(0) === "t") {
+                page.clearSelection();
+                page.allMode = false;
                 page.teamId = parseInt(id.substring(1), 10);
                 page.closeForm();
                 page.refreshPlayers();
@@ -467,7 +486,7 @@ Item {
             }
             IconButton {
                 objectName: "importButton"
-                visible: page.team !== null
+                visible: page.team !== null && !page.allMode
                 iconName: "text"
                 fillColor: Theme.surface
                 accessibleName: "Importer une liste de joueurs"
@@ -475,14 +494,14 @@ Item {
             }
             IconButton {
                 objectName: "photosButton"
-                visible: page.team !== null
+                visible: page.team !== null && !page.allMode
                 iconName: "photo"
                 fillColor: Theme.surface
                 accessibleName: "Importer des photos"
                 onClicked: photosDialog.open()
             }
             IconButton {
-                visible: page.team !== null
+                visible: page.team !== null && !page.allMode
                 iconName: "plus"
                 iconColor: Theme.textOnAccent
                 fillColor: Theme.accent
@@ -631,6 +650,7 @@ Item {
                     size: 20
                 }
                 TextField {
+                    KeyboardRetry {}
                     id: search
                     anchors.left: searchIcon.right
                     anchors.right: parent.right
@@ -727,6 +747,8 @@ Item {
                         color: Theme.textMuted
                         text: {
                             var parts = [];
+                            if (page.allMode)
+                                parts.push(row.modelData.teamName);
                             if (row.modelData.position)
                                 parts.push(page.positionLabels[row.modelData.position]);
                             if (row.modelData.age >= 0)
@@ -833,6 +855,8 @@ Item {
                             color: Theme.textMuted
                             text: {
                                 var parts = [];
+                                if (page.allMode)
+                                    parts.push(String(cell.modelData.teamName).toUpperCase());
                                 if (cell.modelData.position)
                                     parts.push(page.positionLabels[cell.modelData.position].toUpperCase());
                                 if (cell.modelData.age >= 0)
@@ -899,7 +923,7 @@ Item {
                                   : "Aucun joueur ne correspond à la recherche ou au filtre."
                         }
                         AppButton {
-                            visible: page.team === null || page.players.length === 0
+                            visible: !page.allMode && (page.team === null || page.players.length === 0)
                             kind: "primary"
                             iconName: "plus"
                             text: page.team === null ? "Créer une équipe" : "Ajouter un joueur"
@@ -907,7 +931,7 @@ Item {
                         }
                         AppButton {
                             objectName: "importEmptyButton"
-                            visible: page.team !== null && page.players.length === 0
+                            visible: !page.allMode && page.team !== null && page.players.length === 0
                             iconName: "text"
                             text: "Importer une liste"
                             onClicked: importDialog.openFor(page.teamId)
@@ -957,7 +981,7 @@ Item {
     Item {
         id: overviewPane
         objectName: "overviewPane"
-        visible: page.split && !page.editing
+        visible: page.split && !page.editing && !page.allMode
         x: page.listWidth
         width: page.width - x
         height: page.height

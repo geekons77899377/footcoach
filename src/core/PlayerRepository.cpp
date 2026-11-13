@@ -47,9 +47,18 @@ QString PlayerRepository::fold(const QString &s)
     return out;
 }
 
+// Clé d'identité : les mots du prénom et du nom, sans accents ni casse, triés. « Zakaria ZANANE », « ZANANE Zakaria »
+// (prénom et nom inversés) et « Zakaria  zanané » donnent la même clé : c'est la même personne.
 QString PlayerRepository::nameKey(const QString &firstName, const QString &lastName)
 {
-    return fold(firstName) + QLatin1Char('\x1f') + fold(lastName);
+    QString joined = fold(firstName) + QLatin1Char(' ') + fold(lastName);
+    for (QChar &c : joined) {
+        if (!c.isLetterOrNumber())
+            c = QLatin1Char(' ');                       // tirets, apostrophes et points séparent les mots
+    }
+    QStringList words = joined.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    words.sort();
+    return words.join(QLatin1Char('\x1f'));
 }
 
 bool PlayerRepository::nameTaken(int teamId, const QString &firstName, const QString &lastName, int excludeId) const

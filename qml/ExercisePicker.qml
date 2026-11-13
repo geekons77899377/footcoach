@@ -92,6 +92,7 @@ Popup {
                 size: 20
             }
             TextField {
+                KeyboardRetry {}
                 id: search
                 anchors.left: searchIcon.right
                 anchors.right: parent.right

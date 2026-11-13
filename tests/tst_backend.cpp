@@ -715,6 +715,28 @@ private slots:
         QCOMPARE(b.players(team, true).size(), 0);
     }
 
+    void allPlayersListsEveryTeamWithItsName()
+    {
+        Backend b(m_db.handle());
+        const int t1 = b.saveTeam({{"name", "U11"}}).value("id").toInt();
+        const int t2 = b.saveTeam({{"name", "U13"}}).value("id").toInt();
+        QVERIFY(b.savePlayer({{"teamId", t1}, {"firstName", "Zoé"}, {"lastName", "Bernard"}}).value("ok").toBool());
+        QVERIFY(b.savePlayer({{"teamId", t2}, {"firstName", "Adam"}, {"lastName", "Alioua"}}).value("ok").toBool());
+        const int off = b.savePlayer({{"teamId", t2}, {"firstName", "Ilyan"}, {"lastName", "Alioua"}, {"active", false}})
+                            .value("id").toInt();
+        QVERIFY(off > 0);
+        const QVariantList active = b.allPlayers(false);
+        QCOMPARE(active.size(), 2);                                          // actifs de toutes les équipes
+        QCOMPARE(active.at(0).toMap().value("lastName").toString(), QStringLiteral("Alioua"));   // tri par nom
+        QCOMPARE(active.at(0).toMap().value("teamName").toString(), QStringLiteral("U13"));
+        QCOMPARE(active.at(1).toMap().value("teamName").toString(), QStringLiteral("U11"));
+        QCOMPARE(b.allPlayers(true).size(), 3);                              // avec les inactifs
+        // Répartition : déplacer depuis la vue « tous » vers une équipe.
+        const QVariantMap r = b.movePlayers({active.at(0).toMap().value("id")}, t1);
+        QVERIFY(r.value("ok").toBool());
+        QCOMPARE(b.players(t1, true).size(), 2);
+    }
+
     void playerNameOptionalAndUnique()
     {
         Backend b(m_db.handle());
@@ -731,6 +753,13 @@ private slots:
         QVERIFY(!save(team, "  LUCAS ", "").value("ok").toBool());
         QVERIFY(save(team, "Lucas", "Martin").value("ok").toBool());       // un nom le distingue
         QVERIFY(!save(team, "lucas", "MARTIN").value("ok").toBool());
+        // Prénom et nom inversés : c'est la même personne (saisie, import).
+        QVERIFY(!save(team, "Martin", "Lucas").value("ok").toBool());
+        QVERIFY(!save(team, "MARTIN", "lucas").value("ok").toBool());
+        QVERIFY(!b.importPlayers(team, QStringLiteral("Martin;Lucas")).value("ok").toBool());
+        QVERIFY(save(team, "Jean-Pierre", "Dupont").value("ok").toBool());
+        QVERIFY(!save(team, "Dupont", "Jean Pierre").value("ok").toBool());   // tirets et espaces équivalents, ordre libre
+        QVERIFY(save(team, "Pierre", "Dupont").value("ok").toBool());          // un mot de moins : autre personne
         const int leo = save(team, "Léo", "").value("id").toInt();
         QVERIFY(!save(team, "Leo", "").value("ok").toBool());               // accent ignoré
         QVERIFY(save(other, "Lucas", "").value("ok").toBool());             // autre équipe : permis

@@ -1,5 +1,17 @@
 # Journal des modifications
 
+## Non publié — clavier Android : nouvelle demande d'affichage après le toucher
+- **Constat (captures sur appareil, formulaire Exercice)** : le 1er toucher dans un champ lui donne le focus (bordure verte) sans clavier ; le 2e affiche le clavier.
+- **Code de Qt 6.9 lu** (`qquicktextedit.cpp`) : l'affichage est demandé à l'entrée du focus, puis, si le champ a déjà le focus, à chaque appui. Seule la 2e demande aboutit chez vous. **Hypothèse non vérifiée** : la 1re part trop tôt, avant que Android ait rattaché le champ à la saisie.
+- Nouveau `KeyboardRetry.qml` : 150 ms après un toucher (écran tactile ou stylet), redemande le clavier si le champ a le focus (sans effet si le clavier est déjà là). Posé dans les champs des formulaires (`FormField`) et les 3 champs de recherche (Effectif, Exercices, choix d'exercice).
+- **À essayer sur appareil** : rien n'est vérifié sur Android, et les tests QML tournent avec la souris, qui n'ouvre pas de clavier virtuel. Si le défaut persiste, relever le journal `adb logcat -s qml` ne suffira pas : il faudrait des traces autour du toucher.
+
+## Non publié — tous les joueurs de toutes les équipes, doublons nom/prénom inversés
+- **Effectif > bouton équipe > « Tous les joueurs (toutes les équipes) »** : liste tous les joueurs de toutes les équipes (triés par nom, équipe indiquée sur chaque ligne ; recherche par nom ou par équipe ; « Afficher les joueurs inactifs » s'applique). Appui long, sélection puis **« Déplacer »** vers n'importe quelle équipe pour répartir les joueurs ; toucher un joueur ouvre sa fiche dans son équipe. Pas d'import ni de nouveau joueur dans cette vue (il faut une équipe).
+- **Doublons** : prénom et nom **inversés** sont la même personne (« Zakaria ZANANE » = « ZANANE Zakaria »), en plus de la casse et des accents ; tirets, apostrophes et espaces sont équivalents (« Jean-Pierre Dupont » = « Dupont Jean Pierre »). Vaut pour la saisie d'un joueur, l'import d'une liste et le déplacement vers une autre équipe. Un même nom dans deux équipes différentes reste permis.
+- Limite : les doublons déjà présents dans une même équipe ne sont pas fusionnés ni signalés ; seul l'ajout, la modification, l'import et le déplacement sont contrôlés.
+- `Backend::allPlayers(bool)`. Tests : `tst_backend::allPlayersListsEveryTeamWithItsName`, `playerNameOptionalAndUnique` étendu, `t_select.py` étendu (backend **simulé**).
+
 ## Non publié — formations à 8 et adversaires en même nombre
 - **Feuille « Formation » du terrain** : choix du format **À 11** ou **À 8**. À 8 (gardien + 7) : **3-3-1, 2-3-2, 3-2-2, 2-4-1**. Pour un match, le format est d'office « À 8 » quand 8 titulaires au plus sont convoqués, sinon « À 11 » ; on le change d'un appui.
 - **Adversaires** : l'interrupteur devient « Avec adversaires (autant de joueurs) » : ils sont toujours aussi nombreux que l'équipe (8 contre 8, 11 contre 11), placés avec la même formation en miroir. Avant, 11 adversaires étaient posés même pour une équipe à 8.

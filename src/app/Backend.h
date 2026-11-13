@@ -79,6 +79,8 @@ public:
     // Joueurs d'une équipe : [{id, teamId, firstName, lastName, fullName, birthDate (yyyy-MM-dd ou vide),
     // age (-1 si inconnu), jerseyNumber (0 = aucun), position, preferredFoot, phone, email, notes, active}].
     Q_INVOKABLE QVariantList players(int teamId, bool includeInactive);
+    // Joueurs de toutes les équipes (triés par nom), chacun avec « teamName » : sert à les répartir entre les équipes.
+    Q_INVOKABLE QVariantList allPlayers(bool includeInactive);
     // Crée (id absent ou <= 0) ou modifie un joueur. Refus : prénom vide (le nom est facultatif), prénom + nom déjà dans l'équipe, date invalide, numéro hors 0..99
     // ou déjà porté par un autre joueur actif de l'équipe, poste ou pied inconnu. Résultat {ok, id, error}.
     Q_INVOKABLE QVariantMap savePlayer(const QVariantMap &player);

@@ -180,7 +180,7 @@ if(FOOTCOACH_HAVE_QML)
         ActionSheet.qml AppState.qml AppButton.qml BoardEditor.qml BoardModel.qml SquadFormation.js BoardThumb.qml BoardToken.qml
         BoardView.qml Card.qml ColorSheet.qml FormationSheet.qml HomePage.qml Icon.qml IconButton.qml
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
-        CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml SlotsPanel.qml SelectMark.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerAvatar.qml ChallengeProblems.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml
+        CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml SlotsPanel.qml SelectMark.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerAvatar.qml ChallengeProblems.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml KeyboardRetry.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml PrivacyPage.qml PrivacyText.js Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
         BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml
     )
