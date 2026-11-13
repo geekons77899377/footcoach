@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## Non publié — feuille de partage pour la feuille de challenge
+- **Match > « Créer la feuille »** : sur Android, le PDF est d'abord proposé via la **feuille de partage** du système (imprimer, enregistrer, envoyer) au lieu de l'ouverture directe d'un fichier du cache, que beaucoup d'appareils refusent (le sélecteur « Enregistrer » s'affichait alors). Si le partage est impossible, l'ancien parcours reste (ouverture externe, puis sélecteur de dossier).
+- `Backend::shareFile(url, mime, titre)` (partage d'un fichier local) ; `ShareBridge.partager` reçoit le type MIME ; `footcoach_exports_paths.xml` expose aussi le cache (droit donné URI par URI) ; `<queries>` pour `application/pdf`.
+- Non vérifié sur appareil ni avec le NDK : le code Android n'est ni compilé ni exécuté ici. Test `t_challenge.py` étendu (backend **simulé**).
+
 ## Non publié — déplacer des joueurs vers une autre équipe
 - **Effectif, mode sélection** : nouveau bouton **« Déplacer »** (flèche) entre « Tous » et la poubelle, visible s'il existe une autre équipe. On choisit l'équipe d'arrivée (nom et club), on confirme, puis un compte rendu s'affiche.
 - Règles (`Backend::movePlayers`) : présences, blessures, photo, contacts et convocations passées suivent le joueur. Un **numéro de maillot** déjà pris dans l'équipe d'arrivée par un joueur actif est retiré. Un joueur qui y existe déjà (**même nom** ou **même licence**, casse ignorée) n'est pas déplacé : il est nommé dans le compte rendu. Tout ou rien pour les autres.

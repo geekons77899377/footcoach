@@ -229,6 +229,9 @@ public:
     // Écrit l'export dans le dossier privé « exports/ » puis ouvre la feuille de partage Android (ShareBridge).
     // Ailleurs : fichier écrit, chemin renvoyé dans « message ». {ok, error, message, path}.
     Q_INVOKABLE QVariantMap partagerDonnees();
+    // Ouvre la feuille de partage Android pour un fichier local (URL file://) : {ok, error, message}.
+    // Hors Android : rien n'est envoyé, ok=false avec error="unsupported".
+    Q_INVOKABLE QVariantMap shareFile(const QString &url, const QString &mime, const QString &title);
     // Lit un fichier sans rien modifier : {ok, error, exportedAt, appVersion, counts: {teams, players, sessions,
     // exercises, boards}, current: {…mêmes clés pour la base actuelle}}.
     Q_INVOKABLE QVariantMap inspectDataFile(const QString &url);
@@ -248,6 +251,7 @@ signals:
 
 private:
     QByteArray buildExport(int *schema = nullptr);
+    QString shareAndroid(const QString &path, const QString &mime, const QString &title);
     bool createBlockBoardFor(int itemId, int exerciseId, const QString &title, QString *error);
     bool parseDataFile(const QString &url, QJsonObject *root, QString *error) const;
     QVariantMap countsOfDatabase();

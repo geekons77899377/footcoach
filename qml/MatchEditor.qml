@@ -210,6 +210,13 @@ Item {
 
     function openSheet(url) {
         lastOpened = url;
+        // Android : feuille de partage (imprimer, enregistrer, envoyer) ; l'ouverture directe d'un fichier du cache
+        // est refusée par beaucoup d'appareils.
+        var s = backend.shareFile(url, "application/pdf", "Feuille de challenge");
+        if (s.ok) {
+            toast.show("Choisissez où envoyer ou enregistrer la feuille.");
+            return;
+        }
         var opened = dryRun ? dryRunOpens : Qt.openUrlExternally(url);
         if (opened) {
             toast.show("Feuille ouverte. Enregistrez-la ou imprimez-la depuis l'application qui s'ouvre.");

@@ -30,6 +30,10 @@
             <action android:name="android.intent.action.SEND" />
             <data android:mimeType="application/json" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="application/pdf" />
+        </intent>
     </queries>
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"

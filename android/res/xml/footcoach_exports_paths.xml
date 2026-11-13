@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dossier exposé au partage : uniquement exports/ dans le stockage privé de l'appli. -->
+<!-- Dossier exposé au partage : exports/ et le cache du stockage privé de l'appli (droit donné URI par URI). -->
 <paths>
     <files-path name="exports" path="exports/" />
+    <!-- Feuille de challenge (PDF) : créée dans le cache avant d'être partagée. -->
+    <cache-path name="cache" path="." />
 </paths>

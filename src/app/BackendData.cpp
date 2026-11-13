@@ -228,19 +228,10 @@ QVariantMap Backend::partagerDonnees()
     f.close();
     setError(QString());
 #ifdef Q_OS_ANDROID
-    QJniObject activite = QJniObject::callStaticObjectMethod("org/qtproject/qt/android/QtNative", "activity",
-                                                             "()Landroid/app/Activity;");
-    // ShareBridge.partager renvoie null en cas de succès, sinon le motif de l'échec.
-    QJniObject erreur = QJniObject::callStaticObjectMethod(
-        "org/footcoach/app/ShareBridge", "partager",
-        "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-        activite.object(),
-        QJniObject::fromString(chemin).object<jstring>(),
-        QJniObject::fromString(tr("Envoyer mes données")).object<jstring>());
-    if (erreur.isValid()) {
-        const QString e = erreur.toString();
-        setError(e);
-        return done(false, e);
+    const QString erreur = shareAndroid(chemin, QStringLiteral("application/json"), tr("Envoyer mes données"));
+    if (!erreur.isEmpty()) {
+        setError(erreur);
+        return done(false, erreur);
     }
     QVariantMap m = done(true);
     m.insert(QStringLiteral("message"), tr("Choisissez où envoyer le fichier."));
@@ -252,6 +243,40 @@ QVariantMap Backend::partagerDonnees()
     m.insert(QStringLiteral("path"), chemin);
     return m;
 #endif
+}
+
+// Feuille de partage Android pour un fichier du stockage privé. Renvoie le motif de l'échec, vide en cas de succès.
+QString Backend::shareAndroid(const QString &path, const QString &mime, const QString &title)
+{
+#ifdef Q_OS_ANDROID
+    QJniObject activite = QJniObject::callStaticObjectMethod("org/qtproject/qt/android/QtNative", "activity",
+                                                             "()Landroid/app/Activity;");
+    // ShareBridge.partager renvoie null en cas de succès, sinon le motif de l'échec.
+    QJniObject erreur = QJniObject::callStaticObjectMethod(
+        "org/footcoach/app/ShareBridge", "partager",
+        "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        activite.object(),
+        QJniObject::fromString(path).object<jstring>(),
+        QJniObject::fromString(title).object<jstring>(),
+        QJniObject::fromString(mime).object<jstring>());
+    return erreur.isValid() ? erreur.toString() : QString();
+#else
+    Q_UNUSED(path) Q_UNUSED(mime) Q_UNUSED(title)
+    return QStringLiteral("unsupported");
+#endif
+}
+
+QVariantMap Backend::shareFile(const QString &url, const QString &mime, const QString &title)
+{
+    const QString path = QUrl(url).isLocalFile() ? QUrl(url).toLocalFile() : url;
+    if (!QFileInfo::exists(path))
+        return done(false, tr("Fichier introuvable pour le partage."));
+    const QString erreur = shareAndroid(path, mime, title);
+    if (!erreur.isEmpty())
+        return done(false, erreur);
+    QVariantMap m = done(true);
+    m.insert(QStringLiteral("message"), tr("Choisissez où envoyer le fichier."));
+    return m;
 }
 
 QVariantMap Backend::exportDataFile(const QString &url)

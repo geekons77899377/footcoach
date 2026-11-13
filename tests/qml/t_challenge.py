@@ -17,6 +17,12 @@ class B7(B6):
     def challengeSheetCheck(self, mid):
         B7.checks += 1
         return dict(B7.check_result)
+    share_ok = False
+    shared = []
+    @Slot(str, str, str, result="QVariantMap")
+    def shareFile(self, url, mime, title):
+        B7.shared.append((url, mime))
+        return {"ok": B7.share_ok, "error": "" if B7.share_ok else "unsupported"}
     @Slot(str, result=str)
     def challengeSheetTempUrl(self, name):
         return "file:///tmp/cache/challenge/" + name
@@ -26,7 +32,7 @@ class B7(B6):
         return {"ok": True, "error": "", "bytes": 20480, "fileName": "x.pdf"}
 
 def make7():
-    B7.check_result = {}; B7.exported = []; B7.checks = 0
+    B7.check_result = {}; B7.exported = []; B7.checks = 0; B7.share_ok = False; B7.shared = []
     b = B7(); b.keep = []; b._club_init()
     h = Harness(412, 892, backend=b); h.spin(500)
     return h, b
@@ -103,5 +109,13 @@ call(ed, "startChallengeSheet"); h.spin(400)
 check(len(B7.exported) == 2 and sd.property("visible") is True and "feuille-challenge-senior-a-2026-11-14.pdf" in str(sd.property("currentFile")),
       "ouverture impossible : le sélecteur propose d'enregistrer sous le même nom")
 QMetaObject.invokeMethod(sd, "close") if sd.property("visible") else None
+
+# Feuille de partage disponible (Android) : elle remplace l'ouverture externe et le sélecteur.
+B7.share_ok = True; B7.shared = []; n = len(B7.exported)
+ed.setProperty("dryRunOpens", True); ed.setProperty("lastOpened", "")
+call(ed, "startChallengeSheet"); h.spin(400)
+check(B7.shared == [(want, "application/pdf")], f"la feuille de partage reçoit le PDF créé ({B7.shared})")
+check(len(B7.exported) == n + 1 and sd.property("visible") is not True, "partage réussi : pas de sélecteur de fichier")
+check("où envoyer ou enregistrer" in toast_text(h), f"message de partage ({toast_text(h)})")
 
 print(f"\n{len(errs)} échec(s)"); sys.exit(1 if errs else 0)

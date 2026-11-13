@@ -9,16 +9,17 @@ import android.net.Uri;
 import androidx.core.content.FileProvider;
 import java.io.File;
 
-// Partage d'un fichier d'export (.footcoach) par la feuille Android. Appelée depuis C++ (Backend::partagerDonnees).
+// Partage d'un fichier (export .footcoach, feuille de challenge PDF) par la feuille Android. Appelée depuis C++
+// (Backend::shareAndroid).
 // Retourne null en cas de succès, sinon le motif de l'échec à afficher.
 public final class ShareBridge {
     private ShareBridge() {}
 
-    public static String partager(Activity activite, String chemin, String titre) {
+    public static String partager(Activity activite, String chemin, String titre, String mime) {
         try {
             Uri uri = FileProvider.getUriForFile(activite, activite.getPackageName() + ".exports", new File(chemin));
             Intent envoi = new Intent(Intent.ACTION_SEND);
-            envoi.setType("application/json");
+            envoi.setType(mime);
             envoi.putExtra(Intent.EXTRA_STREAM, uri);
             // Le droit de lecture doit suivre l'URI jusqu'à l'application choisie : ClipData + drapeau sur
             // l'intent ET sur le sélecteur.
