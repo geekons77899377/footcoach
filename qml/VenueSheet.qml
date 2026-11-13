@@ -100,21 +100,37 @@ Popup {
                 color: Theme.textMuted
                 size: 20
             }
+            IconButton {
+                id: searchGo
+                objectName: "venueSearchGo"
+                anchors.right: parent.right
+                anchors.rightMargin: 3
+                anchors.verticalCenter: parent.verticalCenter
+                diameter: 42
+                iconName: "search"
+                iconColor: Theme.accent
+                accessibleName: "Rechercher"
+                onClicked: { root.query = search.text; search.focus = false; }
+            }
             TextField {
                 KeyboardRetry {}
                 id: search
                 objectName: "venueSearch"
                 anchors.left: searchIcon.right
-                anchors.right: parent.right
+                anchors.right: searchGo.left
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.leftMargin: 4
                 color: Theme.text
-                placeholderText: "Commune, stade, rue…"
+                placeholderText: "Commune, stade, rue… puis Entrée"
                 placeholderTextColor: Theme.textDim
                 background: null
                 font.pixelSize: 16
                 inputMethodHints: Qt.ImhNoPredictiveText
-                onTextChanged: root.query = text
+                // Recherche lancée par Entrée ou la loupe, pas à chaque lettre : sur téléphone, refaire la liste pendant
+                // la frappe fermait le clavier (constat sur appareil, 13/11/2026). Effacer le texte remet toute la liste.
+                EnterKey.type: Qt.EnterKeySearch
+                onAccepted: { root.query = text; focus = false; }
+                onTextChanged: if (text.trim() === "") root.query = ""
             }
         }
 

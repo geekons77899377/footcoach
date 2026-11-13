@@ -305,21 +305,37 @@ Item {
                     color: Theme.textMuted
                     size: 20
                 }
+                IconButton {
+                    id: searchGo
+                    objectName: "venuesSearchGo"
+                    anchors.right: parent.right
+                    anchors.rightMargin: 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    diameter: 42
+                    iconName: "search"
+                    iconColor: Theme.accent
+                    accessibleName: "Rechercher"
+                    onClicked: { page.query = search.text; search.focus = false; }
+                }
                 TextField {
                     KeyboardRetry {}
                     id: search
                     objectName: "venuesSearch"
                     anchors.left: searchIcon.right
-                    anchors.right: parent.right
+                    anchors.right: searchGo.left
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: 4
                     color: Theme.text
-                    placeholderText: "Rechercher : commune, stade, rue…"
+                    placeholderText: "Commune, stade, rue… puis Entrée"
                     placeholderTextColor: Theme.textDim
                     background: null
                     font.pixelSize: 16
                     inputMethodHints: Qt.ImhNoPredictiveText
-                    onTextChanged: page.query = text
+                    // Recherche lancée par Entrée ou la loupe, pas à chaque lettre : sur téléphone, refaire la liste pendant
+                    // la frappe fermait le clavier (constat sur appareil, 13/11/2026). Effacer le texte remet toute la liste.
+                    EnterKey.type: Qt.EnterKeySearch
+                    onAccepted: { page.query = text; focus = false; }
+                    onTextChanged: if (text.trim() === "") page.query = ""
                     Component.onCompleted: page.searchField = search
                 }
             }

@@ -3,6 +3,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QNetworkRequest>
+#include <QUrl>
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#endif
 
 // Lieux de match (schéma 11) : liste des stades d'un club, chargée depuis Data ES (recensement des équipements
 // sportifs du ministère des Sports) à la demande de l'entraîneur, dans les Paramètres. Aucun appel réseau sans cette
@@ -258,4 +262,53 @@ QVariantMap Backend::suggestedVenue(int teamId, const QString &homeAway, const Q
     if (v.id <= 0 || !v.selectable())
         return {};
     return venueMap(v);
+}
+
+QString Backend::geoUri(double lat, double lon, const QString &label, const QString &address)
+{
+    const auto enc = [](const QString &t) { return QString::fromLatin1(QUrl::toPercentEncoding(t.simplified())); };
+    if (!qIsNaN(lat) && !qIsNaN(lon) && !(lat == 0.0 && lon == 0.0)) {
+        QString q = QString::number(lat, 'f', 6) + QLatin1Char(',') + QString::number(lon, 'f', 6);
+        // Les parenthèses délimitent le nom affiché : on les retire du nom lui-même.
+        QString name = label.simplified();
+        name.replace(QLatin1Char('('), QLatin1Char(' ')).replace(QLatin1Char(')'), QLatin1Char(' '));
+        if (!name.simplified().isEmpty())
+            q += QLatin1Char('(') + enc(name) + QLatin1Char(')');
+        return QStringLiteral("geo:0,0?q=") + q;
+    }
+    if (address.simplified().isEmpty())
+        return QString();
+    return QStringLiteral("geo:0,0?q=") + enc(address);
+}
+
+QVariantMap Backend::openItinerary(int venueId, const QString &address)
+{
+    Venue v;
+    QString uri;
+    if (venueId > 0 && m_venues.get(venueId, &v))
+        uri = geoUri(v.lat, v.lon, v.city.isEmpty() ? v.name : v.name + QStringLiteral(" - ") + v.city,
+                     address.isEmpty() ? v.label() : address);
+    else
+        uri = geoUri(qQNaN(), qQNaN(), QString(), address);
+    if (uri.isEmpty()) {
+        const QString e = tr("Indiquez d'abord le stade ou l'adresse du match.");
+        setError(e);
+        return venueResult(false, e);
+    }
+    QVariantMap r;
+#ifdef Q_OS_ANDROID
+    QJniObject activite = QJniObject::callStaticObjectMethod("org/qtproject/qt/android/QtNative", "activity",
+                                                             "()Landroid/app/Activity;");
+    QJniObject erreur = QJniObject::callStaticObjectMethod(
+        "org/footcoach/app/ShareBridge", "itineraire",
+        "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", activite.object(),
+        QJniObject::fromString(uri).object<jstring>(), QJniObject::fromString(tr("Itinéraire avec…")).object<jstring>());
+    const QString e = erreur.isValid() ? erreur.toString() : QString();
+    setError(e);
+    r = venueResult(e.isEmpty(), e);
+#else
+    r = venueResult(false, tr("L'itinéraire s'ouvre sur le téléphone (Waze, Google Maps…)."));
+#endif
+    r.insert(QStringLiteral("uri"), uri);
+    return r;
 }

@@ -279,6 +279,13 @@ public:
     // Lieu proposé pour un match de l'équipe : à domicile le stade du club, à l'extérieur le stade retenu pour cet
     // adversaire. {} (map vide) s'il n'y en a pas ou si le lieu n'est plus disponible.
     Q_INVOKABLE QVariantMap suggestedVenue(int teamId, const QString &homeAway, const QString &opponent);
+    // Itinéraire : ouvre la liste Android des applications de navigation (Waze, Google Maps…) sur le stade venueId
+    // (coordonnées GPS) ou, à défaut, sur le texte de l'adresse. Rien n'est envoyé par FootCoach. {ok, error, uri}.
+    // Hors Android : ok=false, error explique que c'est sur téléphone.
+    Q_INVOKABLE QVariantMap openItinerary(int venueId, const QString &address);
+    // Adresse « geo: » (documentation Android, intents Google Maps) : « geo:0,0?q=lat,lon(nom) » si les coordonnées
+    // sont connues, sinon « geo:0,0?q=adresse ». Vide si rien n'est connu.
+    static QString geoUri(double lat, double lon, const QString &label, const QString &address);
 
 signals:
     void venuesBusyChanged();

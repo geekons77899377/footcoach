@@ -1,5 +1,17 @@
 # Journal des modifications
 
+## Non publié — itinéraire vers le lieu du match
+- **Fiche du match** : bouton **« Itinéraire »** sous le champ « Stade ou adresse » (dès qu'un lieu est indiqué). Il ouvre la **liste Android des applications de navigation** (Waze, Google Maps…), comme demandé, avec le sélecteur même si une application est réglée par défaut (`Intent.createChooser`, `ShareBridge.itineraire`).
+- Adresse « geo: » (documentation Android des intents Google Maps) : stade de la liste → `geo:0,0?q=lat,lon(nom - commune)` ; lieu tapé à la main → `geo:0,0?q=<adresse>`. FootCoach n'envoie rien : c'est l'application choisie qui reçoit le lieu.
+- Pourquoi pas `Qt.openUrlExternally` : dans Qt 6.9 (`QtNative.openURL`, lu dans le code source), l'intent `ACTION_VIEW` part sans sélecteur, donc l'application par défaut s'ouvrirait directement.
+- Hors Android (Windows) : message « L'itinéraire s'ouvre sur le téléphone ».
+- Tests : `tst_venues::geoUriUsesCoordinatesOrTheAddress`, `t_venues.py` (bouton, données envoyées ; backend **simulé**). **Non vérifié** : le code Java n'est pas compilé ici (pas de SDK Android), ni essayé sur appareil.
+
+## Non publié — recherche des stades : sur Entrée ou la loupe
+- **Constat (sur appareil)** : le clavier se fermait à chaque lettre tapée. Les deux recherches de stades (Paramètres > Stades des matchs, et choix d'un stade depuis un match) refaisaient la liste à chaque lettre. **Hypothèse non vérifiée** : c'est cette reconstruction qui fait perdre le clavier sur Android.
+- La liste ne se filtre plus pendant la frappe : la recherche part avec la touche Entrée du clavier (affichée « Rechercher ») ou la loupe à droite du champ, comme demandé. Effacer le texte remet toute la liste.
+- `t_venues.py` vérifie que taper seul ne filtre pas, puis qu'Entrée et la loupe filtrent (backend **simulé**, souris et non clavier tactile).
+
 ## Non publié — épingle du champ « Stade ou adresse » invisible
 - **Constat (capture sur appareil)** : pas d'épingle à droite du champ, donc pas d'accès à la liste des stades. Cause : l'icône avait été ajoutée à `Icons.js` (dessins du terrain) au lieu de `Icon.qml` (icônes de l'interface) ; le bouton était là mais vide. Même défaut pour l'icône du bouton « Mettre à jour les stades » (`rotateR` inexistante, remplacée par `repeat`).
 - `t_venues.py` vérifie maintenant que l'épingle et les icônes des stades existent dans `Icon.qml` (backend **simulé**).

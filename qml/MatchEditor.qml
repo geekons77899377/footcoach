@@ -24,6 +24,7 @@ Item {
     property int venueId: -1
     property string venueText: ""
     property string venueHint: ""
+    property string lastItinerary: ""           // dernière adresse « geo: » demandée (tests)
 
     property bool boardOpen: false
     property int openBoardId: -1
@@ -554,14 +555,40 @@ Item {
                 onActionClicked: venueSheet.openFor(backend.clubOfTeam(root.teamId))
                 onTextChanged: if (root.venueId > 0 && text !== root.venueText) root.clearVenue()
             }
-            Text {
-                objectName: "venueHint"
-                visible: root.venueHint !== ""
+            Item {
                 width: parent.width
-                topPadding: -6
-                text: root.venueHint
-                font.pixelSize: 12
-                color: Theme.accent
+                readonly property bool hasHint: root.venueHint !== ""
+                readonly property bool hasPlace: location.text.trim() !== ""
+                height: Math.max(hasHint ? hintText.implicitHeight : 0, hasPlace ? routeButton.height : 0)
+                visible: hasHint || hasPlace
+                Text {
+                    id: hintText
+                    objectName: "venueHint"
+                    visible: parent.hasHint
+                    anchors.left: parent.left
+                    anchors.right: parent.hasPlace ? routeButton.left : parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    elide: Text.ElideRight
+                    text: root.venueHint
+                    font.pixelSize: 12
+                    color: Theme.accent
+                }
+                // Itinéraire : la liste Android des applications de navigation (Waze, Google Maps…) s'ouvre sur le lieu.
+                AppButton {
+                    id: routeButton
+                    objectName: "routeButton"
+                    visible: parent.hasPlace
+                    anchors.right: parent.right
+                    kind: "outline"
+                    iconName: "pin"
+                    text: "Itinéraire"
+                    onClicked: {
+                        var r = backend.openItinerary(root.venueId, location.text);
+                        root.lastItinerary = r.uri || "";
+                        if (!r.ok)
+                            toast.show(r.error);
+                    }
+                }
             }
             ChipRow { id: status; width: parent.width; label: "Statut"; options: root.statuses; allowClear: false; value: "planned" }
             Row {

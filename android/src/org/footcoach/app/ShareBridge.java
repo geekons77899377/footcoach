@@ -45,4 +45,17 @@ public final class ShareBridge {
             return "Partage impossible : " + e.getMessage();
         }
     }
+
+    // Itinéraire vers un lieu de match : adresse « geo: » ouverte par la liste Android des applications capables de
+    // l'afficher (Waze, Google Maps…), avec le sélecteur même si une application est réglée par défaut.
+    // Retourne null en cas de succès, sinon le motif de l'échec.
+    public static String itineraire(Activity activite, String geo, String titre) {
+        try {
+            Intent vue = new Intent(Intent.ACTION_VIEW, Uri.parse(geo));
+            activite.startActivity(Intent.createChooser(vue, titre));
+            return null;
+        } catch (RuntimeException e) {
+            return "Impossible d'ouvrir une application de navigation : " + e.getMessage();
+        }
+    }
 }

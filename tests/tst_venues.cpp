@@ -383,6 +383,23 @@ private slots:
         QVERIFY(venueIdOf("E001I603410001") > 0);                // Lagny-le-Sec
     }
 
+    // ----- Itinéraire : adresse « geo: » (documentation Android, intents Google Maps) -----
+    void geoUriUsesCoordinatesOrTheAddress()
+    {
+        QCOMPARE(Backend::geoUri(49.08513, 2.74982, QStringLiteral("Complexe (Lagny)"), QString()),
+                 QStringLiteral("geo:0,0?q=49.085130,2.749820(Complexe%20Lagny)"));
+        QCOMPARE(Backend::geoUri(qQNaN(), qQNaN(), QString(), QStringLiteral("2 rue des Écoles, 60330 Lagny-le-Sec")),
+                 QStringLiteral("geo:0,0?q=2%20rue%20des%20%C3%89coles%2C%2060330%20Lagny-le-Sec"));
+        QCOMPARE(Backend::geoUri(0.0, 0.0, QStringLiteral("X"), QStringLiteral("Stade, Paris")),
+                 QStringLiteral("geo:0,0?q=Stade%2C%20Paris"));                 // 0,0 : coordonnées absentes
+        QVERIFY(Backend::geoUri(qQNaN(), qQNaN(), QString(), QStringLiteral("  ")).isEmpty());
+        Backend b(m_db.handle());
+        QVERIFY(b.applyVenueData(m_club, fixture()).value("ok").toBool());
+        const QVariantMap r = b.openItinerary(venueIdOf("E001I603410001"), QStringLiteral("texte"));
+        QCOMPARE(r.value("uri").toString(), QStringLiteral("geo:0,0?q=49.085130,2.749820(Complexe%20Sportif%20-%20Lagny-le-Sec)"));
+        QVERIFY(!b.openItinerary(-1, QString()).value("ok").toBool());          // ni stade ni adresse
+    }
+
     // ----- Fonctions pures -----
     void opponentKeyIgnoresCaseAccentsAndPunctuation()
     {

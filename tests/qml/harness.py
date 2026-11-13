@@ -213,6 +213,14 @@ class Backend(QObject):
         self._venue_init()
         if self._venue_busy:
             self._refresh_timer.stop(); self._finish_refresh(cancelled=True)
+    @Slot(int, str, result="QVariantMap")
+    def openItinerary(self, vid, address):
+        self._venue_init()
+        v = self._venues.get(vid)
+        q = (v["name"] + " - " + v["city"]) if v else address.strip()
+        if not q: return {"ok": False, "error": "Indiquez d'abord le stade ou l'adresse du match.", "uri": ""}
+        self.itinerary_calls = getattr(self, "itinerary_calls", []) + [(vid, address)]
+        return {"ok": False, "error": "L'itinéraire s'ouvre sur le téléphone (Waze, Google Maps…).", "uri": "geo:0,0?q=" + q}
     @staticmethod
     def _opp_key(s):
         import unicodedata, re

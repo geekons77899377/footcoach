@@ -92,12 +92,16 @@ check("Dernière mise à jour" in named(h, "venueSummary").property("text"), "da
 h.shot("venues_3_liste_telephone")
 
 # recherche sans accents ni majuscules
-vp.property("searchField").setProperty("text", "nanteuil honneur"); h.spin(200)
+sf = vp.property("searchField")
+sf.setProperty("text", "nanteuil honneur"); h.spin(200)
+check(len(jv(vp.property("shown"))) == 6, "taper ne filtre pas encore la liste (le clavier reste ouvert)")
+QMetaObject.invokeMethod(sf, "accepted"); h.spin(200)
 shown = jv(vp.property("shown"))
 check(len(shown) == 1 and "honneur" in shown[0]["field"].lower(), f"recherche « nanteuil honneur » : 1 stade ({[s['field'] for s in shown]})")
-vp.property("searchField").setProperty("text", "lagny"); h.spin(200)
+sf.setProperty("text", "lagny"); call(named(h, "venuesSearchGo"), "clicked"); h.spin(200)
 lagny = jv(vp.property("shown"))[0]
-vp.property("searchField").setProperty("text", ""); h.spin(200)
+sf.setProperty("text", ""); h.spin(200)
+check(len(jv(vp.property("shown"))) == 6, "effacer la recherche remet toute la liste")
 
 # --- 4. Stade du club, terrain indisponible (feuille d'actions) ------------------------------------------------------
 acts = named(h, "venueActions")
@@ -156,6 +160,7 @@ h.shot("venues_6_match_domicile")
 named(h, "opponentField").setProperty("text", "US Nanteuil")
 sig(named(h, "placeChips"), "picked", "away"); named(h, "placeChips").setProperty("value", "away"); h.spin(300)
 check(loc.property("text") == "" and ed.property("venueId") == -1, "extérieur, adversaire inconnu : le stade du club est retiré")
+check(named(h, "routeButton").property("visible") is False, "sans lieu : pas de bouton « Itinéraire »")
 
 # L'épingle du champ est bien dessinée (Icon.qml : l'icône doit exister dans ses glyphes, sinon le bouton est vide).
 icon = find(h, lambda o: o.metaObject().className().startswith("Icon_") and o.property("name") == "pin")
@@ -169,11 +174,18 @@ sheet = named(h, "venueSheet")
 call(loc, "actionClicked"); h.spin(400)
 check(sheet.property("visible") is True and len(jv(sheet.property("allVenues"))) == 5, "le bouton du champ ouvre la liste des stades proposés")
 named(h, "venueSearch").setProperty("text", "honneur"); h.spin(200)
+check(len(jv(sheet.property("shown"))) == 5, "choix d'un stade : taper ne filtre pas encore")
+QMetaObject.invokeMethod(named(h, "venueSearch"), "accepted"); h.spin(200)
 pick = jv(sheet.property("shown"))
 check(len(pick) == 1, "recherche dans la liste")
 h.shot("venues_7_choix_stade")
 QMetaObject.invokeMethod(sheet, "picked", Q_ARG("QVariant", pick[0])); call(sheet, "close"); h.spin(300)
 check(ed.property("venueId") == pick[0]["id"] and "Nanteuil-le-Haudouin" in loc.property("text"), "stade choisi : lieu rempli")
+rb = named(h, "routeButton")
+check(rb is not None and rb.property("visible") is True, "bouton « Itinéraire » affiché dès qu'il y a un lieu")
+call(rb, "clicked"); h.spin(200)
+check(b.itinerary_calls[-1] == (pick[0]["id"], loc.property("text")), "« Itinéraire » envoie le stade choisi (et son adresse)")
+h.shot("venues_7b_itineraire")
 call(ed, "save"); h.spin(300)
 saved = b.last_match_saved
 check(saved["venueId"] == pick[0]["id"] and saved["homeAway"] == "away", "le lieu choisi est envoyé à l'enregistrement")
