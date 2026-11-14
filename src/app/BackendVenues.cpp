@@ -268,13 +268,12 @@ QString Backend::geoUri(double lat, double lon, const QString &label, const QStr
 {
     const auto enc = [](const QString &t) { return QString::fromLatin1(QUrl::toPercentEncoding(t.simplified())); };
     if (!qIsNaN(lat) && !qIsNaN(lon) && !(lat == 0.0 && lon == 0.0)) {
-        QString q = QString::number(lat, 'f', 6) + QLatin1Char(',') + QString::number(lon, 'f', 6);
-        // Les parenthèses délimitent le nom affiché : on les retire du nom lui-même.
-        QString name = label.simplified();
-        name.replace(QLatin1Char('('), QLatin1Char(' ')).replace(QLatin1Char(')'), QLatin1Char(' '));
-        if (!name.simplified().isEmpty())
-            q += QLatin1Char('(') + enc(name) + QLatin1Char(')');
-        return QStringLiteral("geo:0,0?q=") + q;
+        // Coordonnées seules, sans nom : avec « q=lat,lon(nom) », Waze a cherché le nom comme du texte et proposé un
+        // autre terrain à 47 km (« Terrain de Football & Tir à l'Arc » → un terrain de tir à l'arc ; essai sur
+        // appareil, 13/11/2026).
+        Q_UNUSED(label)
+        const QString ll = QString::number(lat, 'f', 6) + QLatin1Char(',') + QString::number(lon, 'f', 6);
+        return QStringLiteral("geo:") + ll + QStringLiteral("?q=") + ll;
     }
     if (address.simplified().isEmpty())
         return QString();

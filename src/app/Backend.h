@@ -283,8 +283,8 @@ public:
     // (coordonnées GPS) ou, à défaut, sur le texte de l'adresse. Rien n'est envoyé par FootCoach. {ok, error, uri}.
     // Hors Android : ok=false, error explique que c'est sur téléphone.
     Q_INVOKABLE QVariantMap openItinerary(int venueId, const QString &address);
-    // Adresse « geo: » (documentation Android, intents Google Maps) : « geo:0,0?q=lat,lon(nom) » si les coordonnées
-    // sont connues, sinon « geo:0,0?q=adresse ». Vide si rien n'est connu.
+    // Adresse « geo: » (documentation Android, intents Google Maps) : « geo:lat,lon?q=lat,lon » si les coordonnées
+    // sont connues (sans nom : Waze le cherchait comme du texte), sinon « geo:0,0?q=adresse ». Vide si rien n'est connu.
     static QString geoUri(double lat, double lon, const QString &label, const QString &address);
 
 signals:

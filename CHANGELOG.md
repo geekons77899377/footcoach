@@ -1,5 +1,21 @@
 # Journal des modifications
 
+## Non publié — terrain d'un match : touchers qui passaient à la fiche dessous
+- **Constat (sur appareil, mode « Multi » du terrain d'un match)** : un toucher sur le terrain a ouvert le partage de la feuille de challenge, bouton de la fiche du match située **sous** le terrain.
+- **Cause probable, non reproduite** : le terrain ne réagit qu'avec des gestionnaires (TapHandler, DragHandler) qui laissent passer l'événement ; rien ne l'arrêtait avant la fiche. Sur le banc de test (souris et doigt simulés, tous les outils, glisser en mode Multi), le défaut **ne se reproduit pas**.
+- Correction défensive : une zone qui absorbe tous les touchers, sous le terrain et au-dessus de la fiche (match et plan de séance). Les gestes du terrain passent avant elle.
+- **Instrumentation (journal « [toucher] »)**, demandée pour trouver la cause sur appareil :
+  - `src/app/TouchTrace.*` (filtre d'événements sur la fenêtre) : chaque appui et relâchement, doigt ou souris, avec la position, l'élément QML le plus haut sous le doigt, et au relâchement **qui a saisi le point** (élément ou gestionnaire) et qui l'observe.
+  - Traces QML (`AppState.trace`) : terrain ouvert ou fermé, TapHandler et DragHandler du terrain (outil, multi), toucher absorbé par la couche de blocage, bouton de la feuille de challenge appuyé, feuille demandée avec la pile d'appels JS (`console.trace`).
+  - Lecture : « Sortie de l'application » dans Qt Creator, ou `adb logcat | findstr toucher` (Windows). Actif par défaut ; `FOOTCOACH_TOUCH_TRACE=0` le coupe. **À retirer** une fois la cause trouvée.
+  - Vérifié : `TouchTrace.cpp` compilé et essayé hors de l'appli (Qt 6.4, programme d'essai : élément sous le doigt et gestionnaire qui saisit corrects). L'appli QML elle-même n'est pas compilable ici (Qt 6.9 Quick absent).
+- Tests : `t_challenge.py` (le bouton est bien touché sans terrain ; fenêtres fermées avant d'ouvrir le terrain, sinon les touchers allaient au voile de la fenêtre de fichier ; plus aucune feuille demandée terrain ouvert, tous outils ; passe aussi sans la correction, donc ne prouve pas la cause), `t_blockboard.py`, `t_squadboard.py`, `t_match.py`, `t_l0a.py`, `t_l0c.py` repassés (backend **simulé**).
+
+## Non publié — itinéraire : coordonnées sans nom
+- **Constat (essai sur appareil avec Waze)** : pour « Terrain de Football & Tir à l'Arc, Grande Rue, 60620 Rouvres-en-Multien », Waze a proposé un terrain de tir à l'arc à Villeneuve-le-Comte (47 km). Les coordonnées de Data ES sont justes (49.11352, 3.02385) : Waze a cherché le **nom** passé entre parenthèses (`q=lat,lon(nom)`) comme du texte.
+- L'adresse envoyée ne contient plus que les coordonnées : `geo:lat,lon?q=lat,lon`. Adresse tapée à la main : inchangée (`geo:0,0?q=<adresse>`).
+- **Non vérifié** : la documentation de Waze ne décrit pas les adresses « geo: » ; seul un essai sur appareil (Waze et Google Maps) confirmera le bon lieu.
+
 ## Non publié — itinéraire vers le lieu du match
 - **Fiche du match** : bouton **« Itinéraire »** sous le champ « Stade ou adresse » (dès qu'un lieu est indiqué). Il ouvre la **liste Android des applications de navigation** (Waze, Google Maps…), comme demandé, avec le sélecteur même si une application est réglée par défaut (`Intent.createChooser`, `ShareBridge.itineraire`).
 - Adresse « geo: » (documentation Android des intents Google Maps) : stade de la liste → `geo:0,0?q=lat,lon(nom - commune)` ; lieu tapé à la main → `geo:0,0?q=<adresse>`. FootCoach n'envoie rien : c'est l'application choisie qui reçoit le lieu.

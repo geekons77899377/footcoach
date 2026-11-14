@@ -386,8 +386,9 @@ private slots:
     // ----- Itinéraire : adresse « geo: » (documentation Android, intents Google Maps) -----
     void geoUriUsesCoordinatesOrTheAddress()
     {
-        QCOMPARE(Backend::geoUri(49.08513, 2.74982, QStringLiteral("Complexe (Lagny)"), QString()),
-                 QStringLiteral("geo:0,0?q=49.085130,2.749820(Complexe%20Lagny)"));
+        // Coordonnées seules : le nom n'est pas envoyé (Waze le cherchait comme du texte et se trompait de lieu).
+        QCOMPARE(Backend::geoUri(49.11352, 3.02385, QStringLiteral("Terrain de Football & Tir à l'Arc"), QString()),
+                 QStringLiteral("geo:49.113520,3.023850?q=49.113520,3.023850"));
         QCOMPARE(Backend::geoUri(qQNaN(), qQNaN(), QString(), QStringLiteral("2 rue des Écoles, 60330 Lagny-le-Sec")),
                  QStringLiteral("geo:0,0?q=2%20rue%20des%20%C3%89coles%2C%2060330%20Lagny-le-Sec"));
         QCOMPARE(Backend::geoUri(0.0, 0.0, QStringLiteral("X"), QStringLiteral("Stade, Paris")),
@@ -396,7 +397,7 @@ private slots:
         Backend b(m_db.handle());
         QVERIFY(b.applyVenueData(m_club, fixture()).value("ok").toBool());
         const QVariantMap r = b.openItinerary(venueIdOf("E001I603410001"), QStringLiteral("texte"));
-        QCOMPARE(r.value("uri").toString(), QStringLiteral("geo:0,0?q=49.085130,2.749820(Complexe%20Sportif%20-%20Lagny-le-Sec)"));
+        QCOMPARE(r.value("uri").toString(), QStringLiteral("geo:49.085130,2.749820?q=49.085130,2.749820"));
         QVERIFY(!b.openItinerary(-1, QString()).value("ok").toBool());          // ni stade ni adresse
     }
 

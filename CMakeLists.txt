@@ -167,6 +167,7 @@ if(FOOTCOACH_HAVE_QML)
         src/app/BackendData.cpp src/app/BackendVenues.cpp
         src/app/IssueReporter.h
         src/app/IssueReporter.cpp
+        src/app/TouchTrace.h src/app/TouchTrace.cpp
         src/app/ChallengeSheet.h
         src/app/ChallengeSheet.cpp
     )

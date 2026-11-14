@@ -4,10 +4,12 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <QStandardPaths>
 
 #include "app/Backend.h"
 #include "app/IssueReporter.h"
+#include "app/TouchTrace.h"
 #include "core/Database.h"
 #include "git_revision.h"
 
@@ -50,11 +52,20 @@ int main(int argc, char *argv[])
                     {QStringLiteral("sha1"), sha},
                     {QStringLiteral("shortSha"), sha.left(7)},
                     {QStringLiteral("dirty"), FOOTCOACH_GIT_DIRTY != 0}});
+    // Diagnostic des touchers (TouchTrace.h) : journal « [toucher] », coupé par FOOTCOACH_TOUCH_TRACE=0.
+    const bool traceTouches = TouchTrace::enabledByEnvironment();
+    engine.rootContext()->setContextProperty(QStringLiteral("traceTouches"), traceTouches);
     engine.rootContext()->setContextProperty(QStringLiteral("startupError"),
                                              opened ? QString() : QObject::tr("Impossible d'ouvrir la base de données :\n%1").arg(error));
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      []() { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.loadFromModule(QStringLiteral("FootCoachUi"), QStringLiteral("Main"));
+    TouchTrace touchTrace;
+    if (traceTouches) {
+        for (QObject *root : engine.rootObjects())
+            if (auto *w = qobject_cast<QQuickWindow *>(root))
+                w->installEventFilter(&touchTrace);
+    }
     return app.exec();
 }

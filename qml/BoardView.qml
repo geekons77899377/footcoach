@@ -330,6 +330,8 @@ Item {
         property point pressNorm: Qt.point(0, 0)
 
         onActiveChanged: {
+            AppState.trace("terrain", "glisser " + (active ? "commencé" : "terminé") + ", outil " + view.tool
+                           + (view.multi ? " (multi)" : ""));
             if (active) {
                 var press = centroid.pressPosition;
                 if (view.arrowTool) {
@@ -440,7 +442,12 @@ Item {
         id: tap
         acceptedButtons: Qt.LeftButton
         property bool wasLongPress: false
-        onPressedChanged: if (pressed) wasLongPress = false
+        onPressedChanged: {
+            if (pressed)
+                wasLongPress = false;
+            AppState.trace("terrain", "TapHandler " + (pressed ? "appui" : "fin") + ", outil " + view.tool
+                           + (view.multi ? " (multi)" : "") + ", saisie " + tap.grabPermissions)
+        }
         onLongPressed: {
             var hit = view.tokenAt(point.position.x, point.position.y);
             if (hit >= 0) {
@@ -449,6 +456,8 @@ Item {
             }
         }
         onTapped: (eventPoint) => {
+            AppState.trace("terrain", "toucher reconnu à (" + Math.round(eventPoint.position.x) + ", "
+                           + Math.round(eventPoint.position.y) + "), objet " + view.tokenAt(eventPoint.position.x, eventPoint.position.y));
             if (wasLongPress)
                 return;
             var px = eventPoint.position.x, py = eventPoint.position.y;

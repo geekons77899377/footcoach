@@ -23,6 +23,12 @@ QtObject {
         returnRequested(target);
         return true;
     }
+    // Diagnostic des touchers (voir src/app/TouchTrace.h) : « [toucher] où | quoi » dans le journal de l'application.
+    // traceTouches vient de main_qml.cpp (absent sur le banc de test : on trace quand même, c'est sans effet).
+    function trace(where, what) {
+        if (typeof traceTouches === "undefined" || traceTouches)
+            console.info("[toucher] " + where + " | " + what);
+    }
     function clearReturn() {
         returnTo = "";
         returnFor = "";

@@ -524,6 +524,17 @@ Item {
         visible: root.boardOpen
         z: 10
         color: Theme.bg
+        // Bloque les touchers qui ne touchent aucun élément du terrain : sans cela, ils passaient à la fiche dessous
+        // (ex. le bouton de la feuille de challenge s'ouvrait depuis le terrain du match ; essai sur appareil, 14/11/2026).
+        MouseArea {
+            objectName: "planBoardBlocker"
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+            onPressed: (mouse) => AppState.trace("terrain du plan", "toucher absorbé par la couche de blocage à ("
+                                                 + Math.round(mouse.x) + ", " + Math.round(mouse.y) + ")")
+            onWheel: (wheel) => wheel.accepted = true
+        }
         Loader {
             id: boardLoader
             objectName: "boardLoader"

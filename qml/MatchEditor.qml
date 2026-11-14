@@ -24,7 +24,8 @@ Item {
     property int venueId: -1
     property string venueText: ""
     property string venueHint: ""
-    property string lastItinerary: ""           // dernière adresse « geo: » demandée (tests)
+    property string lastItinerary: ""
+    onBoardOpenChanged: AppState.trace("fiche du match", boardOpen ? "terrain ouvert" : "terrain fermé")           // dernière adresse « geo: » demandée (tests)
 
     property bool boardOpen: false
     property int openBoardId: -1
@@ -216,6 +217,8 @@ Item {
     property string sheetFileName: "feuille-challenge.pdf"
 
     function startChallengeSheet() {
+        AppState.trace("fiche du match", "feuille de challenge demandée (terrain ouvert : " + boardOpen + ")");
+        console.trace();
         if (isNew || dirty) {
             toast.show("Enregistrez d'abord le match et ses convoqués.");
             return;
@@ -746,6 +749,7 @@ Item {
                         iconName: "text"
                         enabled: !root.isNew && !root.dirty
                         text: "Créer la feuille (PDF)"
+                        onPressedChanged: if (pressed) AppState.trace("fiche du match", "bouton de la feuille de challenge appuyé (terrain ouvert : " + root.boardOpen + ")")
                         onClicked: root.startChallengeSheet()
                     }
                 }
@@ -769,6 +773,17 @@ Item {
         visible: root.boardOpen
         z: 10
         color: Theme.bg
+        // Bloque les touchers qui ne touchent aucun élément du terrain : sans cela, ils passaient à la fiche dessous
+        // (ex. le bouton de la feuille de challenge s'ouvrait depuis le terrain du match ; essai sur appareil, 14/11/2026).
+        MouseArea {
+            objectName: "matchBoardBlocker"
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+            onPressed: (mouse) => AppState.trace("terrain du match", "toucher absorbé par la couche de blocage à ("
+                                                 + Math.round(mouse.x) + ", " + Math.round(mouse.y) + ")")
+            onWheel: (wheel) => wheel.accepted = true
+        }
         Loader {
             id: boardLoader
             objectName: "matchBoardLoader"

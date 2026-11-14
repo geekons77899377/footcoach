@@ -118,4 +118,62 @@ check(B7.shared == [(want, "application/pdf")], f"la feuille de partage reçoit 
 check(len(B7.exported) == n + 1 and sd.property("visible") is not True, "partage réussi : pas de sélecteur de fichier")
 check("où envoyer ou enregistrer" in toast_text(h), f"message de partage ({toast_text(h)})")
 
+# Terrain du match ouvert par-dessus la fiche : un toucher sur le terrain ne doit jamais atteindre la fiche dessous
+# (constat sur appareil, 14/11/2026 : la feuille de challenge s'ouvrait depuis le terrain).
+h, b = make7()
+B7.check_result = {"ok": True, "fileName": "feuille.pdf"}
+go(h, "matches"); page = cls(h, "MatchesPage"); ed = cls(h, "MatchEditor")
+call(page, "newMatch", D(4)); h.spin(500)
+field(h, "opponentField").setProperty("text", "AS Voisins"); call(ed, "setRole", 1, "starter"); call(ed, "save"); h.spin(400)
+btn = named(h, "challengeSheetButton")
+# Amène le bouton au milieu de l'écran : on fait défiler la Flickable de la fiche qui le contient.
+scroll = btn.parentItem()
+while scroll is not None and not scroll.inherits("QQuickFlickable"):
+    scroll = scroll.parentItem()
+scroll = scroll.parentItem() if scroll is not None and scroll.objectName() == "" and not scroll.property("contentHeight") else scroll
+p0 = btn.mapToItem(scroll.property("contentItem"), QPointF(0, 0))
+scroll.setProperty("contentY", max(0, p0.y() - 400)); h.spin(300)
+c = btn.mapToScene(QPointF(btn.width() / 2, btn.height() / 2))
+n0 = B7.checks
+h.click(c.x(), c.y()); h.spin(400)
+check(B7.checks == n0 + 1, f"témoin : sans terrain ouvert, le toucher atteint bien le bouton ({c.x():.0f}, {c.y():.0f})")
+# Le témoin a ouvert le choix du fichier (fenêtre modale) : on ferme toute fenêtre ouverte, sinon les touchers
+# suivants iraient à son voile et non au terrain.
+for o in h.win.findChildren(QObject):
+    try:
+        if o.inherits("QQuickPopup") and o.property("visible"):
+            QMetaObject.invokeMethod(o, "close")
+    except Exception: pass
+h.spin(400)
+call(ed, "openBoard"); h.spin(800)
+check(ed.property("boardOpen") is True, "terrain du match ouvert")
+pops = [o.objectName() or o.metaObject().className() for o in h.win.findChildren(QObject) if o.inherits("QQuickPopup") and o.property("visible")]
+check(pops == [], f"aucune fenêtre ouverte par-dessus le terrain ({pops})")
+n1 = B7.checks
+# Toucher du doigt (et non clic de souris) : c'est le cas du téléphone.
+from PySide6.QtCore import QPoint
+touch = QTest.createTouchDevice()
+def tap_finger(x, y):
+    QTest.touchEvent(h.win, touch).press(0, QPoint(int(x), int(y)), h.win).commit(); h.spin(60)
+    QTest.touchEvent(h.win, touch).release(0, QPoint(int(x), int(y)), h.win).commit(); h.spin(300)
+for dy in (0, -60, 60, -120, 120):
+    h.click(c.x(), c.y() + dy); h.spin(250)
+    tap_finger(c.x(), c.y() + dy)
+for dx in (-150, 150):
+    h.click(c.x() + dx, c.y()); h.spin(250)
+    tap_finger(c.x() + dx, c.y())
+be = find(h, lambda o: o.metaObject().className().startswith("BoardEditor"))
+for tool in ("multi", "select", "player", "opponent", "ball"):
+    be.setProperty("tool", tool); h.spin(200)
+    for dy in (0, -100, 100, 250, -250):
+        tap_finger(c.x(), c.y() + dy)
+        h.click(c.x(), c.y() + dy); h.spin(150)
+    # glisser du doigt (entourer en mode multiple)
+    QTest.touchEvent(h.win, touch).press(0, QPoint(int(c.x()) - 80, int(c.y()) - 80), h.win).commit(); h.spin(40)
+    for k in range(1, 8):
+        QTest.touchEvent(h.win, touch).move(0, QPoint(int(c.x()) - 80 + 20 * k, int(c.y()) - 80 + 20 * k), h.win).commit(); h.spin(30)
+    QTest.touchEvent(h.win, touch).release(0, QPoint(int(c.x()) + 60, int(c.y()) + 60), h.win).commit(); h.spin(300)
+be.setProperty("tool", "select"); h.spin(200)
+check(B7.checks == n1, f"terrain ouvert : aucun toucher ne passe à la fiche dessous ({B7.checks - n1} feuille(s) demandée(s))")
+
 print(f"\n{len(errs)} échec(s)"); sys.exit(1 if errs else 0)
