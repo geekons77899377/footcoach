@@ -67,7 +67,7 @@ Column {
                 rightPadding: root.actionIcon !== "" ? 52 : 12
                 verticalAlignment: root.multiline ? TextEdit.AlignTop : TextEdit.AlignVCenter
                 inputMethodHints: root.inputHints
-                KeyboardRetry {}
+                KeyboardRetry { tag: root.label }
                 onTextChanged: {
                     if (text.length > root.maxLength)
                         text = text.substring(0, root.maxLength);

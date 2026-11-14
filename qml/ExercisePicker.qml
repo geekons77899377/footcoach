@@ -92,7 +92,7 @@ Popup {
                 size: 20
             }
             TextField {
-                KeyboardRetry {}
+                KeyboardRetry { tag: "recherche exercice" }
                 id: search
                 anchors.left: searchIcon.right
                 anchors.right: parent.right

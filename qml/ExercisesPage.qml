@@ -194,7 +194,7 @@ Item {
                     size: 20
                 }
                 TextField {
-                    KeyboardRetry {}
+                    KeyboardRetry { tag: "recherche exercices" }
                     id: search
                     anchors.left: searchIcon.right
                     anchors.right: parent.right

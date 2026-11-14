@@ -50,6 +50,11 @@
 - Tests : `tst_venues` (14 cas sur un extrait réel de Data ES, `tests/fixtures/data-es-oise-extrait.json` ; plus `realDataEsDownload`, vrai appel, lancé seulement avec `FOOTCOACH_NETWORK_TESTS=1` : 681 terrains pour l'Oise le 13/11/2026), `tst_dataformat` et `tst_slots` adaptés au schéma 11, `t_venues.py` et `t_fields.py` étendus (backend **simulé**).
 - Non vérifié : Qt 6.9, Android (clavier, réseau mobile), fiche Play Store (« aucune connexion Internet » y était déjà inexact depuis les signalements).
 
+## Non publié — traces du clavier Android (diagnostic temporaire)
+- Le défaut persiste (« Stade ou adresse », « Joueurs max. » : 1er toucher = focus sans clavier) : `KeyboardRetry` n'a donc pas suffi, ou le build ne le contenait pas.
+- `KeyboardRetry` écrit maintenant dans le journal (`[toucher] clavier | champ : événement [état]`) : doigt posé, doigt levé, focus obtenu/perdu, demande de clavier à +150 ms, état à +700 ms ; `Main.qml` trace les changements de `Qt.inputMethod.visible` et de hauteur du clavier. L'état donne le focus du champ, la fenêtre active, le clavier vu par Qt et sa hauteur.
+- Où lire : « Sortie de l'application » de Qt Creator ou `adb logcat | grep toucher`. À retirer une fois la cause trouvée.
+
 ## Non publié — clavier Android : nouvelle demande d'affichage après le toucher
 - **Constat (captures sur appareil, formulaire Exercice)** : le 1er toucher dans un champ lui donne le focus (bordure verte) sans clavier ; le 2e affiche le clavier.
 - **Code de Qt 6.9 lu** (`qquicktextedit.cpp`) : l'affichage est demandé à l'entrée du focus, puis, si le champ a déjà le focus, à chaque appui. Seule la 2e demande aboutit chez vous. **Hypothèse non vérifiée** : la 1re part trop tôt, avant que Android ait rattaché le champ à la saisie.

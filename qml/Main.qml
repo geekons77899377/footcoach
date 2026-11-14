@@ -27,6 +27,14 @@ ApplicationWindow {
 
     // Clavier à l'écran ouvert (Android : la fenêtre est alors réduite). Propriété simple pour pouvoir la simuler en test.
     property bool keyboardUp: Qt.inputMethod.visible
+    // Diagnostic clavier (temporaire) : changements d'état du clavier tels que Qt les voit.
+    Connections {
+        target: Qt.inputMethod
+        function onVisibleChanged() { AppState.trace("clavier", "Qt.inputMethod.visible -> " + Qt.inputMethod.visible) }
+        function onKeyboardRectangleChanged() {
+            AppState.trace("clavier", "hauteur du clavier -> " + Math.round(Qt.inputMethod.keyboardRectangle.height))
+        }
+    }
 
     readonly property string navMode: width < 600 ? "bottom" : (width >= 840 && height >= 520 ? "sidebar" : "rail")
     property string section: "home"
