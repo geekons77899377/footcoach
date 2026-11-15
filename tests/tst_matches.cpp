@@ -239,13 +239,14 @@ private slots:
         QCOMPARE(repo.players(m.id).size(), 0);
     }
 
-    // Un joueur ne peut être que sur un seul match à la même heure (créneau de kMatchSlotMinutes).
+    // Schéma 14 : un joueur ne peut pas être sur deux matchs dont les créneaux (coup d'envoi + durée) se chevauchent ;
+    // il peut jouer un match qui commence quand l'autre est fini (décision du 15/11/2026).
     void aPlayerCannotBeOnTwoMatchesAtTheSameTime()
     {
         MatchRepository repo(m_db.handle());
         Match a = makeMatch(QStringLiteral("A"), QDateTime(QDate(2026, 11, 8), QTime(15, 0)));
         Match same = makeMatch(QStringLiteral("B"), QDateTime(QDate(2026, 11, 8), QTime(15, 0)));
-        Match close = makeMatch(QStringLiteral("C"), QDateTime(QDate(2026, 11, 8), QTime(16, 30)));
+        Match close = makeMatch(QStringLiteral("C"), QDateTime(QDate(2026, 11, 8), QTime(16, 0)));
         Match later = makeMatch(QStringLiteral("D"), QDateTime(QDate(2026, 11, 8), QTime(17, 0)));
         QVERIFY(repo.insert(a) && repo.insert(same) && repo.insert(close) && repo.insert(later));
         QVERIFY(repo.setPlayers(a.id, {{m_p1, QStringLiteral("starter")}}));
@@ -255,8 +256,9 @@ private slots:
         QVERIFY2(error.contains(QStringLiteral("déjà convoqué")), qPrintable(error));
         QVERIFY(error.contains(QStringLiteral("contre A")));
         QCOMPARE(repo.players(same.id).size(), 0);                                           // rien n'est écrit
-        QVERIFY(!repo.setPlayers(close.id, {{m_p1, QStringLiteral("substitute")}}, &error));  // 90 min d'écart : chevauche
-        QVERIFY(repo.setPlayers(later.id, {{m_p1, QStringLiteral("starter")}}));              // 120 min d'écart : libre
+        QVERIFY(!repo.setPlayers(close.id, {{m_p1, QStringLiteral("substitute")}}, &error));  // A dure 90 min : chevauche
+        QVERIFY2(error.contains(QStringLiteral("15:00 à 16:30")), qPrintable(error));
+        QVERIFY(repo.setPlayers(later.id, {{m_p1, QStringLiteral("starter")}}));              // après la fin de A : libre
         QVERIFY(repo.setPlayers(same.id, {{m_p2, QStringLiteral("starter")}}));               // un autre joueur : permis
 
         // Réenregistrer le même match ne s'oppose pas à lui-même.
@@ -277,6 +279,52 @@ private slots:
         cancelled.status = QStringLiteral("planned");
         QVERIFY(!repo.update(cancelled, &error));
         QCOMPARE(repo.get(a.id).status, QStringLiteral("cancelled"));
+
+        // Plateau U10-U11 : matchs de 30 min enchaînés, le même joueur peut jouer les deux.
+        Match p1 = makeMatch(QStringLiteral("Plateau 1"), QDateTime(QDate(2026, 11, 14), QTime(10, 0)));
+        Match p2 = makeMatch(QStringLiteral("Plateau 2"), QDateTime(QDate(2026, 11, 14), QTime(10, 30)));
+        Match p3 = makeMatch(QStringLiteral("Plateau 3"), QDateTime(QDate(2026, 11, 14), QTime(10, 45)));
+        p1.durationMin = p2.durationMin = p3.durationMin = 30;
+        QVERIFY(repo.insert(p1) && repo.insert(p2) && repo.insert(p3));
+        QCOMPARE(repo.get(p1.id).durationMin, 30);
+        QVERIFY(repo.setPlayers(p1.id, {{m_p1, QStringLiteral("starter")}}));
+        QVERIFY(repo.setPlayers(p2.id, {{m_p1, QStringLiteral("starter")}}));                  // commence à la fin de p1
+        QVERIFY(!repo.setPlayers(p3.id, {{m_p1, QStringLiteral("starter")}}, &error));         // 10:45 pendant p2
+        // Allonger p1 sur p2 est refusé (son joueur serait sur les deux).
+        Match longer = repo.get(p1.id);
+        longer.durationMin = 45;
+        QVERIFY(!repo.update(longer, &error));
+        QCOMPARE(repo.get(p1.id).durationMin, 30);
+        // Durée hors bornes refusée.
+        Match bad = makeMatch(QStringLiteral("X"), QDateTime(QDate(2026, 12, 1), QTime(10, 0)));
+        bad.durationMin = 0;
+        QVERIFY(!repo.insert(bad, &error));
+        QVERIFY(error.contains(QStringLiteral("durée")));
+    }
+
+    // Durée par défaut d'un nouveau match : 30 min pour les U10-U11 (quelle que soit l'écriture), 90 min sinon.
+    void defaultDurationDependsOnTheTeamCategory()
+    {
+        QCOMPARE(MatchRepository::defaultDuration(QStringLiteral("U10U11")), 30);
+        QCOMPARE(MatchRepository::defaultDuration(QStringLiteral("U10-U11")), 30);
+        QCOMPARE(MatchRepository::defaultDuration(QStringLiteral("u11")), 30);
+        QCOMPARE(MatchRepository::defaultDuration(QStringLiteral("U15")), 90);
+        QCOMPARE(MatchRepository::defaultDuration(QString()), 90);
+        Backend b(m_db.handle());
+        QVERIFY(b.saveTeam({{"id", m_team}, {"name", "U15"}, {"category", "U10U11"}}).value("ok").toBool());
+        QCOMPARE(b.defaultMatchDuration(m_team), 30);
+        QVariantMap r = b.saveMatch({{"teamId", m_team}, {"date", "2026-11-21"}, {"time", "10:00"}, {"opponent", "AS"}});
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        const int id = r.value("id").toInt();
+        QVariantMap m = b.match(id).value("match").toMap();
+        QCOMPARE(m.value("durationMin").toInt(), 30);
+        QCOMPARE(m.value("endTime").toString(), QStringLiteral("10:30"));
+        // Modification sans la clé : durée conservée ; avec : remplacée.
+        QVERIFY(b.saveMatch({{"id", id}, {"date", "2026-11-21"}, {"time", "10:00"}, {"opponent", "AS 2"}}).value("ok").toBool());
+        QCOMPARE(b.match(id).value("match").toMap().value("durationMin").toInt(), 30);
+        QVERIFY(b.saveMatch({{"id", id}, {"date", "2026-11-21"}, {"time", "10:00"}, {"opponent", "AS 2"}, {"durationMin", 50}})
+                    .value("ok").toBool());
+        QCOMPARE(b.match(id).value("match").toMap().value("endTime").toString(), QStringLiteral("10:50"));
     }
 
     void deletingAPlayerOrAMatchCleansConvocations()
@@ -522,6 +570,9 @@ private slots:
         r = b.challengeSheetCheck(match);
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
         QCOMPARE(r.value("teamName").toString(), QStringLiteral("U15"));
+        QCOMPARE(r.value("clubName").toString(), QStringLiteral("Mon club"));
+        QCOMPARE(r.value("responsibleName").toString(), QString());       // pas d'éducateur : cases vides
+        QCOMPARE(r.value("responsibleLicence").toString(), QString());
         QCOMPARE(r.value("fileName").toString(), QStringLiteral("feuille-challenge-u15-2026-11-14.pdf"));
         r = b.exportChallengeSheet(match, QUrl::fromLocalFile(out).toString());
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
@@ -540,7 +591,8 @@ private slots:
             QVERIFY(p.waitForFinished(15000));
             const QString text = QString::fromUtf8(p.readAllStandardOutput());
             QVERIFY(text.contains(QStringLiteral("FEUILLE DE CHALLENGE 2/2")));
-            QVERIFY(text.contains(QStringLiteral("U15")));
+            QVERIFY(text.contains(QStringLiteral("Mon club")));     // le club, pas le nom de l'équipe
+            QVERIFY(!text.contains(QStringLiteral("U15")));
             const int adam = text.indexOf(QStringLiteral("9605922556")), ilyan = text.indexOf(QStringLiteral("9605922562"));
             QVERIFY(adam > 0 && ilyan > adam);              // Alioua Adam avant Alioua Ilyan malgré l'ordre de convocation
             QCOMPARE(text.count(QStringLiteral("Blessure")), 5);   // quatre en-têtes de bloc + la note de bas de page
@@ -594,6 +646,111 @@ private slots:
         r = b.exportChallengeSheet(match, dir.filePath(QStringLiteral("absent/feuille.pdf")));
         QVERIFY(!r.value("ok").toBool());
         QVERIFY2(r.value("error").toString().contains(QStringLiteral("écrire")), qPrintable(r.value("error").toString()));
+    }
+    // Schéma 12 : éducateurs du club, responsable de l'équipe, imprimé sur la feuille de challenge avec le nom du club.
+    void educatorIsTheResponsibleOnTheChallengeSheet()
+    {
+        Backend b(m_db.handle());
+        const int club = b.clubOfTeam(m_team);
+        QVERIFY(club > 0);
+        QVERIFY(b.saveClub({{"id", club}, {"name", "US Lagny-le-Sec"}}).value("ok").toBool());
+
+        // Saisie : prénom et nom obligatoires, licence facultative et unique dans le club (espaces retirés).
+        QVERIFY(!b.saveEducator({{"clubId", club}, {"firstName", "Karim"}, {"lastName", " "}}).value("ok").toBool());
+        QVERIFY(!b.saveEducator({{"clubId", 9999}, {"firstName", "Karim"}, {"lastName", "Benali"}}).value("ok").toBool());
+        const int karim = b.saveEducator({{"clubId", club}, {"firstName", " Karim "}, {"lastName", "Benali"},
+                                          {"licence", "23 1807 3452"}}).value("id").toInt();
+        QVERIFY(karim > 0);
+        const int sans = b.saveEducator({{"clubId", club}, {"firstName", "Paul"}, {"lastName", "Adam"}}).value("id").toInt();
+        QVERIFY(sans > 0);
+        QVariantMap r = b.saveEducator({{"clubId", club}, {"firstName", "Luc"}, {"lastName", "Doublon"}, {"licence", "2318073452"}});
+        QVERIFY(!r.value("ok").toBool());
+        QVERIFY2(r.value("error").toString().contains(QStringLiteral("Karim Benali")), qPrintable(r.value("error").toString()));
+        QVariantList list = b.educators(club);
+        QCOMPARE(list.size(), 2);
+        QCOMPARE(list.at(0).toMap().value("fullName").toString(), QStringLiteral("ADAM Paul"));     // tri par nom
+        QCOMPARE(list.at(1).toMap().value("fullName").toString(), QStringLiteral("BENALI Karim"));
+        QCOMPARE(list.at(1).toMap().value("licence").toString(), QStringLiteral("2318073452"));
+
+        // Un éducateur d'un autre club ne peut pas être responsable de l'équipe.
+        const int other = b.saveClub({{"name", "AS Voisins 2"}}).value("id").toInt();
+        const int stranger = b.saveEducator({{"clubId", other}, {"firstName", "Zoé"}, {"lastName", "Ailleurs"}}).value("id").toInt();
+        QVERIFY(stranger > 0);
+        QVERIFY(!b.saveTeam({{"id", m_team}, {"name", "U15"}, {"educatorId", stranger}}).value("ok").toBool());
+        QCOMPARE(b.teams(club).at(0).toMap().value("educatorId").toInt(), -1);
+
+        // Responsable choisi dans la fiche de l'équipe ; une fiche sans la clé educatorId ne l'efface pas.
+        QVERIFY(b.saveTeam({{"id", m_team}, {"name", "U15"}, {"educatorId", karim}}).value("ok").toBool());
+        QVERIFY(b.saveTeam({{"id", m_team}, {"name", "U15"}, {"category", "U15"}}).value("ok").toBool());
+        QVariantMap team = b.teams(club).at(0).toMap();
+        QCOMPARE(team.value("educatorId").toInt(), karim);
+        QCOMPARE(team.value("educatorName").toString(), QStringLiteral("BENALI Karim"));
+        QCOMPARE(b.educators(club).at(1).toMap().value("teamCount").toInt(), 1);
+
+
+        const int p = b.savePlayer({{"teamId", m_team}, {"firstName", "Adam"}, {"lastName", "Alioua"}, {"licence", "9605922556"}})
+                          .value("id").toInt();
+        const int match = b.saveMatch({{"teamId", m_team}, {"date", "2026-11-21"}, {"time", "10:30"}, {"opponent", "AS Test"}})
+                              .value("id").toInt();
+        QVERIFY(b.setMatchPlayers(match, {QVariantMap{{"playerId", p}, {"role", "starter"}}}).value("ok").toBool());
+        r = b.challengeSheetCheck(match);
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(r.value("clubName").toString(), QStringLiteral("US Lagny-le-Sec"));
+        QCOMPARE(r.value("responsibleName").toString(), QStringLiteral("BENALI Karim"));
+        QCOMPARE(r.value("responsibleLicence").toString(), QStringLiteral("2318073452"));
+
+        QTemporaryDir dir;
+        const QString out = dir.filePath(QStringLiteral("feuille.pdf"));
+        QVERIFY(b.exportChallengeSheet(match, out).value("ok").toBool());
+        const QString tool = QStandardPaths::findExecutable(QStringLiteral("pdftotext"));
+        if (!tool.isEmpty()) {
+            QProcess proc;
+            proc.start(tool, {QStringLiteral("-layout"), out, QStringLiteral("-")});
+            QVERIFY(proc.waitForFinished(15000));
+            const QString text = QString::fromUtf8(proc.readAllStandardOutput());
+            QVERIFY(text.contains(QStringLiteral("US Lagny-le-Sec")));
+            QVERIFY(text.contains(QStringLiteral("BENALI Karim")));
+            QVERIFY(text.contains(QStringLiteral("2318073452")));
+        }
+
+        QCOMPARE(r.value("responsibleWarning").toString(), QString());        // licence correcte : pas d'avertissement
+
+        // Décision du 15/11/2026 : licence sans 10 chiffres imprimée telle que saisie, avec un avertissement.
+        QVERIFY(b.saveEducator({{"id", karim}, {"firstName", "Karim"}, {"lastName", "Benali"}, {"licence", "abc 123"}})
+                    .value("ok").toBool());
+        r = b.challengeSheetCheck(match);
+        QVERIFY(r.value("ok").toBool());
+        QCOMPARE(r.value("responsibleName").toString(), QStringLiteral("BENALI Karim"));
+        QCOMPARE(r.value("responsibleLicence").toString(), QStringLiteral("ABC123"));
+        QVERIFY2(r.value("responsibleWarning").toString().contains(QStringLiteral("10 chiffres")),
+                 qPrintable(r.value("responsibleWarning").toString()));
+        QVERIFY(b.exportChallengeSheet(match, out).value("ok").toBool());
+        if (!tool.isEmpty()) {
+            QProcess proc;
+            proc.start(tool, {QStringLiteral("-layout"), out, QStringLiteral("-")});
+            QVERIFY(proc.waitForFinished(15000));
+            QVERIFY(QString::fromUtf8(proc.readAllStandardOutput()).contains(QStringLiteral("ABC123")));
+        }
+        // Licence vide : case vide, avertissement.
+        QVERIFY(b.saveEducator({{"id", karim}, {"firstName", "Karim"}, {"lastName", "Benali"}, {"licence", ""}})
+                    .value("ok").toBool());
+        r = b.challengeSheetCheck(match);
+        QVERIFY(r.value("ok").toBool());
+        QCOMPARE(r.value("responsibleLicence").toString(), QString());
+        QVERIFY(r.value("responsibleWarning").toString().contains(QStringLiteral("non renseignée")));
+
+        // Éducateur supprimé : l'équipe n'a plus de responsable, les cases redeviennent vides.
+        QVERIFY(b.deleteEducator(karim).value("ok").toBool());
+        QCOMPARE(b.teams(club).at(0).toMap().value("educatorId").toInt(), -1);
+        r = b.challengeSheetCheck(match);
+        QVERIFY(r.value("ok").toBool());
+        QCOMPARE(r.value("responsibleName").toString(), QString());
+        QVERIFY(r.value("responsibleWarning").toString().contains(QStringLiteral("Aucun éducateur")));
+        QVERIFY(!b.deleteEducator(karim).value("ok").toBool());
+
+        // Club supprimé : ses éducateurs aussi (cascade).
+        QVERIFY(b.deleteClub(other).value("ok").toBool());
+        QCOMPARE(b.educators(other).size(), 0);
     }
 };
 

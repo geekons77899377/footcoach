@@ -27,7 +27,7 @@
 #include <QJsonObject>
 
 Backend::Backend(const QSqlDatabase &db, QObject *parent)
-    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_clubs(db), m_matches(db), m_players(db), m_sessions(db), m_slots(db), m_attendance(db), m_exercises(db), m_plan(db), m_venues(db)
+    : QObject(parent), m_db(db), m_repo(db), m_teams(db), m_clubs(db), m_matches(db), m_players(db), m_sessions(db), m_slots(db), m_attendance(db), m_exercises(db), m_plan(db), m_venues(db), m_educators(db)
 {
 }
 
@@ -530,8 +530,12 @@ QVariantList Backend::teams(int clubId)
     const QList<Team> all = m_teams.all(&error, clubId);
     setError(error);
     QHash<int, QString> clubNames;
-    for (const Club &c : m_clubs.all())
+    QHash<int, QString> educatorNames;
+    for (const Club &c : m_clubs.all()) {
         clubNames.insert(c.id, c.name);
+        for (const Educator &e : m_educators.list(c.id))
+            educatorNames.insert(e.id, e.fullName());
+    }
     for (const Team &t : all) {
         QVariantMap m;
         m.insert(QStringLiteral("id"), t.id);
@@ -541,6 +545,8 @@ QVariantList Backend::teams(int clubId)
         m.insert(QStringLiteral("category"), t.category);
         m.insert(QStringLiteral("season"), t.season);
         m.insert(QStringLiteral("playerCount"), m_teams.playerCount(t.id));
+        m.insert(QStringLiteral("educatorId"), t.educatorId);
+        m.insert(QStringLiteral("educatorName"), educatorNames.value(t.educatorId));
         list.append(m);
     }
     return list;
@@ -559,9 +565,64 @@ QVariantMap Backend::saveTeam(const QVariantMap &team)
         return result(false, -1, m_lastError);
     }
     QString error;
-    const bool ok = t.id > 0 ? m_teams.update(t, &error) : m_teams.insert(t, &error);
+    if (!m_db.transaction()) {
+        setError(m_db.lastError().text());
+        return result(false, -1, m_lastError);
+    }
+    bool ok = t.id > 0 ? m_teams.update(t, &error) : m_teams.insert(t, &error);
+    // Éducateur responsable : seulement si la clé est fournie (une ancienne fiche sans ce champ ne l'efface pas).
+    if (ok && team.contains(QStringLiteral("educatorId")))
+        ok = m_educators.setTeamEducator(t.id, team.value(QStringLiteral("educatorId")).toInt(), &error);
+    if (!ok || !m_db.commit()) {
+        if (ok)
+            error = m_db.lastError().text();
+        m_db.rollback();
+        setError(error);
+        return result(false, -1, error);
+    }
+    setError(QString());
+    return result(true, t.id);
+}
+
+QVariantList Backend::educators(int clubId)
+{
+    QVariantList list;
+    QString error;
+    for (const Educator &e : m_educators.list(clubId, &error)) {
+        QVariantMap m;
+        m.insert(QStringLiteral("id"), e.id);
+        m.insert(QStringLiteral("clubId"), e.clubId);
+        m.insert(QStringLiteral("firstName"), e.firstName);
+        m.insert(QStringLiteral("lastName"), e.lastName);
+        m.insert(QStringLiteral("fullName"), e.fullName());
+        m.insert(QStringLiteral("licence"), e.licence);
+        m.insert(QStringLiteral("teamCount"), m_educators.teamCount(e.id));
+        list.append(m);
+    }
     setError(error);
-    return ok ? result(true, t.id) : result(false, -1, error);
+    return list;
+}
+
+QVariantMap Backend::saveEducator(const QVariantMap &educator)
+{
+    Educator e;
+    e.id = educator.value(QStringLiteral("id"), -1).toInt();
+    e.clubId = educator.value(QStringLiteral("clubId"), -1).toInt();
+    e.firstName = educator.value(QStringLiteral("firstName")).toString();
+    e.lastName = educator.value(QStringLiteral("lastName")).toString();
+    e.licence = educator.value(QStringLiteral("licence")).toString();
+    QString error;
+    const bool ok = m_educators.save(e, &error);
+    setError(error);
+    return result(ok, ok ? e.id : -1, error);
+}
+
+QVariantMap Backend::deleteEducator(int id)
+{
+    QString error;
+    const bool ok = m_educators.remove(id, &error);
+    setError(error);
+    return result(ok, id, error);
 }
 
 QVariantMap Backend::deleteTeam(int id)

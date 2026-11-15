@@ -3,6 +3,9 @@
 
 #include "core/PlanSchedule.h"
 #include "core/TacticalBoard.h"
+#include "ExerciseSheet.h"
+
+#include <QBuffer>
 
 #include <QRegularExpression>
 #include <QSet>
@@ -56,6 +59,10 @@ QVariantMap exerciseMap(const Exercise &e, int usage)
     m.insert(QStringLiteral("archived"), e.archived);
     m.insert(QStringLiteral("categoryId"), e.categoryId);
     m.insert(QStringLiteral("categoryName"), e.categoryName);
+    m.insert(QStringLiteral("instructions"), e.instructions);
+    m.insert(QStringLiteral("variations"), e.variations);
+    m.insert(QStringLiteral("successCriteria"), e.successCriteria);
+    m.insert(QStringLiteral("coachCue"), e.coachCue);
     m.insert(QStringLiteral("usage"), usage);
     return m;
 }
@@ -152,6 +159,22 @@ QVariantMap Backend::saveExercise(const QVariantMap &in)
     e.description = in.value(QStringLiteral("description")).toString().trimmed();
     e.archived = in.value(QStringLiteral("archived"), false).toBool();
     e.categoryId = in.value(QStringLiteral("categoryId"), 0).toInt();
+    // Schéma 13 : rubriques de la fiche. Clé absente lors d'une modification : valeur actuelle conservée.
+    Exercise current;
+    if (e.id > 0) {
+        for (const Exercise &x : m_exercises.list(true)) {
+            if (x.id == e.id)
+                current = x;
+        }
+    }
+    const auto field = [&](const char *key, const QString &old) {
+        const QString k = QString::fromLatin1(key);
+        return in.contains(k) ? in.value(k).toString().trimmed() : old;
+    };
+    e.instructions = field("instructions", current.instructions);
+    e.variations = field("variations", current.variations);
+    e.successCriteria = field("successCriteria", current.successCriteria);
+    e.coachCue = field("coachCue", current.coachCue);
 
     QString problem;
     if (e.title.isEmpty())
@@ -417,4 +440,75 @@ QVariantMap Backend::movePlanItem(int itemId, int delta)
     const bool ok = m_plan.move(itemId, delta < 0 ? -1 : 1, &error);
     setError(ok ? QString() : error);
     return done(ok, itemId, error);
+}
+
+// --- Fiche exercice (schéma 13) ------------------------------------------------------------------------
+
+QString Backend::exerciseSheetFileName(int exerciseId)
+{
+    for (const Exercise &e : m_exercises.list(true)) {
+        if (e.id == exerciseId)
+            return ExerciseSheet::fileName(e.title);
+    }
+    return ExerciseSheet::fileName(QString());
+}
+
+QVariantMap Backend::exportExerciseSheet(int exerciseId, const QString &url)
+{
+    QVariantMap r{{QStringLiteral("ok"), false}};
+    auto fail = [&](const QString &message) {
+        r.insert(QStringLiteral("ok"), false);
+        r.insert(QStringLiteral("error"), message);
+        setError(message);
+        return r;
+    };
+    QString error;
+    Exercise e;
+    bool found = false;
+    for (const Exercise &x : m_exercises.list(true, &error)) {
+        if (x.id == exerciseId) {
+            e = x;
+            found = true;
+        }
+    }
+    if (!found)
+        return fail(error.isEmpty() ? tr("Exercice introuvable.") : error);
+
+    ExerciseSheetData d;
+    d.title = e.title;
+    d.ageCategory = e.categoryName;
+    d.durationMin = e.durationMin;
+    d.objective = e.objective;
+    // Organisation : description (terrain, dispositif), nombre de joueurs, matériel.
+    d.organisation = ExerciseSheet::splitLines(e.description);
+    if (e.playersMin > 0 && e.playersMax > 0 && e.playersMax != e.playersMin)
+        d.organisation.append(tr("%1 à %2 joueurs").arg(e.playersMin).arg(e.playersMax));
+    else if (e.playersMin > 0 || e.playersMax > 0)
+        d.organisation.append(tr("%1 joueurs").arg(std::max(e.playersMin, e.playersMax)));
+    d.organisation.append(splitEquipment(e.equipment));
+    d.instructions = ExerciseSheet::splitLines(e.instructions);
+    d.variations = ExerciseSheet::splitLines(e.variations);
+    d.criteria = ExerciseSheet::splitLines(e.successCriteria);
+    d.coachCue = e.coachCue;
+    BoardRecord board;
+    if (m_repo.referenceForExercise(exerciseId, &board, &error))
+        d.hasBoard = Tactics::fromJson(board.sceneJson, &d.board);
+
+    QByteArray pdf;
+    QBuffer buffer(&pdf);
+    buffer.open(QIODevice::WriteOnly);
+    QString problem;
+    if (!ExerciseSheet::writePdf(&buffer, d, &problem))
+        return fail(tr("Impossible de créer le PDF : %1").arg(problem));
+    buffer.close();
+    const QVariantMap w = writeExportFile(url, pdf);
+    if (!w.value(QStringLiteral("ok")).toBool())
+        return fail(w.value(QStringLiteral("error")).toString());
+    if (w.contains(QStringLiteral("warning")))
+        r.insert(QStringLiteral("warning"), w.value(QStringLiteral("warning")));
+    r.insert(QStringLiteral("ok"), true);
+    r.insert(QStringLiteral("bytes"), pdf.size());
+    r.insert(QStringLiteral("hasBoard"), d.hasBoard);
+    setError(QString());
+    return r;
 }

@@ -185,6 +185,13 @@ Item {
                     width: 58
                     spacing: 2
                     Text { text: row.modelData.time; font.pixelSize: 18; font.weight: Font.ExtraBold; color: Theme.text }
+                    Text {
+                        objectName: "matchEnd"
+                        text: row.modelData.endTime ? "→ " + row.modelData.endTime : ""
+                        visible: text !== ""
+                        font.pixelSize: 12
+                        color: Theme.textMuted
+                    }
                     Text { text: row.modelData.homeAway === "home" ? "Dom." : "Ext."; font.pixelSize: 12; color: Theme.textMuted }
                 }
                 Rectangle {

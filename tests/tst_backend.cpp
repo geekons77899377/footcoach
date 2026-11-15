@@ -82,7 +82,7 @@ private slots:
             QVERIFY(board.value("readable").toBool());
             QVERIFY(board.value("json").toString().contains(QStringLiteral("\"items\"")));
         }
-        QCOMPARE(found, 27);
+        QCOMPARE(found, 28);
     }
 
     // Migration 009 : « U10-U11 · » quitte les titres et devient une catégorie.
@@ -95,7 +95,7 @@ private slots:
         const QVariantList cats = b.categories();
         QCOMPARE(cats.size(), 1);
         QCOMPARE(cats.at(0).toMap().value("name").toString(), QStringLiteral("U10-U11"));
-        QCOMPARE(cats.at(0).toMap().value("count").toInt(), 27);
+        QCOMPARE(cats.at(0).toMap().value("count").toInt(), 28);
         int inCategory = 0;
         for (const QVariant &v : b.exercises(true)) {
             const QVariantMap e = v.toMap();
@@ -103,7 +103,7 @@ private slots:
             if (e.value("categoryId").toInt() > 0)
                 ++inCategory;
         }
-        QCOMPARE(inCategory, 27);
+        QCOMPARE(inCategory, 28);
         QSqlQuery q(fresh.handle());
         QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board WHERE title LIKE '%U10-U11%'")) && q.next());
         QCOMPARE(q.value(0).toInt(), 0);

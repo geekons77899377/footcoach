@@ -299,6 +299,12 @@ Item {
         }
     }
 
+    // Éducateurs du club (schéma 12) : responsable d'une équipe sur la feuille de challenge.
+    EducatorsDialog {
+        id: educatorsDialog
+        onChanged: page.refreshTeams()
+    }
+
     // Saisie du nom d'un club (création ou renommage).
     PromptDialog {
         id: clubPrompt
@@ -420,6 +426,7 @@ Item {
             m.push({ id: "newClub", text: "Nouveau club", icon: "plus" });
             if (page.team) {
                 m.push({ id: "renameClub", text: "Renommer le club « " + page.team.clubName + " »", icon: "edit" });
+                m.push({ id: "educators", text: "Éducateurs du club « " + page.team.clubName + " »", icon: "users" });
                 if (several)
                     m.push({ id: "deleteClub", text: "Supprimer le club « " + page.team.clubName + " »", icon: "trash", danger: true });
             }
@@ -436,6 +443,8 @@ Item {
             } else if (id === "newClub") {
                 clubPrompt.clubId = -1;
                 clubPrompt.ask("Nouveau club", "", false, 60);
+            } else if (id === "educators") {
+                educatorsDialog.openFor(page.team.clubId, page.team.clubName);
             } else if (id === "renameClub") {
                 clubPrompt.clubId = page.team.clubId;
                 clubPrompt.ask("Renommer le club", page.team.clubName, false, 60);

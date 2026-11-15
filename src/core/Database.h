@@ -28,6 +28,8 @@ public:
     // (club « Mon club », bibliothèque d'exercices, exemples U10-U11 et leurs terrains…). Rejoués sur des tables
     // vides, ils redonnent le contenu d'une première installation. Liste vide et *error rempli en cas d'échec.
     static QStringList seedStatements(QString *error = nullptr);
+    // INSERT et UPDATE des migrations de version strictement supérieure à afterVersion, dans l'ordre.
+    static QStringList seedStatementsAfter(int afterVersion, QString *error = nullptr);
 
 private:
     bool migrate(QString *error);

@@ -529,6 +529,10 @@ Item {
         showBack: !page.split
         onCloseRequested: page.backFromForm()
         onOpenBoardRequested: (id) => page.openBoard(id)
+        onSavedInPlace: {
+            page.currentId = form.exerciseId;
+            page.refresh();
+        }
         onSaved: {
             page.currentId = form.exerciseId;
             page.refresh();

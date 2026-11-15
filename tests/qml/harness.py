@@ -335,6 +335,50 @@ class Backend(QObject):
         if len(self._clubs) <= 1: return {"ok": False, "id": cid, "error": "Impossible de supprimer le dernier club."}
         self._clubs = [c for c in self._clubs if c["id"] != cid]
         return {"ok": True, "id": cid, "error": ""}
+    # --- Durée des matchs (schéma 14, simulée : 30 min pour les U10-U11, 90 sinon) ---
+    @Slot(int, result=int)
+    def defaultMatchDuration(self, team):
+        for t in (getattr(self, "teams_", None) or []):
+            if t.get("id") == team:
+                c = str(t.get("category", "")).upper()
+                return 30 if ("U10" in c or "U11" in c) else 90
+        return 90
+
+    # --- Éducateurs du club (schéma 12, simulés : mêmes clés que Backend::educators) ---------------------------------
+    def _edu_init(self):
+        if not hasattr(self, "_educators"):
+            self._educators = []
+            self._next_edu = 1
+            self.saved_educators = []
+    @Slot(int, result="QVariantList")
+    def educators(self, club):
+        self._edu_init()
+        out = [dict(e, fullName=(e["lastName"].upper() + " " + e["firstName"]).strip(), teamCount=e.get("teamCount", 0))
+               for e in self._educators if e["clubId"] == club]
+        return sorted(out, key=lambda e: (e["lastName"].lower(), e["firstName"].lower()))
+    @Slot("QVariantMap", result="QVariantMap")
+    def saveEducator(self, e):
+        self._edu_init()
+        self.saved_educators.append(dict(e))
+        first, last = str(e.get("firstName", "")).strip(), str(e.get("lastName", "")).strip()
+        lic = "".join(str(e.get("licence", "")).split()).upper()
+        if not first or not last:
+            return {"ok": False, "id": -1, "error": "Le prénom et le nom de l'éducateur sont obligatoires."}
+        eid = int(e.get("id", -1))
+        if eid > 0:
+            for x in self._educators:
+                if x["id"] == eid:
+                    x.update(firstName=first, lastName=last, licence=lic); return {"ok": True, "id": eid, "error": ""}
+            return {"ok": False, "id": -1, "error": "Éducateur introuvable."}
+        eid = self._next_edu; self._next_edu += 1
+        self._educators.append({"id": eid, "clubId": int(e.get("clubId", -1)), "firstName": first, "lastName": last, "licence": lic})
+        return {"ok": True, "id": eid, "error": ""}
+    @Slot(int, result="QVariantMap")
+    def deleteEducator(self, eid):
+        self._edu_init()
+        n = len(self._educators)
+        self._educators = [x for x in self._educators if x["id"] != eid]
+        return {"ok": len(self._educators) < n, "id": eid, "error": "" if len(self._educators) < n else "Éducateur introuvable."}
     def _match_map(self, m):
         mid = m["id"]
         return dict(m, venueId=m.get("venueId", -1), convoked=len(self._match_players.get(mid, [])), hasBoard=mid in self._match_board)
@@ -370,7 +414,7 @@ class Backend(QObject):
         self._matches[mid] = {"id": mid, "teamId": int(m["teamId"]), "date": m["date"], "time": m["time"],
                               "opponent": m["opponent"].strip(), "location": m.get("location", ""), "homeAway": m.get("homeAway", "home"),
                               "status": m.get("status", "planned"), "scoreFor": sf, "scoreAgainst": sa, "notes": m.get("notes", ""),
-                              "venueId": int(m.get("venueId", -1))}
+                              "venueId": int(m.get("venueId", -1)), "durationMin": int(m.get("durationMin", 90))}
         vid = int(m.get("venueId", -1))
         if vid > 0:
             self._venue_init()

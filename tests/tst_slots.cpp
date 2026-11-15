@@ -263,7 +263,13 @@ private slots:
     void migrationCopiesExistingPhoneAndEmailToContact1()
     {
         QSqlQuery q(m_db.handle());
-        // On revient au schéma 9 pour rejouer la migration 010 (et la 011, qui la suit).
+        // On revient au schéma 9 pour rejouer la migration 010 (et les 011 à 014, qui la suivent).
+        QVERIFY(q.exec(QStringLiteral("ALTER TABLE football_match DROP COLUMN duration_min")));
+        for (const char *col : {"instructions", "variations", "success_criteria", "coach_cue"})
+            QVERIFY(q.exec(QStringLiteral("ALTER TABLE exercise DROP COLUMN %1").arg(QLatin1String(col))));
+        QVERIFY(q.exec(QStringLiteral("DROP INDEX idx_team_educator")));
+        QVERIFY(q.exec(QStringLiteral("ALTER TABLE team DROP COLUMN educator_id")));
+        QVERIFY(q.exec(QStringLiteral("DROP TABLE educator")));
         QVERIFY(q.exec(QStringLiteral("DROP TABLE opponent_venue")));
         QVERIFY(q.exec(QStringLiteral("DROP INDEX idx_match_venue")));
         QVERIFY(q.exec(QStringLiteral("ALTER TABLE football_match DROP COLUMN venue_id")));
@@ -281,7 +287,7 @@ private slots:
         m_db.close();
         QString error;
         QVERIFY2(m_db.open(m_dir.filePath(QStringLiteral("t.db")), &error), qPrintable(error));
-        QCOMPARE(m_db.schemaVersion(), 11);
+        QCOMPARE(m_db.schemaVersion(), 14);
         const QSqlDatabase db = m_db.handle();
         QCOMPARE(count(db, QStringLiteral("SELECT COUNT(*) FROM player_contact")), 2);
         QCOMPARE(count(db, QStringLiteral("SELECT COUNT(*) FROM player_contact c JOIN player p ON p.id = c.player_id "

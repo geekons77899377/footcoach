@@ -27,7 +27,8 @@ QVariant nullIfNegative(int v)
 }
 
 const QString kSelect = QStringLiteral(
-    "SELECT id, team_id, start_at, opponent, location, home_away, status, score_for, score_against, notes, venue_id "
+    "SELECT id, team_id, start_at, opponent, location, home_away, status, score_for, score_against, notes, venue_id, "
+    "duration_min "
     "FROM football_match");
 
 Match readMatch(const QSqlQuery &q)
@@ -44,6 +45,7 @@ Match readMatch(const QSqlQuery &q)
     m.scoreAgainst = q.value(8).isNull() ? -1 : q.value(8).toInt();
     m.notes = q.value(9).toString();
     m.venueId = q.value(10).isNull() ? -1 : q.value(10).toInt();
+    m.durationMin = q.value(11).toInt();
     return m;
 }
 
@@ -66,6 +68,11 @@ bool validate(const Match &m, QString *error)
         setError(error, QStringLiteral("Statut du match inconnu."));
         return false;
     }
+    if (m.durationMin < kMatchMinDuration || m.durationMin > kMatchMaxDuration) {
+        setError(error, QStringLiteral("La durée du match doit être comprise entre %1 et %2 minutes.")
+                            .arg(kMatchMinDuration).arg(kMatchMaxDuration));
+        return false;
+    }
     if ((m.scoreFor >= 0) != (m.scoreAgainst >= 0)) {
         setError(error, QStringLiteral("Le score est incomplet : renseignez les deux scores ou aucun."));
         return false;
@@ -75,15 +82,28 @@ bool validate(const Match &m, QString *error)
 
 } // namespace
 
-QString MatchRepository::slotConflict(int matchId, const QDateTime &startAt, const QList<int> &playerIds,
-                                      QString *dbError) const
+int MatchRepository::defaultDuration(const QString &teamCategory)
+{
+    const QString c = teamCategory.toUpper();
+    return (c.contains(QLatin1String("U10")) || c.contains(QLatin1String("U11"))) ? 30 : 90;
+}
+
+QString MatchRepository::defaultDurationUpdateSql()
+{
+    return QStringLiteral("UPDATE football_match SET duration_min = 30 WHERE team_id IN (SELECT id FROM team "
+                          "WHERE upper(category) LIKE '%U10%' OR upper(category) LIKE '%U11%')");
+}
+
+QString MatchRepository::slotConflict(int matchId, const QDateTime &startAt, int durationMin,
+                                      const QList<int> &playerIds, QString *dbError) const
 {
     if (playerIds.isEmpty() || !startAt.isValid())
         return QString();
+    const QDateTime endAt = startAt.addSecs(qint64(durationMin) * 60);
     for (int pid : playerIds) {
         QSqlQuery q(m_db);
         q.prepare(QStringLiteral(
-            "SELECT p.first_name, p.last_name, m.opponent, m.start_at FROM match_player mp "
+            "SELECT p.first_name, p.last_name, m.opponent, m.start_at, m.duration_min FROM match_player mp "
             "JOIN football_match m ON m.id = mp.match_id JOIN player p ON p.id = mp.player_id "
             "WHERE mp.player_id = ? AND m.id != ? AND m.status != 'cancelled'"));
         q.addBindValue(pid);
@@ -94,10 +114,14 @@ QString MatchRepository::slotConflict(int matchId, const QDateTime &startAt, con
         }
         while (q.next()) {
             const QDateTime other = QDateTime::fromString(q.value(3).toString(), kDateTimeFormat);
-            if (other.isValid() && qAbs(other.secsTo(startAt)) < kMatchSlotMinutes * 60)
-                return QStringLiteral("%1 %2 est déjà convoqué au match contre %3 (%4).")
+            if (!other.isValid())
+                continue;
+            const QDateTime otherEnd = other.addSecs(qint64(q.value(4).toInt()) * 60);
+            // Chevauchement strict : un match qui commence à la fin de l'autre est permis.
+            if (other < endAt && startAt < otherEnd)
+                return QStringLiteral("%1 %2 est déjà convoqué au match contre %3 (%4 à %5).")
                     .arg(q.value(0).toString(), q.value(1).toString(), q.value(2).toString(),
-                         other.toString(QStringLiteral("dd/MM/yyyy HH:mm")));
+                         other.toString(QStringLiteral("dd/MM/yyyy HH:mm")), otherEnd.toString(QStringLiteral("HH:mm")));
         }
     }
     return QString();
@@ -154,7 +178,7 @@ bool MatchRepository::insert(Match &match, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "INSERT INTO football_match(team_id, start_at, opponent, location, home_away, status, score_for, "
-        "score_against, notes, venue_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "score_against, notes, venue_id, duration_min) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     q.addBindValue(match.teamId);
     q.addBindValue(match.startAt.toString(kDateTimeFormat));
     q.addBindValue(match.opponent.trimmed());
@@ -165,6 +189,7 @@ bool MatchRepository::insert(Match &match, QString *error)
     q.addBindValue(nullIfNegative(match.scoreAgainst));
     q.addBindValue(nullIfEmpty(match.notes));
     q.addBindValue(match.venueId > 0 ? QVariant(match.venueId) : QVariant(QMetaType::fromType<int>()));
+    q.addBindValue(match.durationMin);
     if (!q.exec()) {
         // La clé étrangère refuse une équipe inexistante.
         setError(error, q.lastError().text().contains(QLatin1String("FOREIGN KEY"), Qt::CaseInsensitive)
@@ -186,7 +211,7 @@ bool MatchRepository::update(const Match &match, QString *error)
         for (const MatchPlayer &p : players(match.id))
             ids.append(p.playerId);
         QString dbError;
-        const QString conflict = slotConflict(match.id, match.startAt, ids, &dbError);
+        const QString conflict = slotConflict(match.id, match.startAt, match.durationMin, ids, &dbError);
         if (!conflict.isEmpty()) {
             setError(error, dbError.isEmpty() ? conflict : dbError);
             return false;
@@ -195,7 +220,7 @@ bool MatchRepository::update(const Match &match, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "UPDATE football_match SET start_at = ?, opponent = ?, location = ?, home_away = ?, status = ?, "
-        "score_for = ?, score_against = ?, notes = ?, venue_id = ? WHERE id = ?"));
+        "score_for = ?, score_against = ?, notes = ?, venue_id = ?, duration_min = ? WHERE id = ?"));
     q.addBindValue(match.startAt.toString(kDateTimeFormat));
     q.addBindValue(match.opponent.trimmed());
     q.addBindValue(nullIfEmpty(match.location));
@@ -205,6 +230,7 @@ bool MatchRepository::update(const Match &match, QString *error)
     q.addBindValue(nullIfNegative(match.scoreAgainst));
     q.addBindValue(nullIfEmpty(match.notes));
     q.addBindValue(match.venueId > 0 ? QVariant(match.venueId) : QVariant(QMetaType::fromType<int>()));
+    q.addBindValue(match.durationMin);
     q.addBindValue(match.id);
     if (!q.exec()) {
         setError(error, q.lastError().text());
@@ -284,7 +310,7 @@ bool MatchRepository::setPlayers(int matchId, const QList<MatchPlayer> &players,
     }
     if (match.status != QLatin1String("cancelled")) {
         QString dbError;
-        const QString conflict = slotConflict(matchId, match.startAt, QList<int>(seen.begin(), seen.end()), &dbError);
+        const QString conflict = slotConflict(matchId, match.startAt, match.durationMin, QList<int>(seen.begin(), seen.end()), &dbError);
         if (!conflict.isEmpty()) {
             setError(error, dbError.isEmpty() ? conflict : dbError);
             return false;

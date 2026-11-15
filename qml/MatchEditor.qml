@@ -64,8 +64,19 @@ Item {
         return n;
     }
 
+    // Fin du match (HH:mm) d'après le coup d'envoi et la durée ; vide si l'un des deux est illisible.
+    function endTime() {
+        var t = DateUtil.parseTime(timeField.text);
+        var d = parseInt(durationField.text, 10);
+        if (!DateUtil.isTime(t) || isNaN(d) || d <= 0)
+            return "";
+        var mins = (parseInt(t.substr(0, 2), 10) * 60 + parseInt(t.substr(3, 2), 10) + d) % (24 * 60);
+        var h = Math.floor(mins / 60), mm = mins % 60;
+        return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm;
+    }
+
     function formState() {
-        return JSON.stringify([dateField.text, timeField.text, opponent.text, location.text, place.value, status.value,
+        return JSON.stringify([dateField.text, timeField.text, durationField.text, opponent.text, location.text, place.value, status.value,
                                scoreFor.text, scoreAgainst.text, notes.text, roles, venueId]);
     }
 
@@ -114,6 +125,7 @@ Item {
         boardId = -1;
         dateField.text = DateUtil.display(day);
         timeField.text = "15:00";
+        durationField.text = String(backend.defaultMatchDuration(team));
         opponent.text = "";
         location.text = "";
         place.value = "home";
@@ -145,6 +157,7 @@ Item {
         boardId = r.boardId;
         dateField.text = DateUtil.display(m.date);
         timeField.text = m.time;
+        durationField.text = String(m.durationMin || backend.defaultMatchDuration(m.teamId));
         opponent.text = m.opponent;
         location.text = m.location;
         venueId = m.venueId > 0 ? m.venueId : -1;
@@ -181,12 +194,19 @@ Item {
         var time = DateUtil.parseTime(timeField.text);
         var sf = scoreFor.text.trim() === "" ? -1 : parseInt(scoreFor.text, 10);
         var sa = scoreAgainst.text.trim() === "" ? -1 : parseInt(scoreAgainst.text, 10);
+        var duration = parseInt(durationField.text, 10);
+        if (isNaN(duration) || String(duration) !== durationField.text.trim()) {
+            errorText = "La durée du match doit être un nombre de minutes.";
+            scroll.contentY = 0;
+            return false;
+        }
         if ((scoreFor.text.trim() !== "" && isNaN(sf)) || (scoreAgainst.text.trim() !== "" && isNaN(sa))) {
             errorText = "Le score doit être un nombre.";
             scroll.contentY = 0;
             return false;
         }
-        var r = backend.saveMatch({ id: matchId, teamId: teamId, date: day, time: time, opponent: opponent.text,
+        var r = backend.saveMatch({ id: matchId, teamId: teamId, date: day, time: time, durationMin: duration,
+                                    opponent: opponent.text,
                                     location: location.text, homeAway: place.value || "home",
                                     status: status.value || "planned", scoreFor: sf, scoreAgainst: sa,
                                     notes: notes.text, venueId: venueId });
@@ -229,6 +249,7 @@ Item {
             return;
         }
         sheetFileName = c.fileName;
+        sheetWarning = c.responsibleWarning || "";
         // La feuille est créée puis ouverte tout de suite ; l'enregistrement se fait depuis l'application qui s'ouvre.
         var url = backend.challengeSheetTempUrl(c.fileName);
         if (url === "") {
@@ -252,6 +273,11 @@ Item {
     property bool dryRun: false                 // tests : ne lance aucune application
     property bool dryRunOpens: true
     property string lastOpened: ""
+    property string sheetWarning: ""            // responsable ou licence manquants : affiché avec le message d'ouverture
+
+    function sheetToast(message) {
+        toast.show(sheetWarning !== "" ? sheetWarning + "\n" + message : message);
+    }
 
     function openSheet(url) {
         lastOpened = url;
@@ -259,12 +285,12 @@ Item {
         // est refusée par beaucoup d'appareils.
         var s = backend.shareFile(url, "application/pdf", "Feuille de challenge");
         if (s.ok) {
-            toast.show("Choisissez où envoyer ou enregistrer la feuille.");
+            sheetToast("Choisissez où envoyer ou enregistrer la feuille.");
             return;
         }
         var opened = dryRun ? dryRunOpens : Qt.openUrlExternally(url);
         if (opened) {
-            toast.show("Feuille ouverte. Enregistrez-la ou imprimez-la depuis l'application qui s'ouvre.");
+            sheetToast("Feuille ouverte. Enregistrez-la ou imprimez-la depuis l'application qui s'ouvre.");
         } else {
             // Aucune application n'a pu l'ouvrir : repli sur l'enregistrement dans un dossier au choix.
             toast.show("Impossible d'ouvrir la feuille ici : choisissez où l'enregistrer.");
@@ -543,6 +569,30 @@ Item {
                         if (DateUtil.isTime(t))
                             timeField.text = t;
                     }
+                }
+            }
+            // Schéma 14 : durée du match. Un joueur peut jouer un autre match qui commence après la fin de celui-ci.
+            Row {
+                width: parent.width
+                spacing: 12
+                FormField {
+                    id: durationField
+                    objectName: "durationField"
+                    width: (parent.width - 12) * 0.4
+                    label: "Durée (min)"
+                    required: true
+                    placeholder: "30"
+                    maxLength: 3
+                    inputHints: Qt.ImhDigitsOnly
+                }
+                Text {
+                    objectName: "matchEndText"
+                    width: (parent.width - 12) * 0.6
+                    height: durationField.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.endTime() !== "" ? "Fin du match : " + root.endTime() : ""
+                    font.pixelSize: 15
+                    color: Theme.textMuted
                 }
             }
             ChipRow {

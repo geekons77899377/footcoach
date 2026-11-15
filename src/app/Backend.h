@@ -11,6 +11,7 @@
 #include "core/TrainingSlotRepository.h"
 #include "core/TeamRepository.h"
 #include "core/VenueRepository.h"
+#include "core/EducatorRepository.h"
 
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -74,13 +75,21 @@ public:
     Q_INVOKABLE QVariantMap saveClub(const QVariantMap &club);
     // Supprime le club et, en cascade, ses équipes, joueurs, séances et matchs. Refusé pour le dernier club.
     Q_INVOKABLE QVariantMap deleteClub(int id);
-    // Équipes : [{id, clubId, name, category, season, playerCount}], triées comme dans la base ; clubId > 0 : celles de
-    // ce club seulement.
+    // Équipes : [{id, clubId, clubName, name, category, season, playerCount, educatorId (-1 : aucun), educatorName}],
+    // triées comme dans la base ; clubId > 0 : celles de ce club seulement.
     Q_INVOKABLE QVariantList teams(int clubId = -1);
     // Crée (id absent ou <= 0) ou modifie une équipe : {id, clubId (création : premier club si absent), name, category,
-    // season}. Le club d'une équipe existante ne change pas. Résultat {ok, id, error}.
+    // season, educatorId (facultatif ; <= 0 : aucun responsable)}. Le club d'une équipe existante ne change pas.
+    // Résultat {ok, id, error}.
     Q_INVOKABLE QVariantMap saveTeam(const QVariantMap &team);
     Q_INVOKABLE QVariantMap deleteTeam(int id);         // supprime aussi joueurs, séances et présences (cascade)
+    // Schéma 12 : éducateurs du club [{id, clubId, firstName, lastName, fullName (« NOM Prénom »), licence, teamCount}].
+    Q_INVOKABLE QVariantList educators(int clubId);
+    // Crée (id absent ou <= 0, clubId obligatoire) ou modifie un éducateur : {id, clubId, firstName, lastName, licence}.
+    // Licence facultative, unique dans le club. Résultat {ok, id, error}.
+    Q_INVOKABLE QVariantMap saveEducator(const QVariantMap &educator);
+    // Supprime l'éducateur ; les équipes dont il était responsable n'en ont plus. Résultat {ok, id, error}.
+    Q_INVOKABLE QVariantMap deleteEducator(int id);
     // Joueurs d'une équipe : [{id, teamId, firstName, lastName, fullName, birthDate (yyyy-MM-dd ou vide),
     // age (-1 si inconnu), jerseyNumber (0 = aucun), position, preferredFoot, phone, email, notes, active}].
     Q_INVOKABLE QVariantList players(int teamId, bool includeInactive);
@@ -158,8 +167,11 @@ public:
     Q_INVOKABLE QStringList matchDates(int teamId, const QString &from, const QString &to);
     // Un match avec ses convoqués : {ok, error, match: {...}, players: [{playerId, name, jerseyNumber, role}], boardId}.
     Q_INVOKABLE QVariantMap match(int id);
-    // Crée (id absent ou <= 0) ou modifie un match : {id, teamId, date, time (HH:mm), opponent, location, homeAway,
-    // status, scoreFor, scoreAgainst, notes}. Résultat {ok, id, error}.
+    // Schéma 14 : durée par défaut d'un nouveau match de l'équipe (minutes) : 30 pour les U10-U11, 90 sinon.
+    Q_INVOKABLE int defaultMatchDuration(int teamId);
+    // Crée (id absent ou <= 0) ou modifie un match : {id, teamId, date, time (HH:mm), durationMin, opponent, location,
+    // homeAway, status, scoreFor, scoreAgainst, notes}. durationMin absent : inchangé, ou durée par défaut à la création.
+    // Résultat {ok, id, error}.
     Q_INVOKABLE QVariantMap saveMatch(const QVariantMap &match);
     Q_INVOKABLE QVariantMap deleteMatch(int id);         // supprime aussi convocations et schéma tactique
     // Remplace les convoqués : entries [{playerId, role (starter|substitute)}]. Refus (rien n'est modifié) si un
@@ -205,6 +217,11 @@ public:
     Q_INVOKABLE QVariantMap saveExercise(const QVariantMap &exercise);   // id < 0 : création
     Q_INVOKABLE QVariantMap setExerciseArchived(int id, bool archived);
     Q_INVOKABLE QVariantMap deleteExercise(int id);      // refusé si l'exercice est dans un plan
+    // Schéma 13 : fiche exercice A4 paysage (PDF couleur). Nom de fichier proposé : « fiche-<titre>.pdf ».
+    Q_INVOKABLE QString exerciseSheetFileName(int exerciseId);
+    // Crée la fiche de l'exercice (avec son schéma de référence s'il en a un) à l'adresse donnée (fichier local ou
+    // content://). Résultat {ok, error, warning, bytes}.
+    Q_INVOKABLE QVariantMap exportExerciseSheet(int exerciseId, const QString &url);
 
     // --- Plan de séance -------------------------------------------------------------------------------
     // {ok, error, session: {...}, entries: [{itemId, position, start, end (HH:mm), durationMin, notes, exerciseId,
@@ -296,6 +313,7 @@ signals:
 private:
     QByteArray buildExport(int *schema = nullptr);
     QString shareAndroid(const QString &path, const QString &mime, const QString &title);
+    QVariantMap writeExportFile(const QString &url, const QByteArray &data);
     bool createBlockBoardFor(int itemId, int exerciseId, const QString &title, QString *error);
     bool parseDataFile(const QString &url, QJsonObject *root, QString *error) const;
     QVariantMap countsOfDatabase();
@@ -315,6 +333,7 @@ private:
     ExerciseRepository m_exercises;
     PlanRepository m_plan;
     VenueRepository m_venues;
+    EducatorRepository m_educators;
     QNetworkAccessManager *m_net = nullptr;     // créé au premier téléchargement des stades
     QNetworkReply *m_venueReply = nullptr;
     QString m_lastError;

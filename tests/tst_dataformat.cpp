@@ -22,7 +22,7 @@
 
 namespace {
 
-const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("venue"),
+const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("educator"),       QStringLiteral("venue"),
                              QStringLiteral("opponent_venue"), QStringLiteral("team"),
                              QStringLiteral("player"),         QStringLiteral("player_contact"),
                              QStringLiteral("training_slot"),  QStringLiteral("training_session"),
@@ -34,6 +34,8 @@ const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("v
 // Tables présentes dans un fichier du schéma donné (le schéma 6 a ajouté club, football_match et match_player).
 bool tableExistsInSchema(const QString &t, int schema)
 {
+    if (t == QLatin1String("educator"))                                                  // schéma 12
+        return schema >= 12;
     if (t == QLatin1String("venue") || t == QLatin1String("opponent_venue"))            // schéma 11
         return schema >= 11;
     if (t == QLatin1String("player_contact") || t == QLatin1String("training_slot"))   // schéma 10
@@ -184,6 +186,9 @@ bool buildDatabaseAtSchema(const QString &dbFile, const QString &conn, int schem
 
 class DataFormatTest : public QObject
 {
+    // Terrains des exercices fournis après le schéma 7 : 27 exemples U10-U11 (008) et « Le parcours des portes » (013).
+    static constexpr int kProvidedBoardsAfter7 = 27 + 1;
+
     Q_OBJECT
 
 private:
@@ -200,9 +205,24 @@ private:
         return readJson(p).value("tables").toObject();
     }
 
-    // Le club par défaut d'un ancien fichier est créé à l'import : son horodatage n'est pas comparable d'un import à l'autre.
+    // Le club par défaut d'un ancien fichier et les exercices fournis depuis sont créés à l'import : leur horodatage
+    // n'est pas comparable d'un import à l'autre.
     static QJsonObject stable(QJsonObject tables)
     {
+        for (const char *name : {"exercise", "exercise_category", "tactical_board"}) {
+            QJsonObject t = tables.value(QLatin1String(name)).toObject();
+            const QJsonArray cols = t.value("columns").toArray();
+            QJsonArray out;
+            for (const QJsonValue &r : t.value("rows").toArray()) {
+                QJsonArray row = r.toArray();
+                for (int i = 0; i < cols.size(); ++i)
+                    if (cols.at(i) == "created_at" || cols.at(i) == "updated_at")
+                        row[i] = QString();
+                out.append(row);
+            }
+            t["rows"] = out;
+            tables[QLatin1String(name)] = t;
+        }
         QJsonObject club = tables.value("club").toObject();
         QJsonArray rows;
         for (const QJsonValue &r : club.value("rows").toArray()) {
@@ -234,7 +254,14 @@ private:
             const QJsonArray frows = fileTables.value(t).toObject().value("rows").toArray();
             const QJsonArray dcols = dbTables.value(t).toObject().value("columns").toArray();
             const QJsonArray drows = dbTables.value(t).toObject().value("rows").toArray();
-            QCOMPARE(drows.size(), frows.size());
+            // Bibliothèque d'exercices : l'import ajoute les exercices fournis par les versions plus récentes que le
+            // fichier (évolution de l'application) ; les lignes du fichier restent en tête, identiques.
+            const bool library = t == QLatin1String("exercise") || t == QLatin1String("exercise_category")
+                                 || t == QLatin1String("tactical_board");
+            if (library)
+                QVERIFY2(drows.size() >= frows.size(), qPrintable(t));
+            else
+                QCOMPARE(drows.size(), frows.size());
             for (int r = 0; r < frows.size(); ++r)
                 for (int c = 0; c < fcols.size(); ++c) {
                     int dc = -1;
@@ -373,7 +400,7 @@ private slots:
         QCOMPARE(now.keys(), ref.keys());
         QCOMPARE(now.value("format"), ref.value("format"));
         QCOMPARE(now.value("version"), ref.value("version"));
-        QCOMPARE(now.value("schema").toInt(), 11);               // 011 : lieux de match (stades)
+        QCOMPARE(now.value("schema").toInt(), 14);               // 014 : durée des matchs
         for (const QString &t : kTables) {
             const QJsonArray cols = now.value("tables").toObject().value(t).toObject().value("columns").toArray();
             if (t == QLatin1String("exercise_category")) {      // table du schéma 9 : absente du fichier de référence (schéma 7)
@@ -398,6 +425,11 @@ private slots:
                                            "source", "source_id", "es_status", "unavailable", "is_home", "updated_at"}));
                 continue;
             }
+            if (t == QLatin1String("educator")) {               // table du schéma 12
+                QVERIFY(ref.value("tables").toObject().value(t).isUndefined());
+                QCOMPARE(cols, (QJsonArray{"id", "club_id", "first_name", "last_name", "licence", "created_at"}));
+                continue;
+            }
             if (t == QLatin1String("opponent_venue")) {
                 QVERIFY(ref.value("tables").toObject().value(t).isUndefined());
                 QCOMPARE(cols, (QJsonArray{"club_id", "opponent_key", "opponent", "venue_id"}));
@@ -414,6 +446,13 @@ private slots:
                 expected.append(QStringLiteral("department"));   // 011
             if (t == QLatin1String("football_match"))
                 expected.append(QStringLiteral("venue_id"));     // 011
+            if (t == QLatin1String("team"))
+                expected.append(QStringLiteral("educator_id"));  // 012
+            if (t == QLatin1String("football_match"))
+                expected.append(QStringLiteral("duration_min"));          // 014
+            if (t == QLatin1String("exercise"))
+                expected << QStringLiteral("instructions") << QStringLiteral("variations")      // 013
+                         << QStringLiteral("success_criteria") << QStringLiteral("coach_cue");
             QCOMPARE(cols, expected);
             // aucune colonne du schéma 4 n'a disparu, et les nouvelles viennent après
             const QJsonArray oldCols = old.value("tables").toObject().value(t).toObject().value("columns").toArray();
@@ -480,7 +519,9 @@ private slots:
         QCOMPARE(lastNames, (QStringList{QStringLiteral("Lefèvre"), QStringLiteral("O'Brien")}));
         QCOMPARE(b.plan(1).value("entries").toList().size(), 1);
         QVERIFY(b.attendanceSheet(1).value("ok").toBool());
-        QCOMPARE(b.boards().size(), 1);                          // la bibliothèque n'affiche pas les terrains de bloc
+        // La bibliothèque n'affiche pas les terrains de bloc ; elle reçoit les terrains des exercices fournis depuis :
+        // 27 exemples U10-U11 (008) et « Le parcours des portes » (013).
+        QCOMPARE(b.boards().size(), 1 + 27 + 1);
 
         // Colonne apparue (schéma 5 : session_exercise_id) : absente des fichiers 1 à 4 → NULL, présente dans le 5
         QSqlQuery qb(m_db.handle());
@@ -494,9 +535,17 @@ private slots:
         for (const QVariant &e : all)
             QVERIFY(!e.toMap().value("archived").toBool());
 
-        // Un fichier de schéma antérieur au 004 n'apporte pas les exercices de départ : ils ne sont pas recréés.
-        const int exercisesInFile = ref.value("tables").toObject().value("exercise").toObject().value("rows").toArray().size();
-        QCOMPARE(all.size(), exercisesInFile);
+        // Décision du 15/11/2026 : les exercices fournis par l'application après le schéma du fichier sont ajoutés
+        // (évolution de l'application). Résultat : l'exercice de l'utilisateur + toute la bibliothèque d'une base neuve.
+        int provided = 0;                                         // exercices fournis : un INSERT par exercice
+        for (const QString &st : Database::seedStatements())
+            provided += st.simplified().startsWith(QStringLiteral("INSERT INTO exercise("));
+        QVERIFY(provided >= 45);
+        QCOMPARE(all.size(), provided + 1);
+        int userExercises = 0;
+        for (const QVariant &e : all)
+            userExercises += e.toMap().value("title").toString() == QStringLiteral("Passes en triangle");
+        QVERIFY(userExercises <= 1);
 
         // Réexporter puis réimporter ne change rien (idempotence).
         const QJsonObject first = stable(snapshot(b));
@@ -517,10 +566,10 @@ private slots:
         QCOMPARE(planned.value("boardReadable").toBool(), schema < 5);
         QCOMPARE(b.saveBoard(made.value("boardId").toInt(), QStringLiteral("{\"version\":1,\"pitch\":\"full\",\"items\":[],\"arrows\":[]}")),
                  schema < 5);
-        QCOMPARE(b.boards().size(), 1);                                          // la bibliothèque ne montre pas les terrains de bloc
-        // 2 terrains au total : le schéma de référence du fichier et le terrain du bloc (créé ici, ou celui du fichier 5)
-        // (+ le schéma tactique du match dans le fichier 6)
-        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), schema >= 6 ? 3 : 2);
+        QCOMPARE(b.boards().size(), 1 + 27 + 1);                                 // la bibliothèque ne montre pas les terrains de bloc
+        // Terrains : le schéma de référence du fichier et le terrain du bloc (créé ici, ou celui du fichier 5)
+        // (+ le schéma tactique du match dans le fichier 6), plus les 28 terrains des exercices fournis depuis.
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), (schema >= 6 ? 3 : 2) + 28);
     }
 
     // ----- Migration 005 : base réelle au schéma 4 ouverte par le code courant -----
@@ -536,7 +585,7 @@ private slots:
         Database db;
         QString error;
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 11);
+        QCOMPARE(db.schemaVersion(), 14);
         QSqlQuery q(db.handle());
         auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
         QCOMPARE(count("SELECT COUNT(*) FROM team"), 2);
@@ -546,8 +595,9 @@ private slots:
         QCOMPARE(count("SELECT COUNT(*) FROM session_exercise"), 1);
         QCOMPARE(count("SELECT COUNT(*) FROM injury"), 1);
         QVERIFY(count("SELECT COUNT(*) FROM exercise") > 1);                     // exercices de départ de la 004 conservés
-        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 28);                // 1 schéma de l'utilisateur + 27 exemples U10-U11 (008)
-        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NULL"), 28);
+        // 1 schéma de l'utilisateur + 27 exemples U10-U11 (008) + « Le parcours des portes » (013)
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 29);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NULL"), 29);
         QVERIFY(q.exec(QStringLiteral("SELECT title, formation, scene_json, length(thumbnail), exercise_id, session_id FROM tactical_board WHERE session_id IS NOT NULL")) && q.next());
         QCOMPARE(q.value(0).toString(), QStringLiteral("Pressing haut"));
         QCOMPARE(q.value(1).toString(), QStringLiteral("4-3-3"));
@@ -565,22 +615,50 @@ private slots:
         QCOMPARE(count("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_board_session_exercise'"), 1);
         // Migration 009 : les 27 exemples sont dans la catégorie U10-U11 sans le préfixe ; les exercices existants n'en ont pas.
         QCOMPARE(count("SELECT COUNT(*) FROM exercise_category"), 1);
-        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE category_id IS NOT NULL"), 27);
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE category_id IS NOT NULL"), 28);              // + « Le parcours des portes » (013)
         QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE title LIKE 'U10-U11%'"), 0);
         QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE title LIKE 'U10-U11%'"), 0);
-        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE category_id IS NULL AND archived = 0"), count("SELECT COUNT(*) FROM exercise") - 27);
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE category_id IS NULL AND archived = 0"), count("SELECT COUNT(*) FROM exercise") - 28);
 
         // Rouvrir ne rejoue rien.
         db.close();
         QVERIFY2(db.open(file, &error), qPrintable(error));
-        QCOMPARE(db.schemaVersion(), 11);
+        QCOMPARE(db.schemaVersion(), 14);
         QSqlQuery q2(db.handle());
         QVERIFY(q2.exec(QStringLiteral("SELECT COUNT(*) FROM tactical_board")) && q2.next());
-        QCOMPARE(q2.value(0).toInt(), 28);
+        QCOMPARE(q2.value(0).toInt(), 29);
     }
 
     // Export puis import : les catégories et le lien exercice -> catégorie font l'aller-retour ; un fichier d'avant le schéma 9
     // s'importe sans catégorie.
+    // Schéma 12 : éducateurs du club et responsable de l'équipe font l'aller-retour export / import.
+    void educatorsRoundTripThroughExportAndImport()
+    {
+        Backend b(m_db.handle());
+        const int team = b.saveTeam({{"name", "U11"}}).value("id").toInt();
+        const int club = b.clubOfTeam(team);
+        const int karim = b.saveEducator({{"clubId", club}, {"firstName", "Karim"}, {"lastName", "Benali"},
+                                          {"licence", "2318073452"}}).value("id").toInt();
+        QVERIFY(karim > 0);
+        QVERIFY(b.saveTeam({{"id", team}, {"name", "U11"}, {"educatorId", karim}}).value("ok").toBool());
+        const QString out = m_dir.filePath(QStringLiteral("edu.footcoach"));
+        QVERIFY(b.exportDataFile(out).value("ok").toBool());
+        QCOMPARE(readJson(out).value("schema").toInt(), 14);
+
+        QVERIFY(b.deleteEducator(karim).value("ok").toBool());
+        const QVariantMap r = b.importDataFile(url(out));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        const QVariantList eds = b.educators(club);
+        QCOMPARE(eds.size(), 1);
+        QCOMPARE(eds.at(0).toMap().value("licence").toString(), QStringLiteral("2318073452"));
+        QVariantMap t;
+        for (const QVariant &v : b.teams(club))
+            if (v.toMap().value("id").toInt() == team)
+                t = v.toMap();
+        QCOMPARE(t.value("educatorId").toInt(), karim);
+        QCOMPARE(t.value("educatorName").toString(), QStringLiteral("BENALI Karim"));
+    }
+
     void categoriesRoundTripThroughExportAndImport()
     {
         Backend b(m_db.handle());
@@ -589,7 +667,7 @@ private slots:
         QVERIFY(b.saveExercise({{"title", "Passe longue"}, {"category", "technical"}, {"categoryId", cat}}).value("ok").toBool());
         const QString out = m_dir.filePath(QStringLiteral("cat.footcoach"));
         QVERIFY(b.exportDataFile(out).value("ok").toBool());
-        QCOMPARE(readJson(out).value("schema").toInt(), 11);
+        QCOMPARE(readJson(out).value("schema").toInt(), 14);
 
         // Autre base : l'import remplace tout et rétablit catégories et liens.
         QVERIFY(b.deleteCategory(cat).value("ok").toBool());
@@ -605,11 +683,21 @@ private slots:
                 linked = v.toMap().value("categoryName").toString() == QStringLiteral("U12-U13");
         QVERIFY(linked);
 
-        // Fichier du schéma 7 (sans table exercise_category) : aucune catégorie, exercices conservés.
+        // Fichier du schéma 7 (sans table exercise_category) : ses exercices restent sans catégorie ; les exercices
+        // fournis depuis (008, 013) sont ajoutés dans la catégorie U10-U11 créée par la 009.
         QVERIFY(b.importDataFile(url(fixturePath(7))).value("ok").toBool());
-        QCOMPARE(b.categories().size(), 0);
-        for (const QVariant &v : b.exercises(true))
-            QCOMPARE(v.toMap().value("categoryId").toInt(), 0);
+        QCOMPARE(b.categories().size(), 1);
+        QCOMPARE(b.categories().at(0).toMap().value("name").toString(), QStringLiteral("U10-U11"));
+        const QJsonArray fileExercises = readJson(fixturePath(7)).value("tables").toObject().value("exercise").toObject().value("rows").toArray();
+        int withoutCategory = 0, inU10 = 0;
+        for (const QVariant &v : b.exercises(true)) {
+            if (v.toMap().value("categoryId").toInt() == 0)
+                ++withoutCategory;
+            else
+                ++inU10;
+        }
+        QCOMPARE(withoutCategory, fileExercises.size());
+        QCOMPARE(inU10, 27 + 1);
     }
 
     // Cascade réelle après import du fichier de référence du schéma 5 : bloc → terrain, séance → blocs → terrains.
@@ -619,12 +707,12 @@ private slots:
         QVERIFY(b.importDataFile(url(fixturePath(5))).value("ok").toBool());
         QSqlQuery q(m_db.handle());
         auto count = [&](const QString &sql) { return q.exec(sql) && q.next() ? q.value(0).toInt() : -1; };
-        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 2);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board"), 2 + kProvidedBoardsAfter7);
         QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NOT NULL"), 1);
         QVERIFY(q.exec(QStringLiteral("DELETE FROM training_session WHERE id = 1")));
         QCOMPARE(count("SELECT COUNT(*) FROM session_exercise"), 0);
         QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE session_exercise_id IS NOT NULL"), 0);
-        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE exercise_id IS NOT NULL OR title = 'Pressing haut'"), 1);   // la référence reste
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board WHERE exercise_id IS NOT NULL OR title = 'Pressing haut'"), 1 + kProvidedBoardsAfter7);   // les références restent
     }
 
     // Un fichier du schéma 5 est refusé par une application qui n'en connaît que 4 : la règle est « schema > schéma courant ».
@@ -632,7 +720,7 @@ private slots:
     {
         Backend b(m_db.handle());
         QJsonObject root = readJson(fixturePath(7));
-        root["schema"] = 12;
+        root["schema"] = 15;
         const QVariantMap r = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r.value("ok").toBool());
         QVERIFY2(r.value("error").toString().contains(QStringLiteral("plus récente")), qPrintable(r.value("error").toString()));
@@ -641,6 +729,96 @@ private slots:
         const QVariantMap r2 = b.importDataFile(url(tmpFile(root)));
         QVERIFY(!r2.value("ok").toBool());
         QVERIFY(r2.value("error").toString().contains(QStringLiteral("Version de fichier")));
+    }
+
+    // Import d'un fichier plus ancien : les exercices apparus depuis dans l'application sont ajoutés, une seule fois,
+    // avec leur terrain ; un exercice de même titre déjà présent dans le fichier n'est pas doublé.
+    void importAddsTheExercisesProvidedSinceTheFile()
+    {
+        Backend b(m_db.handle());
+        auto count = [&](const QString &sql) {
+            QSqlQuery q(m_db.handle());
+            return q.exec(sql) && q.next() ? q.value(0).toInt() : -1;
+        };
+        QVariantMap r = b.importDataFile(url(fixturePath(7)));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE title = 'Le parcours des portes'"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board t JOIN exercise e ON e.id = t.exercise_id "
+                       "WHERE e.title = 'Le parcours des portes'"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11')"), 28);
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE title LIKE 'U10-U11%'"), 0);     // 009 rejouée aussi
+        QCOMPARE(count("SELECT COUNT(*) FROM club"), 1);                                     // données de départ hors bibliothèque : jamais rejouées
+
+        // Fichier du schéma 12 qui contient déjà un exercice de ce titre : pas de doublon, pas de second terrain.
+        QJsonObject root = readJson(fixturePath(7));
+        QVERIFY(b.exportDataFile(m_dir.filePath("cur.footcoach")).value("ok").toBool());
+        root = readJson(m_dir.filePath("cur.footcoach"));
+        root["schema"] = 12;
+        QJsonObject tables = root["tables"].toObject();
+        QJsonObject ex = tables["exercise"].toObject();
+        const QJsonArray cols = ex["columns"].toArray();
+        QJsonArray keptCols;
+        QList<int> keep;
+        for (int i = 0; i < cols.size(); ++i) {
+            const QString c = cols.at(i).toString();
+            if (c != "instructions" && c != "variations" && c != "success_criteria" && c != "coach_cue") {
+                keptCols.append(c);
+                keep << i;
+            }
+        }
+        QJsonArray rows;
+        for (const QJsonValue &v : ex["rows"].toArray()) {
+            QJsonArray row;
+            for (int i : keep)
+                row.append(v.toArray().at(i));
+            rows.append(row);
+        }
+        ex["columns"] = keptCols;
+        ex["rows"] = rows;
+        tables["exercise"] = ex;
+        root["tables"] = tables;
+        r = b.importDataFile(url(tmpFile(root)));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise WHERE title = 'Le parcours des portes'"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM tactical_board t JOIN exercise e ON e.id = t.exercise_id "
+                       "WHERE e.title = 'Le parcours des portes'"), 1);
+        QCOMPARE(count("SELECT COUNT(*) FROM pragma_foreign_key_check"), 0);
+
+        // Fichier du schéma actuel : rien n'est ajouté.
+        const int before = count("SELECT COUNT(*) FROM exercise");
+        QVERIFY(b.exportDataFile(m_dir.filePath("cur2.footcoach")).value("ok").toBool());
+        QVERIFY(b.importDataFile(url(m_dir.filePath("cur2.footcoach"))).value("ok").toBool());
+        QCOMPARE(count("SELECT COUNT(*) FROM exercise"), before);
+    }
+
+    // Schéma 14 : les matchs d'un fichier plus ancien reçoivent la durée par défaut de la catégorie de leur équipe.
+    void importGivesOldMatchesTheDefaultDuration()
+    {
+        QJsonObject root = readJson(fixturePath(7));
+        QJsonObject tables = root["tables"].toObject();
+        QVERIFY(!tables["football_match"].toObject()["rows"].toArray().isEmpty());
+        // L'équipe du fichier passe en U10U11 : ses matchs doivent recevoir 30 min.
+        QJsonObject team = tables["team"].toObject();
+        const QJsonArray cols = team["columns"].toArray();
+        const int cat = cols.toVariantList().indexOf(QStringLiteral("category"));
+        QVERIFY(cat >= 0);
+        QJsonArray rows;
+        for (const QJsonValue &v : team["rows"].toArray()) {
+            QJsonArray r = v.toArray();
+            r[cat] = QStringLiteral("U10U11");
+            rows.append(r);
+        }
+        team["rows"] = rows;
+        tables["team"] = team;
+        root["tables"] = tables;
+        Backend b(m_db.handle());
+        const QVariantMap r = b.importDataFile(url(tmpFile(root)));
+        QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
+        QSqlQuery q(m_db.handle());
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*), MIN(duration_min), MAX(duration_min) FROM football_match")) && q.next());
+        QVERIFY(q.value(0).toInt() > 0);
+        QCOMPARE(q.value(1).toInt(), 30);
+        QCOMPARE(q.value(2).toInt(), 30);
     }
 
     void referenceFileContainsTheSeedExercisesOnlyFromSchema4()
@@ -657,7 +835,7 @@ private slots:
     {
         QTest::addColumn<QByteArray>("mutation");
         QTest::addColumn<QString>("messagePart");
-        QTest::newRow("schema plus récent") << QByteArray("schema=12") << QString("plus récente");
+        QTest::newRow("schema plus récent") << QByteArray("schema=15") << QString("plus récente");
         QTest::newRow("schema très grand") << QByteArray("schema=999") << QString("plus récente");
         QTest::newRow("schema absent") << QByteArray("schema=remove") << QString("");
         QTest::newRow("schema nul") << QByteArray("schema=0") << QString("");
@@ -844,7 +1022,7 @@ private slots:
         QJsonObject root = withExtraBoard(readJson(fixturePath(4)), 0, {{"title", QJsonValue(QStringLiteral("Second schéma"))}});
         const QVariantMap r = b.importDataFile(url(tmpFile(root)));
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
-        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2 + kProvidedBoardsAfter7);
     }
 
     void validBoardLinksAreAccepted()
@@ -852,7 +1030,7 @@ private slots:
         Backend b(m_db.handle());
         const QVariantMap r = b.importDataFile(url(fixturePath(5)));
         QVERIFY2(r.value("ok").toBool(), qPrintable(r.value("error").toString()));
-        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2);
+        QCOMPARE(snapshot(b).value("tactical_board").toObject().value("rows").toArray().size(), 2 + kProvidedBoardsAfter7);
     }
 
     // Un import refusé ne doit pas faire tourner les trois sauvegardes ; un import réussi garde les trois plus récentes.
@@ -1007,7 +1185,8 @@ private slots:
         root["tables"] = tables;
         QVERIFY(b.importDataFile(url(tmpFile(root))).value("ok").toBool());
         QCOMPARE(b.teams().size(), 0);
-        QCOMPARE(b.exercises(true).size(), 0);
+        // Seuls restent les exercices fournis après le schéma 4 du fichier (008, 013) : ceux du 004 ne sont pas recréés.
+        QCOMPARE(b.exercises(true).size(), 27 + 1);
     }
 
     // Une sauvegarde automatique est créée avant un remplacement, et elle est elle-même un fichier valide.

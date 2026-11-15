@@ -95,6 +95,7 @@ def test_popup(name, cls, call, which=0):
     kb(False); QMetaObject.invokeMethod(p,"close"); h.spin(300)
 sec("squad")
 test_popup("Équipe (nouvelle)","TeamDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",None),Q_ARG("QVariant",-1)))
+test_popup("Éducateurs du club","EducatorsDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",1),Q_ARG("QVariant","Mon club")))
 test_popup("Import de joueurs","PlayersImportDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",1)))
 sec("sessions")
 test_popup("Plan : durée et notes d'un exercice","PlanItemDialog",lambda p: QMetaObject.invokeMethod(p,"openFor",Q_ARG("QVariant",{"itemId":1,"title":"Rondo","durationMin":15,"notes":""})))

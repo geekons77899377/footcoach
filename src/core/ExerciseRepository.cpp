@@ -34,6 +34,10 @@ void bindExercise(QSqlQuery &q, const Exercise &e)
     q.addBindValue(nullIfEmpty(e.description));
     q.addBindValue(e.archived ? 1 : 0);
     q.addBindValue(nullIfNotPositive(e.categoryId));
+    q.addBindValue(nullIfEmpty(e.instructions));
+    q.addBindValue(nullIfEmpty(e.variations));
+    q.addBindValue(nullIfEmpty(e.successCriteria));
+    q.addBindValue(nullIfEmpty(e.coachCue));
 }
 
 } // namespace
@@ -43,7 +47,8 @@ QList<Exercise> ExerciseRepository::list(bool includeArchived, QString *error) c
     QList<Exercise> result;
     QString sql = QStringLiteral(
         "SELECT e.id, e.title, e.category, e.objective, e.duration_min, e.players_min, e.players_max, e.equipment, "
-        "e.description, e.archived, e.category_id, c.name FROM exercise e "
+        "e.description, e.archived, e.category_id, c.name, e.instructions, e.variations, e.success_criteria, "
+        "e.coach_cue FROM exercise e "
         "LEFT JOIN exercise_category c ON c.id = e.category_id");
     if (!includeArchived)
         sql += QStringLiteral(" WHERE e.archived = 0");
@@ -68,6 +73,10 @@ QList<Exercise> ExerciseRepository::list(bool includeArchived, QString *error) c
         e.archived = q.value(9).toInt() != 0;
         e.categoryId = q.value(10).isNull() ? 0 : q.value(10).toInt();
         e.categoryName = q.value(11).toString();
+        e.instructions = q.value(12).toString();
+        e.variations = q.value(13).toString();
+        e.successCriteria = q.value(14).toString();
+        e.coachCue = q.value(15).toString();
         result.append(e);
     }
     return result;
@@ -78,7 +87,8 @@ bool ExerciseRepository::insert(Exercise &exercise, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "INSERT INTO exercise(title, category, objective, duration_min, players_min, players_max, "
-        "equipment, description, archived, category_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "equipment, description, archived, category_id, instructions, variations, success_criteria, coach_cue) "
+        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     bindExercise(q, exercise);
     if (!q.exec()) {
         setError(error, q.lastError().text());
@@ -93,7 +103,8 @@ bool ExerciseRepository::update(const Exercise &exercise, QString *error)
     QSqlQuery q(m_db);
     q.prepare(QStringLiteral(
         "UPDATE exercise SET title = ?, category = ?, objective = ?, duration_min = ?, players_min = ?, "
-        "players_max = ?, equipment = ?, description = ?, archived = ?, category_id = ? WHERE id = ?"));
+        "players_max = ?, equipment = ?, description = ?, archived = ?, category_id = ?, instructions = ?, "
+        "variations = ?, success_criteria = ?, coach_cue = ? WHERE id = ?"));
     bindExercise(q, exercise);
     q.addBindValue(exercise.id);
     if (!q.exec()) {

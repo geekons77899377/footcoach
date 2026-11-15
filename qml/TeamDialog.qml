@@ -2,13 +2,15 @@ import QtQuick
 import QtQuick.Controls
 import "DateUtil.js" as DateUtil
 
-// Création ou modification d'une équipe (nom, catégorie, saison).
+// Création ou modification d'une équipe (nom, catégorie, saison, éducateur responsable).
 Popup {
     id: root
 
     property int teamId: -1
     property int clubId: -1                // club de la nouvelle équipe (celui d'une équipe existante ne change pas)
     property var clubs: []
+    property var educators: []             // éducateurs du club de l'équipe (schéma 12)
+    property int educatorId: -1            // responsable choisi, -1 : aucun
     property string errorText: ""
     signal saved(int id)
 
@@ -20,8 +22,24 @@ Popup {
         categoryField.text = team ? team.category : "";
         // Nouvelle équipe : la saison en cours est proposée d'office (modifiable).
         seasonField.text = team ? team.season : DateUtil.seasonOf(DateUtil.todayIso());
+        educatorId = team && team.educatorId !== undefined ? team.educatorId : -1;
+        reloadEducators();
         errorText = "";
         open();
+    }
+    function reloadEducators() {
+        educators = clubId > 0 ? backend.educators(clubId) : [];
+        var found = false;
+        for (var i = 0; i < educators.length; ++i)
+            found = found || educators[i].id === educatorId;
+        if (!found)
+            educatorId = -1;               // supprimé entre-temps, ou autre club
+    }
+    function clubNameOf(id) {
+        for (var i = 0; i < clubs.length; ++i)
+            if (clubs[i].id === id)
+                return clubs[i].name;
+        return "";
     }
 
     parent: Overlay.overlay
@@ -66,7 +84,10 @@ Popup {
                     o.push({ id: String(root.clubs[i].id), text: root.clubs[i].name });
                 return o;
             }
-            onPicked: (id) => root.clubId = parseInt(id, 10)
+            onPicked: (id) => {
+                root.clubId = parseInt(id, 10);
+                root.reloadEducators();
+            }
             Binding { target: clubChips; property: "value"; value: String(root.clubId) }
         }
         FormField { id: categoryField; width: parent.width; label: "Catégorie"; placeholder: "Ex. U15, Seniors" }
@@ -79,6 +100,28 @@ Popup {
             onPicked: (id) => seasonField.text = id
             // Binding (et non « value: … ») : ChipRow écrit lui-même dans value au toucher, ce qui casserait une liaison simple.
             Binding { target: seasonChips; property: "value"; value: seasonField.text }
+        }
+        // Éducateur responsable : imprimé dans « Nom Responsable » de la feuille de challenge.
+        ChipRow {
+            id: educatorChips
+            objectName: "educatorChips"
+            visible: root.educators.length > 0
+            width: parent.width
+            label: "Éducateur responsable"
+            options: {
+                var o = [];
+                for (var i = 0; i < root.educators.length; ++i)
+                    o.push({ id: String(root.educators[i].id), text: root.educators[i].fullName });
+                return o;
+            }
+            onPicked: (id) => root.educatorId = id === "" ? -1 : parseInt(id, 10)
+            Binding { target: educatorChips; property: "value"; value: root.educatorId > 0 ? String(root.educatorId) : "" }
+        }
+        AppButton {
+            objectName: "manageEducators"
+            kind: "outline"
+            text: root.educators.length > 0 ? "Gérer les éducateurs du club" : "Ajouter un éducateur responsable"
+            onClicked: educatorsDialog.openFor(root.clubId, root.clubNameOf(root.clubId))
         }
         Text {
             visible: root.errorText !== ""
@@ -97,7 +140,8 @@ Popup {
                 text: "Enregistrer"
                 onClicked: {
                     var r = backend.saveTeam({ id: root.teamId, clubId: root.clubId, name: nameField.text,
-                                               category: categoryField.text, season: seasonField.text });
+                                               category: categoryField.text, season: seasonField.text,
+                                               educatorId: root.educatorId });
                     if (r.ok) {
                         root.close();
                         root.saved(r.id);
@@ -108,5 +152,10 @@ Popup {
             }
             AppButton { kind: "ghost"; text: "Annuler"; onClicked: root.close() }
         }
+    }
+
+    EducatorsDialog {
+        id: educatorsDialog
+        onChanged: root.reloadEducators()
     }
 }

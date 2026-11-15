@@ -53,19 +53,19 @@ void fitText(QPainter &p, const QRect &r, const QString &s, Qt::Alignment align,
     text(p, r, s, align, font(pt, bold), padding);
 }
 
-void block(QPainter &p, int x, int y, int number, const QString &teamName, const QList<ChallengeEntry> &entries)
+void block(QPainter &p, int x, int y, int number, const ChallengeHeader &header, const QList<ChallengeEntry> &entries)
 {
     const QPen thick(Qt::black, 4);
     const QPen thin(Qt::black, 2);
 
-    // « ÉQUIPE n : » et cadre du nom de l'équipe.
+    // « ÉQUIPE n : » et cadre du nom du club.
     const QRect label(x, y, 250, kNameRowH);
     text(p, label, QStringLiteral("ÉQUIPE %1 :").arg(number), Qt::AlignLeft, font(11, true), 0);
     const QRect nameBox(x + 260, y, kBlockW - 260, kNameRowH);
     p.setPen(thick);
     p.drawRect(nameBox);
-    if (!teamName.isEmpty())
-        text(p, nameBox, teamName, Qt::AlignLeft, font(12, true));
+    if (!header.clubName.isEmpty())
+        fitText(p, nameBox, header.clubName, Qt::AlignLeft, 12, true, 12);
 
     // Tableau : en-tête puis kRows lignes.
     const int top = y + kNameRowH + 25;
@@ -108,14 +108,18 @@ void block(QPainter &p, int x, int y, int number, const QString &teamName, const
     p.drawRect(x, top, kBlockW, tableH);
     p.drawLine(x, top + kHeaderH, x + kBlockW, top + kHeaderH);
 
-    // Responsable : à remplir à la main.
+    // Responsable : éducateur responsable de l'équipe (cases vides s'il n'y en a pas).
     const int ry = top + tableH + 25;
     text(p, QRect(x, ry, 330, 60), QStringLiteral("Nom Responsable"), Qt::AlignLeft, font(9), 0);
+    const QRect respBox(x + 340, ry, 350, 60);
     p.setPen(thick);
-    p.drawRect(x + 340, ry, 350, 60);
+    p.drawRect(respBox);
+    fitText(p, respBox, header.responsibleName, Qt::AlignLeft, 10, true, 10);
     text(p, QRect(x + 720, ry, 220, 60), QStringLiteral("N° de licence"), Qt::AlignLeft, font(9), 0);
+    const QRect licBox(x + 950, ry, kBlockW - 950, 60);
     p.setPen(thick);
-    p.drawRect(x + 950, ry, kBlockW - 950, 60);
+    p.drawRect(licBox);
+    fitText(p, licBox, header.responsibleLicence, Qt::AlignHCenter, 10, false, 10);
 }
 
 } // namespace
@@ -133,7 +137,8 @@ bool ChallengeSheet::isValidLicence(const QString &licence)
     return digits.size() == kLicenceDigits;
 }
 
-bool ChallengeSheet::writePdf(QIODevice *out, const QString &teamName, const QList<ChallengeEntry> &entries, QString *error)
+bool ChallengeSheet::writePdf(QIODevice *out, const ChallengeHeader &header, const QList<ChallengeEntry> &entries,
+                              QString *error)
 {
     if (!out || !out->isOpen() || !out->isWritable()) {
         if (error)
@@ -145,7 +150,7 @@ bool ChallengeSheet::writePdf(QIODevice *out, const QString &teamName, const QLi
     pdf.setPageOrientation(QPageLayout::Landscape);
     pdf.setPageMargins(QMarginsF(0, 0, 0, 0));
     pdf.setResolution(254);
-    pdf.setTitle(QStringLiteral("Feuille de challenge 2/2 - %1").arg(teamName));
+    pdf.setTitle(QStringLiteral("Feuille de challenge 2/2 - %1").arg(header.teamName));
     pdf.setCreator(QStringLiteral("FootCoach"));
 
     QPainter p(&pdf);
@@ -164,10 +169,10 @@ bool ChallengeSheet::writePdf(QIODevice *out, const QString &teamName, const QLi
     const QList<ChallengeEntry> shown = entries.mid(0, kRows);
     const int x0 = kMargin;
     const int x1 = kMargin + kBlockW + kBlockGap;
-    block(p, x0, kTopOfBlocks, 1, teamName, shown);
-    block(p, x1, kTopOfBlocks, 2, QString(), {});
-    block(p, x0, kTopOfBlocks + kBlockH + kRowGap, 3, QString(), {});
-    block(p, x1, kTopOfBlocks + kBlockH + kRowGap, 4, QString(), {});
+    block(p, x0, kTopOfBlocks, 1, header, shown);
+    block(p, x1, kTopOfBlocks, 2, {}, {});
+    block(p, x0, kTopOfBlocks + kBlockH + kRowGap, 3, {}, {});
+    block(p, x1, kTopOfBlocks + kBlockH + kRowGap, 4, {}, {});
 
     // Séparations en croix, comme la feuille papier.
     p.setPen(QPen(Qt::black, 2));

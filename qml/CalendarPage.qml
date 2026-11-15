@@ -291,7 +291,8 @@ Item {
                         font.pixelSize: 12
                         color: Theme.textMuted
                         text: (page.scope !== "day" ? DateUtil.longLabel(mcard.modelData.date) + " · " : "")
-                              + mcard.modelData.time + " · " + (mcard.modelData.homeAway === "home" ? "Domicile" : "Extérieur")
+                              + mcard.modelData.time + (mcard.modelData.endTime ? " – " + mcard.modelData.endTime : "")
+                              + " · " + (mcard.modelData.homeAway === "home" ? "Domicile" : "Extérieur")
                     }
                     Text {
                         text: mcard.st.label.toUpperCase()

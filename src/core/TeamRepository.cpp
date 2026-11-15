@@ -23,7 +23,7 @@ QList<Team> TeamRepository::all(QString *error, int clubId) const
 {
     QList<Team> teams;
     QSqlQuery q(m_db);
-    q.prepare(QStringLiteral("SELECT id, name, category, season, club_id FROM team %1 ORDER BY name COLLATE NOCASE")
+    q.prepare(QStringLiteral("SELECT id, name, category, season, club_id, educator_id FROM team %1 ORDER BY name COLLATE NOCASE")
                   .arg(clubId > 0 ? QStringLiteral("WHERE club_id = ?") : QString()));
     if (clubId > 0)
         q.addBindValue(clubId);
@@ -38,6 +38,7 @@ QList<Team> TeamRepository::all(QString *error, int clubId) const
         t.category = q.value(2).toString();
         t.season = q.value(3).toString();
         t.clubId = q.value(4).isNull() ? -1 : q.value(4).toInt();
+        t.educatorId = q.value(5).isNull() ? -1 : q.value(5).toInt();
         teams.append(t);
     }
     return teams;

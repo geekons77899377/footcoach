@@ -88,6 +88,19 @@ check(m["opponent"] == "FC Rivière" and m["date"] == D(5) and m["time"] == "15:
       f"valeurs enregistrées ({m['opponent']}, {m['date']}, {m['time']}, {m['homeAway']})")
 check(sorted(b.last_convoked) == [(1, "starter"), (2, "substitute")], f"convoqués envoyés au backend ({b.last_convoked})")
 check(ed.property("dirty") is False, "après enregistrement : plus de modification en attente")
+check(m.get("durationMin") == 90, f"durée par défaut envoyée avec le match ({m.get('durationMin')})")
+
+# 1b'. durée (schéma 14) : fin affichée, durée enregistrée, durée illisible refusée
+field(h, "durationField").setProperty("text", "30"); h.spin(100)
+check(named(h, "matchEndText").property("text") == "Fin du match : 15:30", f"fin du match affichée ({named(h, 'matchEndText').property('text')})")
+call(ed, "save"); h.spin(200)
+check(b._matches[ed.property("matchId")]["durationMin"] == 30, "durée de 30 min enregistrée")
+n0 = b.match_saves
+field(h, "durationField").setProperty("text", "trente"); h.spin(100)
+call(ed, "save"); h.spin(100)
+check(b.match_saves == n0 and "durée" in ed.property("errorText"), f"durée illisible : refusée ({ed.property('errorText')})")
+field(h, "durationField").setProperty("text", "30"); h.spin(100)
+call(ed, "save"); h.spin(100)
 
 # 1c. score incomplet refusé par le backend, le match n'est pas modifié
 field(h, "scoreFor").setProperty("text", "2"); h.spin(100)

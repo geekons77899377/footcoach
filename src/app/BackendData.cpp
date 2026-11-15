@@ -1,5 +1,6 @@
 // Export et import de toutes les données (fichier « .footcoach ») de Backend (voir Backend.h).
 #include "Backend.h"
+#include "core/MatchRepository.h"
 #include "core/Database.h"
 
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
@@ -31,7 +33,7 @@ constexpr qint64 kMaxBytes = 64LL * 1024 * 1024;
 constexpr int kMaxRows = 500000;
 
 // Ordre d'insertion (parents avant enfants) ; la suppression se fait dans l'ordre inverse.
-const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("venue"),
+const QStringList kTables = {QStringLiteral("club"),           QStringLiteral("educator"),       QStringLiteral("venue"),
                              QStringLiteral("opponent_venue"), QStringLiteral("team"),
                              QStringLiteral("player"),         QStringLiteral("player_contact"),
                              QStringLiteral("training_slot"),  QStringLiteral("training_session"),
@@ -49,6 +51,8 @@ bool isSchema6Table(const QString &t)
 // Schéma de la première version qui contient la table (fichiers plus anciens : table absente, normal).
 int tableSince(const QString &t)
 {
+    if (t == QLatin1String("educator"))
+        return 12;
     if (t == QLatin1String("venue") || t == QLatin1String("opponent_venue"))
         return 11;
     if (t == QLatin1String("player_contact") || t == QLatin1String("training_slot"))
@@ -492,6 +496,74 @@ QVariantMap Backend::importDataFile(const QString &url)
             "WHERE NULLIF(trim(phone), '') IS NOT NULL OR NULLIF(trim(email), '') IS NOT NULL"));
         if (!ok)
             failure = c.lastError().text();
+    }
+
+    // Exercices fournis par une version plus récente de FootCoach que le fichier (ex. « Le parcours des portes »,
+    // schéma 13) : c'est une évolution de l'application, ils sont ajoutés à la bibliothèque importée, comme le fait la
+    // migration. Seules les données de la bibliothèque sont rejouées (exercices, catégories, leurs terrains) ; un
+    // exercice dont le titre existe déjà dans le fichier n'est pas ajouté une deuxième fois (ni son terrain).
+    const int fileSchema = root.value(QStringLiteral("schema")).toInt(-1);
+    if (ok && fileSchema < schemaOf(m_db)) {
+        QString seedError;
+        const QStringList seeds = Database::seedStatementsAfter(fileSchema, &seedError);
+        static const QRegularExpression titleRe(QStringLiteral("^INSERT\\s+INTO\\s+exercise\\s*\\([^)]*\\)\\s*VALUES\\s*\\(\\s*'((?:[^']|'')*)'"),
+                                                QRegularExpression::CaseInsensitiveOption);
+        const auto startsWith = [](const QString &st, const char *prefix) {
+            return st.simplified().startsWith(QLatin1String(prefix), Qt::CaseInsensitive);
+        };
+        bool skipBoard = false;
+        QSqlQuery c(m_db);
+        // Numérotation reprise juste après les lignes du fichier : réimporter le même fichier redonne les mêmes id.
+        for (const char *t : {"exercise", "exercise_category", "tactical_board"})
+            c.exec(QStringLiteral("UPDATE sqlite_sequence SET seq = (SELECT IFNULL(MAX(id), 0) FROM %1) WHERE name = '%1'")
+                       .arg(QLatin1String(t)));
+        for (const QString &raw : seeds) {
+            QString st = raw.trimmed();
+            const bool isExercise = startsWith(st, "INSERT INTO exercise(") || startsWith(st, "INSERT INTO exercise (");
+            const bool isBoard = startsWith(st, "INSERT INTO tactical_board");
+            const bool isCategory = startsWith(st, "INSERT INTO exercise_category") || startsWith(st, "INSERT OR IGNORE INTO exercise_category");
+            const bool isLibraryUpdate = startsWith(st, "UPDATE exercise ") || startsWith(st, "UPDATE tactical_board ");
+            if (!isExercise && !isBoard && !isCategory && !isLibraryUpdate)
+                continue;                                     // clubs et autres données de départ : jamais rejoués
+            if (isBoard && skipBoard) {
+                skipBoard = false;
+                continue;
+            }
+            skipBoard = false;
+            if (isExercise) {
+                const QRegularExpressionMatch m = titleRe.match(st);
+                if (m.hasMatch()) {
+                    const QString title = m.captured(1).replace(QStringLiteral("''"), QStringLiteral("'"));
+                    c.prepare(QStringLiteral("SELECT COUNT(*) FROM exercise WHERE lower(title) = lower(?)"));
+                    c.addBindValue(title);
+                    if (c.exec() && c.next() && c.value(0).toInt() > 0) {
+                        skipBoard = true;                     // déjà dans le fichier : ni l'exercice ni son terrain
+                        continue;
+                    }
+                }
+            }
+            if (isCategory && !startsWith(st, "INSERT OR IGNORE"))
+                st.replace(0, QStringLiteral("INSERT").size(), QStringLiteral("INSERT OR IGNORE"));
+            if (!c.exec(st)) {
+                ok = false;
+                failure = tr("exercices de l'application : %1").arg(c.lastError().text());
+                break;
+            }
+        }
+        if (ok && seeds.isEmpty() && !seedError.isEmpty()) {
+            ok = false;
+            failure = seedError;
+        }
+    }
+
+    // Schéma 14 : les matchs d'un fichier plus ancien reçoivent la durée par défaut de la catégorie de leur équipe,
+    // comme le fait la migration (sinon ils garderaient 90 min, valeur par défaut de la colonne).
+    if (ok && fileSchema >= 0 && fileSchema < 14) {
+        QSqlQuery d(m_db);
+        if (!d.exec(MatchRepository::defaultDurationUpdateSql())) {
+            ok = false;
+            failure = tr("durée des matchs : %1").arg(d.lastError().text());
+        }
     }
 
     // Règles de liens des terrains (SDD 5.3, décision D18) : refus total, rien n'est réparé. Le contrôle se fait sur

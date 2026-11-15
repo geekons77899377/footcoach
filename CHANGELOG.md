@@ -1,5 +1,47 @@
 # Journal des modifications
 
+## Non publié — durée des matchs (schéma 14)
+- **Décision du 15/11/2026** : un match a une durée ; un joueur peut jouer un autre match qui ne chevauche pas la durée du premier. Durée par défaut : 30 min pour les U10-U11 (catégorie contenant U10 ou U11 : « U10U11 », « U10-U11 »…), 90 min sinon.
+- Migration `014_match_duration.sql` (schéma 13 → 14) : `football_match.duration_min` (1 à 600 min) ; matchs existants : 30 min pour les équipes U10/U11, 90 min sinon. Même règle à l'import d'un fichier plus ancien (`MatchRepository::defaultDurationUpdateSql`).
+- Conflit de convocation calculé sur les créneaux réels (coup d'envoi → fin) au lieu des 2 heures fixes (`kMatchSlotMinutes`, supprimé) : un match qui commence à la fin de l'autre est permis ; allonger un match sur un autre match d'un de ses convoqués est refusé. Le message indique l'heure de fin de l'autre match.
+- Fiche du match : champ « Durée (min) » (prérempli selon la catégorie de l'équipe) et « Fin du match : HH:MM » ; liste des matchs et calendrier : heure de fin affichée.
+- API : `defaultMatchDuration(teamId)` ; `match()`/`matches()` renvoient `durationMin` et `endTime` ; `saveMatch` accepte `durationMin` (absent : inchangé, ou durée par défaut à la création).
+- Tests : `tst_matches` (plateau U10-U11 de 30 min enchaînés, chevauchement, allongement refusé, durée hors bornes, durée par défaut), `tst_dataformat::importGivesOldMatchesTheDefaultDuration`, `t_match.py` (backend simulé). Export réel de l'utilisateur (schéma 11) importé : schéma 14, ses 2 matchs U10U11 conservés. **Non vérifié** sur Android.
+
+## Non publié — feuille de challenge : licence de l'éducateur imprimée telle que saisie
+- **Constat (15/11/2026)** : la licence de l'éducateur n'apparaissait pas sur la feuille ; la règle précédente laissait la case vide sans explication quand la licence n'avait pas 10 chiffres.
+- **Décision du 15/11/2026** : la licence est imprimée telle que saisie (espaces retirés, majuscules), quel que soit son nombre de chiffres.
+- Avertissements, sans bloquer : `challengeSheetCheck` renvoie `responsibleWarning` (aucun éducateur responsable, licence non renseignée, ou licence sans 10 chiffres), affiché avec le message d'ouverture ou de partage de la feuille ; dans « Éducateurs du club », la ligne indique « (10 chiffres attendus) » et le formulaire affiche un avertissement sous le n° de licence.
+- Tests : `tst_matches::educatorIsTheResponsibleOnTheChallengeSheet` (licence « ABC123 » lue dans le PDF, avertissements), `t_challenge.py` et `t_educator.py` (backend simulé).
+
+## Non publié — correctif : arrêt au démarrage (EducatorsDialog.qml non embarqué)
+- **Constat (sur appareil, 15/11/2026)** : l'appli se fermait dès son lancement après l'application des patchs éducateurs et fiche exercice.
+- **Cause (reproduite hors écran)** : `qml/EducatorsDialog.qml` manquait dans `QML_FILES` (CMakeLists.txt) ; Main.qml ne se chargeait pas (« SquadPage.qml:303:5: EducatorsDialog is not a type »). Les tests QML lisent `qml/` directement et ne l'ont pas vu.
+- Correctif : fichier ajouté à `QML_FILES`. Nouveau test `qml_files_declared` (ctest, `cmake/CheckQmlFiles.cmake`) : échoue si un fichier de `qml/` n'est pas déclaré.
+- Vérifié : l'application compilée (Linux, Qt 6.9.3, hors écran) démarre et reste ouverte avec une base neuve. **Non vérifié** sur Android.
+
+## Non publié — import : les exercices apparus depuis le fichier sont ajoutés
+- **Décision du 15/11/2026** : importer un fichier plus ancien que l'application ajoute les exercices fournis par les versions suivantes (évolution de l'application), avec leurs terrains et leur catégorie, comme le fait la migration. Constaté sur l'export réel de l'utilisateur (schéma 11) : sans cela, « Le parcours des portes » disparaissait après import.
+- Seules les données de la bibliothèque sont rejouées (`INSERT`/`UPDATE` sur exercise, exercise_category, tactical_board des migrations de version > schéma du fichier, `Database::seedStatementsAfter`) ; les autres données de départ (club « Mon club »…) jamais. Un exercice dont le titre est déjà dans le fichier n'est pas ajouté une seconde fois, ni son terrain. Numérotation reprise après les lignes du fichier : réimporter le même fichier redonne les mêmes id.
+- Fichier du schéma actuel : rien n'est ajouté (un exercice fourni que l'éducateur a supprimé ne revient pas).
+- Tests : `tst_dataformat::importAddsTheExercisesProvidedSinceTheFile` (ajout, pas de doublon, rien pour un fichier récent), attentes des imports de fichiers de référence 1 à 7 mises à jour ; export réel de l'utilisateur (schéma 11) importé : 46 exercices dont « Le parcours des portes », 31 terrains, aucune autre donnée changée ; réimport de son réexport : aucun doublon.
+
+## Non publié — fiche exercice en couleur et « Le parcours des portes » (schéma 13)
+- **Rubriques de la fiche** (migration `013_exercise_sheet.sql`, schéma 12 → 13, validée le 15/11/2026) : colonnes `exercise.instructions`, `variations`, `success_criteria`, `coach_cue`, une ligne par point. Saisie dans la fiche exercice (Consignes, Évolutions, Critères de réussite, Consigne éducateur) ; le champ « Description » s'appelle maintenant « Organisation ».
+- **Fiche exercice PDF A4 paysage**, en couleur, dessinée au QPainter (`src/app/ExerciseSheet.*`, aucune image externe) : bandeau titre, pastilles catégorie et durée, objectif, schéma de référence cadré sur la zone utilisée (traits du vrai terrain, coupelles en relief, joueurs, flèches), cadres Organisation (description, nombre de joueurs, matériel), Consignes numérotées, Évolutions, Critères de réussite, bulle de la consigne éducateur. Textes trop longs : réduits, puis coupés dans leur cadre. Sans schéma : message à la place.
+- **Accès** : bouton « Fiche exercice (PDF) » en bas de la fiche et dans son menu ; la saisie est enregistrée d'abord (sans fermer la fiche), puis le PDF s'ouvre dans la feuille de partage d'Android (imprimer, enregistrer, envoyer).
+- **Nouvel exercice fourni** : « Le parcours des portes » (U10-U11, 17 min, 8 à 12 joueurs), d'après la fiche donnée par l'éducateur le 15/11/2026, avec son schéma (carré de 20 × 20 m, 11 portes de 4 couleurs, trajet en conduite). Placement des portes repris à l'œil.
+- Export/import `.footcoach` : `schema = 13`. L'écriture du fichier (local ou content://) est partagée avec la feuille de challenge (`Backend::writeExportFile`).
+- Tests : `tst_exercisesheet` (exercice fourni, rubriques conservées si absentes de l'appel, PDF lu par pdftotext, textes très longs), compteurs des exercices fournis mis à jour (`tst_board`, `tst_backend`, `tst_dataformat`), `t_exercisesheet.py` (backend **simulé**). **Non vérifié** : Windows, Android (polices du téléphone : la mise en page peut varier légèrement), et pas encore validé visuellement par l'utilisateur.
+
+## Non publié — feuille de challenge : nom du club et éducateur responsable (schéma 12)
+- **Case « ÉQUIPE 1 : »** : le nom du **club** de l'équipe remplace le nom de l'équipe (le nom de l'équipe reste dans le titre et le nom du fichier PDF).
+- **Éducateurs du club** (migration `012_educator.sql`, schéma 11 → 12, validée le 15/11/2026) : table `educator` (club, prénom, nom, n° de licence facultatif et unique dans le club) ; colonne `team.educator_id` (ON DELETE SET NULL). Un éducateur peut être responsable de plusieurs équipes du club.
+- **Interface** : « Modifier l'équipe » propose les éducateurs du club en pastilles (« Éducateur responsable ») et un bouton « Gérer les éducateurs du club » ; entrée « Éducateurs du club « … » » dans le menu de l'Effectif ; liste avec ajout, modification (toucher la ligne) et suppression confirmée.
+- **Feuille** : « Nom Responsable » = « NOM Prénom » du responsable, « N° de licence » = sa licence si elle a 10 chiffres. Licence absente ou invalide : la feuille est créée quand même, case vide. Pas de responsable : cases vides.
+- Export/import `.footcoach` : `schema = 12`, table `educator` ; les fichiers plus anciens s'importent sans éducateur.
+- Tests : `tst_matches::educatorIsTheResponsibleOnTheChallengeSheet` (texte du PDF lu par pdftotext), `tst_dataformat::educatorsRoundTripThroughExportAndImport`, `t_educator.py` et `t_fields.py` (backend **simulé**). Les 13 suites C++ et les 31 scripts QML passent sous Linux (Qt 6.9.3). **Non vérifié** : Windows, Android, et pas encore validé visuellement par l'utilisateur.
+
 ## Non publié — terrain d'un match : touchers qui passaient à la fiche dessous
 - **Constat (sur appareil, mode « Multi » du terrain d'un match)** : un toucher sur le terrain a ouvert le partage de la feuille de challenge, bouton de la fiche du match située **sous** le terrain.
 - **Cause probable, non reproduite** : le terrain ne réagit qu'avec des gestionnaires (TapHandler, DragHandler) qui laissent passer l'événement ; rien ne l'arrêtait avant la fiche. Sur le banc de test (souris et doigt simulés, tous les outils, glisser en mode Multi), le défaut **ne se reproduit pas**.

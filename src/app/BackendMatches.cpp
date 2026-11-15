@@ -32,6 +32,8 @@ QVariantMap matchMap(const Match &m, int convoked = 0, bool hasBoard = false)
     r.insert(QStringLiteral("teamId"), m.teamId);
     r.insert(QStringLiteral("date"), m.startAt.date().toString(kDay));
     r.insert(QStringLiteral("time"), m.startAt.time().toString(QStringLiteral("HH:mm")));
+    r.insert(QStringLiteral("durationMin"), m.durationMin);
+    r.insert(QStringLiteral("endTime"), m.startAt.addSecs(qint64(m.durationMin) * 60).time().toString(QStringLiteral("HH:mm")));
     r.insert(QStringLiteral("opponent"), m.opponent);
     r.insert(QStringLiteral("location"), m.location);
     r.insert(QStringLiteral("homeAway"), m.homeAway);
@@ -125,6 +127,15 @@ QVariantMap Backend::saveMatch(const QVariantMap &in)
     m.scoreAgainst = in.value(QStringLiteral("scoreAgainst"), -1).toInt();
     m.notes = in.value(QStringLiteral("notes")).toString().trimmed();
     m.venueId = in.value(QStringLiteral("venueId"), -1).toInt();
+    // Schéma 14 : durée. Absente : celle du match existant, ou la durée par défaut de la catégorie de l'équipe.
+    if (in.contains(QStringLiteral("durationMin"))) {
+        m.durationMin = in.value(QStringLiteral("durationMin")).toInt();
+    } else if (m.id > 0) {
+        const Match old = m_matches.get(m.id);
+        m.durationMin = old.id > 0 ? old.durationMin : defaultMatchDuration(m.teamId);
+    } else {
+        m.durationMin = defaultMatchDuration(m.teamId);
+    }
     QString error;
     // Schéma 11 : le lieu choisi doit être un lieu du club de l'équipe ; son adresse est recopiée si le texte manque.
     int clubId = -1;
@@ -263,11 +274,32 @@ QVariantMap Backend::challengeSheetCheck(int matchId)
     if (m.id < 0)
         return refuse(error.isEmpty() ? tr("Match introuvable.") : error);
     QString teamName;
+    int clubId = -1;
     for (const Team &t : m_teams.all(&error)) {
-        if (t.id == m.teamId)
+        if (t.id == m.teamId) {
             teamName = t.name;
+            clubId = t.clubId;
+        }
     }
     r.insert(QStringLiteral("teamName"), teamName);
+    // Case « ÉQUIPE 1 : » : le club de l'équipe, pas le nom de l'équipe.
+    Club club;
+    r.insert(QStringLiteral("clubName"), m_clubs.get(clubId, &club) ? club.name : QString());
+    // Responsable : éducateur de l'équipe. Sa licence est imprimée telle que saisie (décision du 15/11/2026) ;
+    // absente ou sans 10 chiffres : avertissement, sans bloquer la feuille.
+    Educator educator;
+    const bool hasEducator = m_educators.ofTeam(m.teamId, &educator);
+    const QString licence = hasEducator ? PlayerRepository::normalizeLicence(educator.licence) : QString();
+    r.insert(QStringLiteral("responsibleName"), hasEducator ? educator.fullName() : QString());
+    r.insert(QStringLiteral("responsibleLicence"), licence);
+    QString warning;
+    if (!hasEducator)
+        warning = tr("Aucun éducateur responsable pour cette équipe : « Nom Responsable » reste vide.");
+    else if (licence.isEmpty())
+        warning = tr("Licence de %1 non renseignée : la case « N° de licence » reste vide.").arg(educator.fullName());
+    else if (!ChallengeSheet::isValidLicence(licence))
+        warning = tr("Licence de %1 (%2) : 10 chiffres attendus.").arg(educator.fullName(), licence);
+    r.insert(QStringLiteral("responsibleWarning"), warning);
     r.insert(QStringLiteral("fileName"),
              QStringLiteral("feuille-challenge-%1-%2.pdf").arg(slug(teamName), m.startAt.date().toString(kDay)));
 
@@ -362,10 +394,34 @@ QVariantMap Backend::exportChallengeSheet(int matchId, const QString &url)
     QBuffer buffer(&pdf);
     buffer.open(QIODevice::WriteOnly);
     QString problem;
-    if (!ChallengeSheet::writePdf(&buffer, r.value(QStringLiteral("teamName")).toString(), entries, &problem))
+    ChallengeHeader header;
+    header.teamName = r.value(QStringLiteral("teamName")).toString();
+    header.clubName = r.value(QStringLiteral("clubName")).toString();
+    header.responsibleName = r.value(QStringLiteral("responsibleName")).toString();
+    header.responsibleLicence = r.value(QStringLiteral("responsibleLicence")).toString();
+    if (!ChallengeSheet::writePdf(&buffer, header, entries, &problem))
         return fail(tr("Impossible de créer le PDF : %1").arg(problem));
     buffer.close();
 
+    const QVariantMap w = writeExportFile(url, pdf);
+    if (!w.value(QStringLiteral("ok")).toBool())
+        return fail(w.value(QStringLiteral("error")).toString());
+    if (w.contains(QStringLiteral("warning")))
+        r.insert(QStringLiteral("warning"), w.value(QStringLiteral("warning")));
+    r.insert(QStringLiteral("bytes"), pdf.size());
+    setError(QString());
+    return r;
+}
+
+// Écrit des octets à l'adresse choisie (fichier local ou content:// d'Android). Résultat {ok, error, warning}.
+QVariantMap Backend::writeExportFile(const QString &url, const QByteArray &data)
+{
+    QVariantMap out{{QStringLiteral("ok"), true}};
+    auto failed = [&](const QString &message) {
+        out.insert(QStringLiteral("ok"), false);
+        out.insert(QStringLiteral("error"), message);
+        return out;
+    };
     // Sur Android, une adresse content:// vers un fichier déjà existant n'accepte pas toujours le mode « tronquer » :
     // on essaie plusieurs modes d'ouverture, puis on ajuste la taille ; l'erreur indique le dernier motif connu.
     const QUrl u(url);
@@ -388,18 +444,25 @@ QVariantMap Backend::exportChallengeSheet(int matchId, const QString &url)
         truncated = opened;
     }
     if (!opened)
-        return fail(tr("Impossible d'écrire le fichier (%1) : %2")
+        return failed(tr("Impossible d'écrire le fichier (%1) : %2")
                         .arg(u.scheme().isEmpty() ? QStringLiteral("local") : u.scheme(), f.errorString()));
-    const bool written = f.write(pdf) == pdf.size();
+    const bool written = f.write(data) == data.size();
     bool sized = true;
     if (written && !truncated)
-        sized = f.resize(pdf.size());                                    // ancien contenu plus long : on coupe le reste
+        sized = f.resize(data.size());                                    // ancien contenu plus long : on coupe le reste
     f.close();
     if (!written)
-        return fail(tr("Écriture incomplète du fichier."));
+        return failed(tr("Écriture incomplète du fichier."));
     if (!sized)
-        r.insert(QStringLiteral("warning"), tr("Le fichier existait déjà : un reste de l'ancien contenu peut subsister."));
-    r.insert(QStringLiteral("bytes"), pdf.size());
-    setError(QString());
-    return r;
+        out.insert(QStringLiteral("warning"), tr("Le fichier existait déjà : un reste de l'ancien contenu peut subsister."));
+    return out;
+}
+
+int Backend::defaultMatchDuration(int teamId)
+{
+    for (const Team &t : m_teams.all()) {
+        if (t.id == teamId)
+            return MatchRepository::defaultDuration(t.category);
+    }
+    return MatchRepository::defaultDuration(QString());
 }

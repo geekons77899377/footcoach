@@ -126,11 +126,16 @@ bool Database::applyScript(const QString &resourcePath, QString *error)
 
 QStringList Database::seedStatements(QString *error)
 {
+    return seedStatementsAfter(0, error);
+}
+
+QStringList Database::seedStatementsAfter(int afterVersion, QString *error)
+{
     const QDir dir(QStringLiteral(":/sql"));
     std::vector<std::pair<int, QString>> scripts;
     for (const QString &name : dir.entryList({QStringLiteral("*.sql")}, QDir::Files)) {
         const int version = versionFromName(name);
-        if (version > 0)
+        if (version > afterVersion)
             scripts.emplace_back(version, dir.filePath(name));
     }
     std::sort(scripts.begin(), scripts.end());

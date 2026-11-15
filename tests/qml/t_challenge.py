@@ -117,6 +117,14 @@ call(ed, "startChallengeSheet"); h.spin(400)
 check(B7.shared == [(want, "application/pdf")], f"la feuille de partage reçoit le PDF créé ({B7.shared})")
 check(len(B7.exported) == n + 1 and sd.property("visible") is not True, "partage réussi : pas de sélecteur de fichier")
 check("où envoyer ou enregistrer" in toast_text(h), f"message de partage ({toast_text(h)})")
+check("10 chiffres" not in toast_text(h), "pas d'avertissement quand le responsable est complet")
+
+# Licence du responsable sans 10 chiffres : la feuille sort, l'avertissement accompagne le message (15/11/2026).
+B7.check_result = dict(B7.check_result, responsibleWarning="Licence de BENALI Karim (1234) : 10 chiffres attendus.")
+call(ed, "startChallengeSheet"); h.spin(400)
+check(len(B7.exported) == n + 2, "licence incomplète : la feuille est quand même créée")
+check("10 chiffres attendus" in toast_text(h) and "où envoyer ou enregistrer" in toast_text(h),
+      f"avertissement affiché avec le message de partage ({toast_text(h)})")
 
 # Terrain du match ouvert par-dessus la fiche : un toucher sur le terrain ne doit jamais atteindre la fiche dessous
 # (constat sur appareil, 14/11/2026 : la feuille de challenge s'ouvrait depuis le terrain).

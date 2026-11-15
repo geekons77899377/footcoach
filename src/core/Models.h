@@ -44,6 +44,18 @@ struct Team
     QString name;
     QString category;   // ex. U15, Seniors
     QString season;     // ex. 2026-2027
+    int educatorId = -1;  // schéma 12 : éducateur responsable (même club), -1 = aucun
+};
+
+// Schéma 12 : éducateur d'un club. Responsable d'une ou plusieurs équipes du club (team.educator_id).
+struct Educator
+{
+    int id = -1;
+    int clubId = -1;
+    QString firstName;
+    QString lastName;
+    QString licence;        // facultatif, sans espaces, unique dans le club
+    QString fullName() const { return (lastName.toUpper() + QLatin1Char(' ') + firstName).trimmed(); }  // « NOM Prénom »
 };
 
 struct Player
@@ -109,6 +121,11 @@ struct Exercise
     bool archived = false;
     int categoryId = 0;         // catégorie définie par l'utilisateur (ex. U10-U11), 0 = aucune
     QString categoryName;       // renseigné à la lecture
+    // Schéma 13 : rubriques de la fiche exercice, une ligne par point.
+    QString instructions;       // Consignes
+    QString variations;         // Évolutions
+    QString successCriteria;    // Critères de réussite
+    QString coachCue;           // Consigne éducateur (phrase dite aux joueurs)
 };
 
 // Catégorie d'exercices définie par l'utilisateur.
@@ -145,6 +162,7 @@ struct Match
     int scoreAgainst = -1;
     QString notes;
     int venueId = -1;           // schéma 11 : lieu choisi dans la liste du club, -1 : saisie libre
+    int durationMin = 90;       // schéma 14 : durée (minutes) ; le match occupe ses joueurs de startAt à startAt + durée
 };
 
 // Un joueur convoqué pour un match.

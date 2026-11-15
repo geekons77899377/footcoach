@@ -46,6 +46,8 @@ set(CORE_SOURCES
     src/core/ClubRepository.cpp
     src/core/VenueRepository.h
     src/core/VenueRepository.cpp
+    src/core/EducatorRepository.h
+    src/core/EducatorRepository.cpp
     src/core/MatchRepository.h
     src/core/MatchRepository.cpp
     src/core/PlayerRepository.h
@@ -87,6 +89,9 @@ set(SQL_MIGRATIONS
     sql/009_exercise_category.sql
     sql/010_slot_presence_contact.sql
     sql/011_venue.sql
+    sql/012_educator.sql
+    sql/013_exercise_sheet.sql
+    sql/014_match_duration.sql
 )
 
 qt_add_executable(FootCoachWidgets WIN32
@@ -170,6 +175,8 @@ if(FOOTCOACH_HAVE_QML)
         src/app/TouchTrace.h src/app/TouchTrace.cpp
         src/app/ChallengeSheet.h
         src/app/ChallengeSheet.cpp
+        src/app/ExerciseSheet.h
+        src/app/ExerciseSheet.cpp
     )
     if(WIN32)
         target_sources(FootCoach PRIVATE windows/footcoach.rc)
@@ -186,7 +193,7 @@ if(FOOTCOACH_HAVE_QML)
         Main.qml PageHeader.qml PlaceholderPage.qml PromptDialog.qml SaveFailedDialog.qml TacticsPage.qml Theme.qml
         CalendarPage.qml AttendancePage.qml SessionForm.qml SessionFields.qml RecurrenceForm.qml SlotsPanel.qml SelectMark.qml AttendanceForm.qml CalendarMonth.qml Status.js DatePicker.qml TimePicker.qml TeamSwitcher.qml DateUtil.js SquadPage.qml PlayersImportDialog.qml PhotosImportResult.qml PlayerAvatar.qml ChallengeProblems.qml PlayerForm.qml TeamDialog.qml FormField.qml ChipRow.qml KeyboardDismiss.qml KeyboardDismissAll.qml KeyboardRetry.qml
         ExerciseForm.qml ExercisesPage.qml ExercisePicker.qml PlanItemDialog.qml PlanEditor.qml SessionsPage.qml MatchesPage.qml MatchEditor.qml PrivacyPage.qml PrivacyText.js Toast.qml DataPage.qml SettingsPage.qml SupportForm.qml SupportLink.js
-        BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml VenueSheet.qml VenuesPage.qml
+        BoardGeometry.js Icons.js LiveSession.js LiveSessionCard.qml EnsureVisible.qml VenueSheet.qml VenuesPage.qml EducatorsDialog.qml
     )
     set(QML_FILES_PATHS)
     foreach(f ${QML_FILES})
@@ -261,8 +268,8 @@ if(FOOTCOACH_BUILD_TESTS)
     enable_testing()
 
     # Un exécutable par fichier tests/tst_<nom>.cpp, avec les sources métier et les migrations.
-    foreach(test_name repositories sessions attendance plan board backend dataformat matches issuereporter slots reset venues)
-        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/BackendVenues.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp src/app/ChallengeSheet.h src/app/ChallengeSheet.cpp)
+    foreach(test_name repositories sessions attendance plan board backend dataformat matches issuereporter slots reset venues exercisesheet)
+        qt_add_executable(tst_${test_name} tests/tst_${test_name}.cpp ${CORE_SOURCES} src/app/Backend.h src/app/Backend.cpp src/app/BackendSessions.cpp src/app/BackendMatches.cpp src/app/BackendPlan.cpp src/app/BackendData.cpp src/app/BackendVenues.cpp src/app/IssueReporter.h src/app/IssueReporter.cpp src/app/ChallengeSheet.h src/app/ChallengeSheet.cpp src/app/ExerciseSheet.h src/app/ExerciseSheet.cpp)
         qt_add_resources(tst_${test_name} "sql_${test_name}"
             PREFIX "/sql"
             BASE "sql"
@@ -280,6 +287,13 @@ if(FOOTCOACH_BUILD_TESTS)
     find_program(NODE_EXECUTABLE node)
     if(NODE_EXECUTABLE)
         add_test(NAME livesession_js COMMAND ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/js/livesession.test.js)
+    endif()
+    # Chaque fichier de qml/ doit être embarqué : un oubli fait s'arrêter l'application au démarrage.
+    if(DEFINED QML_FILES)
+        string(REPLACE ";" "|" QML_FILES_ARG "${QML_FILES}")
+        add_test(NAME qml_files_declared
+                 COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR} "-DDECLARED_PIPE=${QML_FILES_ARG}"
+                         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckQmlFiles.cmake)
     endif()
     # Tests QML hors écran (PySide6) : voir tests/qml/README.md, à lancer avec python3 tests/qml/run_all.py.
 endif()

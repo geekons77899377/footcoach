@@ -336,7 +336,7 @@ private slots:
             QVERIFY(fromJson(toJson(board), &again));
             QVERIFY2(again == board, qPrintable(title));
         }
-        QCOMPARE(n, 27);
+        QCOMPARE(n, 28);                    // 27 exemples GIFE (008) + « Le parcours des portes » (013)
         // Une seule fiche de référence par exercice, via le dépôt.
         QVERIFY(q.exec(QStringLiteral("SELECT id FROM exercise WHERE category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11')")));
         while (q.next())
@@ -346,7 +346,7 @@ private slots:
             QVERIFY(rec.id > 0);
         }
         QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM exercise WHERE archived = 0 AND category_id = (SELECT id FROM exercise_category WHERE name = 'U10-U11')")) && q.next());
-        QCOMPARE(q.value(0).toInt(), 27);
+        QCOMPARE(q.value(0).toInt(), 28);
     }
 
     void repositoryCrud()
