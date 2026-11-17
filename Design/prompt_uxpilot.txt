@@ -1,0 +1,527 @@
+# FOOTCOACH — Brief UX/UI pour UX Pilot
+
+## 1. Objectif du projet
+
+Concevoir une application professionnelle de gestion d'équipe et de préparation d'entraînements de football, destinée principalement aux entraîneurs.
+
+L'application doit permettre à un entraîneur de gérer son effectif, organiser les entraînements, suivre les présences, constituer une bibliothèque d'exercices, préparer des séances et travailler les aspects tactiques.
+
+L'interface doit être moderne, claire, efficace et adaptée à une utilisation régulière sur le terrain comme au bureau.
+
+**Objectif de cette mission :** compléter les écrans manquants, harmoniser les écrans existants et définir une expérience cohérente sur ordinateur, tablette et téléphone.
+
+Ne pas repartir de zéro. Les écrans déjà conçus constituent la référence visuelle à préserver.
+
+---
+
+## 2. Utilisateurs et contexte d'utilisation
+
+### Utilisateur principal
+
+- Entraîneur de football.
+- Gestion d'un effectif et de ses joueurs.
+- Préparation et organisation des entraînements.
+- Suivi de la présence et de la disponibilité des joueurs.
+- Construction de séances à partir d'exercices.
+- Consultation des informations de l'équipe et des joueurs.
+
+### Contextes d'utilisation
+
+- **Ordinateur Windows :** préparation des séances, gestion de l'effectif, consultation des statistiques et organisation générale.
+- **Tablette Android en paysage :** utilisation au bord du terrain, consultation et modification des séances.
+- **Téléphone Android en portrait :** consultation rapide, accès aux informations essentielles et opérations courantes.
+
+L'interface doit privilégier la rapidité d'accès à l'information et limiter les manipulations inutiles.
+
+---
+
+## 3. Architecture fonctionnelle
+
+Prévoir une navigation principale organisée autour des rubriques suivantes :
+
+1. Dashboard
+2. Squad
+3. Calendar
+4. Attendance
+5. Exercises
+6. Sessions
+7. Tactics
+
+Ces rubriques constituent l'architecture fonctionnelle de référence.
+
+La navigation doit rester cohérente sur les trois formats d'écran.
+
+### Principes de navigation
+
+- Sur desktop : navigation latérale persistante.
+- Sur tablette : navigation adaptée à l'espace disponible, sans perdre l'accès aux rubriques principales.
+- Sur mobile : navigation compacte, adaptée au format portrait.
+- Conserver une hiérarchie visuelle claire entre navigation principale, sous-navigation et contenu.
+- Prévoir des retours explicites vers les listes depuis les écrans de détail.
+- Conserver le contexte de navigation lorsque l'utilisateur revient à un écran précédent.
+
+Ne pas ajouter de nouvelles rubriques principales sans justification.
+
+---
+
+## 4. Spécifications des écrans
+
+### 4.1 Dashboard
+
+**Statut : écran déjà maquetté — à préserver et harmoniser.**
+
+Le Dashboard constitue le point d'entrée de l'application.
+
+Il doit donner une vision synthétique de la situation de l'équipe.
+
+Éléments attendus :
+- Prochaine séance.
+- Entraînements à venir.
+- Informations sur les présences.
+- Vue synthétique de l'effectif.
+- Accès rapide aux principales fonctionnalités.
+- Zone d'accès rapide aux outils de l'entraîneur.
+
+Principes d'interaction :
+- Cliquer sur la prochaine séance permet d'accéder à son détail.
+- Cliquer sur un indicateur permet d'accéder à la rubrique correspondante.
+- Les actions rapides doivent conduire directement à la fonctionnalité concernée.
+
+Ne pas inventer de statistiques métier ou de données chiffrées définitives. Utiliser des données fictives clairement identifiables pour les maquettes.
+
+### 4.2 Squad — Gestion de l'effectif
+
+**Statut : écran déjà maquetté — à préserver et harmoniser.**
+
+Cet écran permet de consulter et gérer les joueurs de l'équipe.
+
+Sur desktop, privilégier une présentation master-detail :
+- Liste des joueurs.
+- Sélection d'un joueur.
+- Fiche détaillée dans une zone de contenu dédiée.
+
+Sur tablette et mobile, adapter la présentation à l'espace disponible, par exemple en séparant la liste et la fiche détaillée.
+
+Informations à représenter :
+- Photo ou avatar.
+- Nom et prénom.
+- Numéro de maillot.
+- Poste.
+- Statut du joueur.
+- Informations statistiques disponibles.
+
+Prévoir les interactions suivantes :
+- Sélectionner un joueur.
+- Consulter sa fiche.
+- Accéder à ses tendances statistiques.
+- Accéder à une action de modification.
+- Revenir à la liste.
+
+Les champs définitifs et les règles de gestion des joueurs restent à confirmer.
+
+### 4.3 Player Profile — Fiche joueur
+
+**Statut : écran déjà maquetté — à préserver et harmoniser.**
+
+La fiche doit offrir une vue individuelle du joueur.
+
+Prévoir une organisation visuelle permettant de distinguer :
+- Informations générales.
+- Poste et numéro.
+- Statut du joueur.
+- Informations sportives.
+- Statistiques disponibles.
+- Historique ou tendances, lorsque ces données existent.
+
+La fiche doit être lisible sans surcharge.
+
+Les données médicales éventuelles doivent être traitées comme des informations sensibles. Ne pas inventer de contenu médical ni de règles d'accès.
+
+### 4.4 Squad Trends — Tendances de l'effectif
+
+**Statut : écran déjà maquetté — à préserver et harmoniser.**
+
+Cet écran présente une lecture synthétique de l'évolution des joueurs ou de l'effectif.
+
+Conserver une présentation claire des indicateurs et de leur évolution.
+
+Prévoir des graphiques lisibles, des périodes de référence et des légendes explicites lorsque les données le permettent.
+
+Ne pas inventer les indicateurs définitifs, les formules de calcul ou les seuils d'évaluation.
+
+### 4.5 Calendar — Calendrier
+
+**Statut : à concevoir ou compléter.**
+
+Cet écran doit permettre à l'entraîneur de visualiser l'organisation des événements de l'équipe.
+
+Prévoir :
+- Une vue calendrier.
+- Une navigation entre les périodes.
+- Une distinction visuelle entre les types d'événements.
+- Un accès au détail d'un événement.
+- Une action pour créer un événement.
+
+Types d'événements à envisager :
+- Entraînement.
+- Match.
+- Événement d'équipe.
+
+Interactions attendues :
+- Sélection d'une date.
+- Consultation des événements de cette date.
+- Ouverture du détail d'un événement.
+- Création ou modification d'un événement.
+
+Les règles précises de récurrence, les champs obligatoires et les types d'événements définitifs restent à définir.
+
+### 4.6 Attendance — Présences
+
+**Statut : à concevoir ou compléter.**
+
+Cet écran doit faciliter le suivi des présences aux entraînements et aux événements.
+
+Prévoir :
+- La sélection d'une séance ou d'un événement.
+- La liste des joueurs concernés.
+- Un statut individuel de présence.
+- Une synthèse du nombre de joueurs présents, absents ou dont le statut reste inconnu.
+
+L'interface doit permettre à l'entraîneur de modifier rapidement le statut d'un joueur.
+
+Prévoir visuellement les états :
+- Présent.
+- Absent.
+- En attente de confirmation.
+
+Ces statuts constituent une proposition de présentation et doivent être confirmés avec les règles métier.
+
+Éviter les interactions complexes : le suivi des présences doit pouvoir être réalisé rapidement depuis une tablette.
+
+### 4.7 Exercises — Bibliothèque d'exercices
+
+**Statut : à concevoir ou compléter.**
+
+Cet écran constitue la bibliothèque des exercices utilisables dans les séances.
+
+Il doit permettre à l'entraîneur de rechercher, consulter et organiser les exercices.
+
+Prévoir :
+- Une liste ou une grille d'exercices.
+- Une recherche.
+- Des filtres.
+- Une fiche détaillée d'exercice.
+- Une action de création.
+- Une action de modification.
+- Un accès depuis la fiche exercice à son utilisation dans une séance.
+
+Informations à prévoir dans une fiche exercice :
+- Nom de l'exercice.
+- Description.
+- Objectif de travail.
+- Organisation du dispositif.
+- Nombre de joueurs.
+- Durée indicative.
+- Matériel nécessaire.
+- Consignes.
+- Illustration ou représentation graphique du terrain.
+
+Filtres possibles à proposer :
+- Thématique.
+- Catégorie.
+- Nombre de joueurs.
+- Durée.
+- Niveau ou intensité.
+
+Ne pas figer les catégories ni les critères de filtrage comme règles métier définitives.
+
+### 4.8 Sessions — Préparation des séances
+
+**Statut : à concevoir ou compléter. Écran central de l'application.**
+
+Cet écran doit permettre de construire une séance d'entraînement à partir d'exercices.
+
+L'expérience doit être particulièrement soignée : la préparation d'une séance est une fonctionnalité centrale de FootCoach.
+
+Prévoir :
+- Une liste des séances.
+- La création d'une séance.
+- La modification d'une séance.
+- La consultation d'une séance.
+- L'ajout d'exercices à une séance.
+- La visualisation de l'organisation globale de la séance.
+
+Pour une séance, prévoir les informations suivantes :
+- Nom ou thème.
+- Date.
+- Durée totale.
+- Objectifs.
+- Exercices associés.
+- Ordre des exercices.
+- Durée de chaque exercice.
+
+Proposer une présentation chronologique des phases de la séance, avec une visualisation claire de leur durée.
+
+Exemple de structure visuelle à explorer :
+1. Échauffement.
+2. Travail technique.
+3. Travail tactique ou situationnel.
+4. Jeu ou mise en application.
+5. Retour au calme.
+
+Cette structure est un exemple d'organisation pédagogique, pas une obligation fonctionnelle définitive.
+
+L'entraîneur doit pouvoir identifier rapidement :
+- Le contenu de chaque phase.
+- La durée prévue.
+- L'ordre des exercices.
+- La durée totale de la séance.
+
+Explorer une interaction permettant d'ajouter un exercice depuis la bibliothèque et de le déplacer dans la chronologie de la séance.
+
+Ne pas inventer de règles automatiques de calcul ou de validation des séances.
+
+### 4.9 Tactics — Tactique
+
+**Statut : à concevoir ou compléter.**
+
+Cet écran doit permettre de représenter les organisations tactiques de l'équipe.
+
+Prévoir une interface visuelle centrée sur un terrain de football.
+
+Éléments à explorer :
+- Terrain de football représenté graphiquement.
+- Placement des joueurs.
+- Numéros ou noms des joueurs.
+- Choix d'une organisation.
+- Déplacement visuel des joueurs.
+- Consultation d'une organisation tactique.
+
+L'interface doit être utilisable à la souris sur desktop et au toucher sur tablette.
+
+Ne pas imposer de formations tactiques prédéfinies comme choix définitifs sans validation fonctionnelle.
+
+---
+
+## 5. Design system
+
+### Direction artistique
+
+Conserver la direction artistique existante : **Pitch Green & Slate / Midnight Dark**.
+
+Palette de référence :
+- Fond principal : `#0F172A`
+- Fond secondaire : `#1E293B`
+- Bordures et séparateurs : `#334155`
+- Vert principal / accent : `#2ECC71`
+- Texte principal : `#F4F6F7`
+
+Les couleurs doivent assurer une bonne lisibilité et une hiérarchie visuelle stable.
+
+Le vert est utilisé pour les actions principales, les validations et les éléments importants, sans être appliqué partout.
+
+### Typographie
+
+- Titres : Outfit.
+- Texte courant : Inter.
+
+Respecter une hiérarchie cohérente :
+- Titre de page.
+- Titre de section.
+- Libellé de carte.
+- Texte courant.
+- Informations secondaires.
+
+### Composants à harmoniser
+
+Définir un langage commun pour :
+- Boutons principaux et secondaires.
+- Champs de saisie.
+- Menus.
+- Cartes.
+- Tableaux.
+- Listes.
+- Onglets.
+- Badges de statut.
+- Dialogues et fenêtres de confirmation.
+- Notifications.
+- Graphiques.
+- États vides.
+- États de chargement.
+- États d'erreur.
+
+Les composants doivent être réutilisables et visuellement cohérents entre les écrans.
+
+### Thème clair
+
+Un mode clair peut être envisagé ultérieurement.
+
+Ne pas concevoir un second thème complet si cela dégrade la cohérence ou retarde la finalisation du thème sombre de référence.
+
+---
+
+## 6. Responsive design
+
+Les écrans doivent être conçus pour trois formats de référence :
+
+| Support | Résolution de référence | Orientation |
+|---|---:|---|
+| Desktop Windows | 1440 × 900 | Paysage |
+| Tablette Android | 1280 × 800 | Paysage |
+| Téléphone Android | 390 × 844 | Portrait |
+
+Ces dimensions sont des références de conception, pas des limites techniques définitives.
+
+### Desktop
+
+- Exploiter l'espace disponible.
+- Navigation latérale.
+- Favoriser les vues multi-colonnes lorsque cela améliore la lisibilité.
+- Utiliser les présentations master-detail lorsque pertinentes.
+- Garder les actions principales visibles.
+
+### Tablette
+
+- Adapter les colonnes et les panneaux.
+- Favoriser les interactions tactiles.
+- Conserver les informations importantes.
+- Éviter les tableaux trop larges.
+- Donner la priorité aux tâches réalisées au bord du terrain.
+
+### Mobile
+
+- Présentation en une colonne.
+- Navigation compacte.
+- Informations essentielles visibles immédiatement.
+- Actions tactiles suffisamment grandes.
+- Éviter les écrans surchargés.
+- Transformer les tableaux complexes en listes ou cartes lorsque nécessaire.
+
+Ne pas simplement réduire les écrans desktop : adapter réellement leur organisation.
+
+---
+
+## 7. États et interactions à prévoir
+
+Pour chaque écran, prévoir les principaux états d'interface :
+
+- État normal avec données.
+- État vide.
+- État de chargement.
+- État d'erreur.
+- État de sélection.
+- État de modification.
+- État de confirmation lorsqu'une action le nécessite.
+
+Les actions doivent avoir un résultat visuel compréhensible.
+
+Les boutons présentés dans les maquettes doivent correspondre à une action identifiable. Éviter les boutons purement décoratifs.
+
+Les actions destructives doivent être visuellement distinguées et demander une confirmation appropriée.
+
+Les formulaires doivent fournir un retour clair en cas de saisie invalide.
+
+---
+
+## 8. Cohérence UX et règles de conception
+
+Appliquer les règles suivantes à l'ensemble de l'application :
+
+1. Une même action doit conserver le même style visuel sur tous les écrans.
+2. Les informations importantes doivent être accessibles rapidement.
+3. Les écrans ne doivent pas être surchargés.
+4. Les actions principales doivent être facilement identifiables.
+5. Les informations secondaires doivent rester discrètes.
+6. Les états doivent être compréhensibles sans ambiguïté.
+7. Les interactions tactiles doivent être adaptées aux tablettes et téléphones.
+8. Les écrans doivent partager les mêmes marges, espacements, rayons, typographies et règles de couleur.
+9. Les données fictives doivent rester cohérentes entre les écrans.
+10. Ne pas créer de fonctionnalités supplémentaires sans nécessité fonctionnelle.
+
+---
+
+## 9. Consignes impératives pour UX Pilot
+
+### Préserver l'existant
+
+Les écrans Dashboard, Squad, Player Profile et Squad Trends ont déjà fait l'objet d'un travail de conception.
+
+Ne pas les redessiner arbitrairement.
+
+Les utiliser comme références visuelles et fonctionnelles, en conservant :
+- Leur identité graphique.
+- Leur hiérarchie d'information.
+- Leur logique générale.
+- Leur cohérence avec la navigation.
+
+Les améliorations doivent être motivées par un problème de lisibilité, d'ergonomie ou de cohérence.
+
+### Compléter les écrans manquants
+
+Concevoir ou compléter :
+- Calendar.
+- Attendance.
+- Exercises.
+- Sessions.
+- Tactics.
+
+Ces écrans doivent reprendre strictement le même design system.
+
+### Ne pas inventer les règles métier
+
+Lorsqu'une information ou un comportement n'est pas spécifié :
+- Proposer une solution UX raisonnable.
+- La rendre identifiable comme une proposition.
+- Ne pas la présenter comme une règle métier validée.
+- Éviter d'ajouter des fonctionnalités non demandées.
+
+### Livrables attendus
+
+Produire :
+1. Les écrans complets des sept rubriques.
+2. Les variantes desktop, tablette et mobile.
+3. Les principaux états des écrans.
+4. Les vues de détail et les formulaires nécessaires.
+5. Les interactions principales.
+6. Un design system commun.
+7. Une navigation cohérente entre les écrans.
+
+Les maquettes doivent être suffisamment détaillées pour servir de référence à l'implémentation de l'application.
+
+---
+
+## 10. Contexte technique cible
+
+L'application est destinée à être développée en :
+
+- C++.
+- Qt 6.9.3.
+- Qt Widgets.
+- Application desktop Windows dans un premier temps.
+
+Les maquettes doivent donc privilégier des composants et des interactions transposables à une application Qt Widgets.
+
+Éviter les comportements exclusivement dépendants du navigateur ou les effets visuels difficiles à reproduire dans une application desktop native.
+
+L'architecture graphique devra permettre de réutiliser les composants et de maintenir une cohérence entre les écrans.
+
+**Important :** les maquettes Android servent à définir l'expérience responsive et ne signifient pas que l'implémentation Android est déjà décidée.
+
+---
+
+## 11. Critères d'acceptation
+
+Le travail UX Pilot sera considéré comme satisfaisant si :
+
+- Les sept rubriques principales sont représentées.
+- Les écrans déjà conçus conservent leur identité.
+- Les nouveaux écrans reprennent le design system.
+- Les trois formats d'écran sont cohérents.
+- Les parcours de navigation sont compréhensibles.
+- Les interactions principales sont représentées.
+- Les états vides, erreurs et modifications sont anticipés.
+- La préparation d'une séance est simple et lisible.
+- La bibliothèque d'exercices et les séances sont visuellement liées.
+- Les maquettes sont suffisamment précises pour préparer le développement Qt Widgets.
+
+**Résultat recherché :** une application FootCoach homogène, professionnelle et exploitable par un entraîneur, dont les maquettes constituent une base fiable pour le développement.
