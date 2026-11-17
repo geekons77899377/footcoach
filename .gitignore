@@ -16,3 +16,9 @@ local.properties
 # Banc d'essai QML (fichiers de travail)
 tests/qml/.work/
 tests/qml/__pycache__/
+
+# Documentations de suivi et d'audit (versions de travail, hors application) : seuls SDD/SRS/SSS et v3_consolidation/ sont suivis
+/Documentations/*.docx
+/Documentations/*.xlsx
+/Documentations/Decisions_arbitrage_v2.md
+/Documentations/Feuille_de_route_consolidee_v2.md
