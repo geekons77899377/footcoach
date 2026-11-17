@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## Non publié — animation des schémas
+- **Demande du 16/11/2026** : les terrains des exercices sont figés ; les animer pour mieux comprendre l'exercice. Choix de l'utilisateur : animation calculée depuis les flèches existantes, commandes lecture / pause, pas à pas et vitesse, partage en vidéo (GIF animé). Aucun changement du schéma SQLite ni du format des schémas.
+- Éditeur de schéma : bouton ▶ « Animer » dans l'en-tête (visible dès qu'il y a une flèche). Barre de lecture à la place de la barre d'outils : fermer, précédent, lecture / pause, suivant, compteur « mouvement k / n », vitesse (Lent ×0,5, Normal, Rapide ×2), partager. Lecture en boucle ; pendant l'animation le terrain n'est pas modifiable et le schéma n'est jamais modifié.
+- Règles (`qml/BoardAnimation.js`) : une flèche = un mouvement, joués dans l'ordre de création. Course → joueur (ou adversaire) le plus proche du départ ; conduite → joueur + ballon à ses pieds (ballon fantôme s'il n'y en a pas) ; passe / centre → ballon le plus proche (le centre suit la courbe). Recherche dans un rayon de 4,5 m, à partir des positions déjà déplacées par les mouvements précédents. Durée selon la distance réelle (course 5,5 m/s, conduite 4, passe 13, centre 15 ; 0,6 à 4 s). Flèche sans élément au départ : seulement mise en avant.
+- Partage : captures du terrain à 10 images/s, assemblées en GIF animé (480 × 640 px au plus, en boucle) par `GifWriter` (encodeur GIF89a intégré, palette fixe, images différentielles), puis feuille de partage Android (`image/gif`). Création annulable.
+- API : `gifBegin(w, h, delayCs)`, `gifAddFrame(image)`, `gifFinish(url)`, `gifCancel()`, `animationFileName(titre)`.
+- Tests : `tst_gif` (couleurs, relecture image par image par Qt, réinitialisation LZW sur image bruitée, fichier écrit par le backend), `t_animation.py` (70 vérifications, téléphone et bureau, backend simulé). **Non vérifié** sur Android (partage réel, fluidité).
+
 ## Non publié — durée des matchs (schéma 14)
 - **Décision du 15/11/2026** : un match a une durée ; un joueur peut jouer un autre match qui ne chevauche pas la durée du premier. Durée par défaut : 30 min pour les U10-U11 (catégorie contenant U10 ou U11 : « U10U11 », « U10-U11 »…), 90 min sinon.
 - Migration `014_match_duration.sql` (schéma 13 → 14) : `football_match.duration_min` (1 à 600 min) ; matchs existants : 30 min pour les équipes U10/U11, 90 min sinon. Même règle à l'import d'un fichier plus ancien (`MatchRepository::defaultDurationUpdateSql`).

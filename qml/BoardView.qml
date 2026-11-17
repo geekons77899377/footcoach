@@ -1,5 +1,6 @@
 import QtQuick
 import "BoardGeometry.js" as Geo
+import "BoardAnimation.js" as Anim
 
 // Terrain interactif : dessin du terrain et des flèches, éléments déplaçables, zoom et déplacement.
 //
@@ -19,6 +20,11 @@ Item {
     property var pendingArrow: null
     property var lasso: null                 // rectangle de sélection en cours (écran) : {x1, y1, x2, y2}
     readonly property bool multi: tool === "multi"
+    // Animation (décision du 16/11/2026) : chronologie construite par BoardAnimation.build(), instant affiché (s).
+    // Tant que anim n'est pas nul, les éléments sont dessinés à leur position animée et les gestes sont coupés.
+    property var anim: null
+    property real animTime: 0
+    readonly property var animState: anim ? Anim.stateAt(anim, animTime) : null
 
     readonly property real margin: 14
     readonly property real maxZoom: 8
@@ -82,6 +88,15 @@ Item {
     onZoomChanged: canvas.requestPaint()
     onVerticalChanged: canvas.requestPaint()
     onPreviewChanged: canvas.requestPaint()
+    onAnimStateChanged: canvas.requestPaint()
+
+    // Position à l'écran d'un élément : animée pendant la lecture, sinon celle du schéma.
+    function tokenScreen(index, nx, ny) {
+        var st = animState;
+        if (st && index >= 0 && index < st.pos.length)
+            return toScreen(st.pos[index].x, st.pos[index].y);
+        return toScreen(nx, ny);
+    }
     Connections {
         target: view.board
         function onRevisionChanged() { canvas.requestPaint(); }
@@ -199,12 +214,29 @@ Item {
             }
             ctx.restore();
 
-            // Flèches.
+            // Flèches. Pendant l'animation : la flèche du mouvement en cours en entier, les autres estompées.
             var arrows = view.board.arrows;
-            for (var j = 0; j < arrows.length; ++j)
-                strokeArrow(ctx, arrows[j], arrows[j].sel);
+            var st = view.animState;
+            var currentArrow = st && st.step >= 0 ? view.anim.steps[st.step].arrow : -1;
+            for (var j = 0; j < arrows.length; ++j) {
+                ctx.globalAlpha = st ? (j === currentArrow ? 1.0 : 0.28) : 1.0;
+                strokeArrow(ctx, arrows[j], st ? false : arrows[j].sel);
+            }
+            ctx.globalAlpha = 1.0;
             if (view.preview)
                 strokeArrow(ctx, view.preview, false);
+            // Ballon dessiné pour une passe ou une conduite sans ballon sur le schéma.
+            if (st && st.ghost) {
+                var g = view.toScreen(st.ghost.x, st.ghost.y);
+                var r = 9 * view.tokenScale;
+                ctx.fillStyle = "#ffffff";
+                ctx.strokeStyle = "#1f2937";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(g.x, g.y, r, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
         }
     }
 

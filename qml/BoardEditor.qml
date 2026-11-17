@@ -25,6 +25,8 @@ Item {
     property string contextTitle: ""                 // titre affiché en en-tête à la place de celui du schéma
     // Plein écran du terrain : l'en-tête et la barre d'outils se masquent ; les outils restent accessibles par un bouton.
     property bool fullscreen: false
+    // Lecture animée du schéma (décision du 16/11/2026) : outils et gestes coupés, barre de lecture à la place des outils.
+    property bool animating: false
     readonly property bool landscape: width > height
     readonly property bool shortLandscape: landscape && height < 500       // téléphone couché : outils plus serrés
     // Toutes les tailles suivent la plus petite dimension de l'écran (1 ≈ téléphone de 400 dp de large).
@@ -128,6 +130,104 @@ Item {
 
     // Quitte le terrain en exécutant action, sauf si l'enregistrement échoue : on reste alors sur l'écran, l'erreur
     // est affichée et l'utilisateur choisit de réessayer ou de quitter sans enregistrer (après confirmation).
+    // --- Animation ---------------------------------------------------------------------------------------
+
+    function startAnimation() {
+        tool = "select";
+        animating = true;
+        view.fit();
+        player.start();
+    }
+    function stopAnimation() {
+        cancelRecording();
+        player.stop();
+        animating = false;
+    }
+
+    // Partage : chaque image de l'animation est capturée (10 images par seconde, vitesse normale) puis assemblée en GIF
+    // animé par le backend, ouvert ensuite dans la feuille de partage d'Android.
+    property bool dryRun: false                 // tests : ne lance aucune application
+    property string lastAnimationUrl: ""
+    property int recFrame: 0
+    property int recFrames: 0
+    property real recFps: 10
+    readonly property int gifWidth: 480
+
+    function exportAnimation() {
+        if (!view.anim || player.recording)
+            return;
+        player.playing = false;
+        view.fit();
+        var total = view.anim.total;
+        recFps = Math.min(10, 150 / Math.max(total, 0.1));             // au plus 150 images
+        recFrames = Math.max(2, Math.ceil(total * recFps) + 1);
+        var w = gifWidth, h = Math.round(gifWidth * view.height / Math.max(1, view.width));
+        if (h > 640) {
+            h = 640;
+            w = Math.round(640 * view.width / Math.max(1, view.height));
+        }
+        if (!backend.gifBegin(w, h, Math.round(100 / recFps))) {
+            toast.show("Impossible de préparer l'animation.");
+            return;
+        }
+        recFrame = 0;
+        player.recording = true;
+        view.animTime = 0;
+        recTimer.restart();
+    }
+    function cancelRecording() {
+        if (!player.recording)
+            return;
+        recTimer.stop();
+        player.recording = false;
+        backend.gifCancel();
+    }
+    function finishRecording() {
+        player.recording = false;
+        view.animTime = 0;
+        var name = backend.animationFileName(editor.title);
+        var url = backend.challengeSheetTempUrl(name);
+        if (url === "") {
+            backend.gifCancel();
+            toast.show("Impossible de préparer le fichier de l'animation.");
+            return;
+        }
+        var r = backend.gifFinish(url);
+        if (!r.ok) {
+            toast.show(r.error);
+            return;
+        }
+        lastAnimationUrl = url;
+        var s = dryRun ? { ok: false } : backend.shareFile(url, "image/gif", "Animation du schéma");
+        if (s.ok)
+            toast.show("Choisissez où envoyer l'animation.");
+        else if (dryRun || Qt.openUrlExternally(url))
+            toast.show("Animation créée.");
+        else
+            toast.show("Impossible d'ouvrir l'animation ici.");
+    }
+    // Une image : l'instant est déjà affiché, on laisse le terrain se redessiner, puis on capture.
+    Timer {
+        id: recTimer
+        interval: 60
+        onTriggered: {
+            if (!player.recording)
+                return;
+            view.grabToImage(function (result) {
+                if (!player.recording)
+                    return;
+                backend.gifAddFrame(result.image);
+                editor.recFrame += 1;
+                if (editor.recFrame >= editor.recFrames) {
+                    editor.finishRecording();
+                } else {
+                    view.animTime = Math.min(view.anim.total, editor.recFrame / editor.recFps);
+                    recTimer.restart();
+                }
+            });
+        }
+    }
+
     function leaveGuarded(action) {
         if (flush()) {
             exitAction = null;
@@ -427,21 +527,28 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 0
             IconButton {
+                objectName: "animateButton"
+                visible: editor.editable && !editor.animating && board.arrows.length > 0
+                iconName: "play"
+                accessibleName: "Animer le schéma"
+                onClicked: editor.startAnimation()
+            }
+            IconButton {
                 iconName: "undo"
                 accessibleName: "Annuler"
-                enabled: editor.editable && board.canUndo
+                enabled: editor.editable && !editor.animating && board.canUndo
                 onClicked: board.undo()
             }
             IconButton {
                 iconName: "redo"
                 accessibleName: "Rétablir"
-                enabled: editor.editable && board.canRedo
+                enabled: editor.editable && !editor.animating && board.canRedo
                 onClicked: board.redo()
             }
             IconButton {
                 iconName: "more"
                 accessibleName: "Plus d'actions"
-                enabled: editor.editable
+                enabled: editor.editable && !editor.animating
                 onClicked: moreSheet.open()
             }
         }
@@ -465,7 +572,7 @@ Item {
             height: body.height - (editor.landscape ? 0 : editor.stripUsed)
             board: board
             tool: editor.tool
-            enabled: editor.editable
+            enabled: editor.editable && !editor.animating
 
             onSelectToolRequested: editor.tool = "select"
             onLabelEditRequested: (index) => editor.editLabel(index)
@@ -510,7 +617,7 @@ Item {
         }
         Rectangle {
             id: hintBox
-            visible: editor.editable && !prefs.hintSeen && board.items.count === 0 && board.arrows.length === 0
+            visible: editor.editable && !editor.animating && !prefs.hintSeen && board.items.count === 0 && board.arrows.length === 0
             MouseArea { anchors.fill: parent; onClicked: prefs.hintSeen = true }
             anchors.left: view.left
             anchors.leftMargin: editor.fullscreen ? editor.zoomButton + 24 : 12
@@ -582,7 +689,7 @@ Item {
 
         // En plein écran : outils, annuler et rétablir restent à portée, en haut à gauche.
         Column {
-            visible: editor.editable && editor.fullscreen
+            visible: editor.editable && editor.fullscreen && !editor.animating
             anchors.left: view.left
             anchors.leftMargin: 12
             anchors.top: view.top
@@ -619,7 +726,7 @@ Item {
 
         // Aide de la sélection multiple.
         Rectangle {
-            visible: editor.editable && editor.tool === "multi"
+            visible: editor.editable && editor.tool === "multi" && !editor.animating
             anchors.left: view.left
             anchors.leftMargin: editor.fullscreen ? editor.zoomButton + 24 : 12
             anchors.top: view.top
@@ -659,7 +766,8 @@ Item {
             id: contextBar
             objectName: "contextBar"
             // Seulement avec l'outil de sélection : un outil de dessin (joueur, flèche…) ne montre pas supprimer, couleur, etc.
-            visible: editor.editable && board.selCount > 0 && (editor.tool === "select" || editor.tool === "multi")
+            visible: editor.editable && !editor.animating && board.selCount > 0
+                     && (editor.tool === "select" || editor.tool === "multi")
             // Déplaçable (poignée à gauche) pour dégager la zone de travail, par exemple autour du gardien.
             property real dx: 0
             property real dy: 0
@@ -815,7 +923,7 @@ Item {
             width: editor.landscape ? editor.stripSize : body.width
             height: editor.landscape ? body.height : editor.stripSize
             color: Theme.bgDeep
-            visible: editor.editable && !editor.fullscreen
+            visible: editor.editable && !editor.fullscreen && !editor.animating
 
             Rectangle {
                 width: editor.landscape ? 1 : parent.width
@@ -866,6 +974,54 @@ Item {
                         anchors.fill: parent
                         onClicked: editor.tool = toolItem.modelData.id
                     }
+                }
+            }
+        }
+
+        // Barre de lecture de l'animation, à la place des outils.
+        BoardPlayer {
+            id: player
+            view: view
+            board: board
+            u: editor.u
+            vertical: editor.landscape && !editor.fullscreen
+            visible: editor.animating
+            x: 0
+            y: vertical ? 0 : body.height - editor.stripSize
+            width: vertical ? editor.stripSize : body.width
+            height: vertical ? body.height : editor.stripSize
+            onCloseRequested: editor.stopAnimation()
+            onShareRequested: editor.exportAnimation()
+        }
+
+        // Création du GIF en cours (hors du terrain : pas capturé).
+        Rectangle {
+            objectName: "recordingBox"
+            visible: player.recording
+            z: 20
+            anchors.horizontalCenter: view.horizontalCenter
+            anchors.top: view.top
+            anchors.topMargin: 12
+            width: recRow.implicitWidth + 28
+            height: recRow.implicitHeight + 18
+            radius: 14
+            color: Theme.surfaceHi
+            border.width: 1
+            border.color: Theme.border
+            Row {
+                id: recRow
+                anchors.centerIn: parent
+                spacing: 12
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Création de l'animation… " + Math.round(100 * editor.recFrame / Math.max(1, editor.recFrames)) + " %"
+                    font.pixelSize: 14
+                    color: Theme.text
+                }
+                AppButton {
+                    kind: "ghost"
+                    text: "Annuler"
+                    onClicked: editor.cancelRecording()
                 }
             }
         }
@@ -947,5 +1103,8 @@ Item {
 
     // Dernier recours seulement : une destruction ne peut pas être bloquée et l'erreur ne serait plus visible. Les
     // sorties (retour, autre terrain, navigation, fermeture de la fenêtre) passent par leaveGuarded().
-    Component.onDestruction: flush()
+    Component.onDestruction: {
+        cancelRecording();
+        flush();
+    }
 }

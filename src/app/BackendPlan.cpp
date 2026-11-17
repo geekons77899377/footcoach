@@ -512,3 +512,55 @@ QVariantMap Backend::exportExerciseSheet(int exerciseId, const QString &url)
     setError(QString());
     return r;
 }
+
+// --- Animation d'un schéma (GIF) ---------------------------------------------------------------------------
+
+bool Backend::gifBegin(int width, int height, int delayCs)
+{
+    if (width < 16 || height < 16 || width > 2000 || height > 2000)
+        return false;
+    m_gif.begin(QSize(width, height), delayCs);
+    return true;
+}
+
+bool Backend::gifAddFrame(const QImage &image)
+{
+    if (!m_gif.isActive() || image.isNull())
+        return false;
+    m_gif.addFrame(image);
+    return true;
+}
+
+QVariantMap Backend::gifFinish(const QString &url)
+{
+    QVariantMap r{{QStringLiteral("ok"), false}};
+    if (!m_gif.isActive() || m_gif.frameCount() == 0) {
+        m_gif.clear();
+        r.insert(QStringLiteral("error"), tr("Aucune image à assembler."));
+        return r;
+    }
+    const int frames = m_gif.frameCount();
+    const QByteArray gif = m_gif.finish();
+    const QVariantMap w = writeExportFile(url, gif);
+    if (!w.value(QStringLiteral("ok")).toBool()) {
+        r.insert(QStringLiteral("error"), w.value(QStringLiteral("error")));
+        return r;
+    }
+    r.insert(QStringLiteral("ok"), true);
+    r.insert(QStringLiteral("bytes"), gif.size());
+    r.insert(QStringLiteral("frames"), frames);
+    return r;
+}
+
+void Backend::gifCancel()
+{
+    m_gif.clear();
+}
+
+QString Backend::animationFileName(const QString &title)
+{
+    QString name = ExerciseSheet::fileName(title);          // « fiche-<titre>.pdf », même nettoyage
+    name.replace(0, 6, QStringLiteral("animation-"));
+    name.chop(4);
+    return name + QStringLiteral(".gif");
+}

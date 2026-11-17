@@ -29,7 +29,7 @@ Item {
     width: Math.max(vw + 8, 54)
     height: Math.max(vh + 8, 54)
 
-    readonly property point screenPos: boardView.toScreen(nx, ny)
+    readonly property point screenPos: boardView.tokenScreen(index, nx, ny)
     x: screenPos.x - width / 2
     y: screenPos.y - height / 2
     transformOrigin: Item.Center

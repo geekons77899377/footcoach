@@ -12,6 +12,7 @@
 #include "core/TeamRepository.h"
 #include "core/VenueRepository.h"
 #include "core/EducatorRepository.h"
+#include "GifWriter.h"
 
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -217,6 +218,14 @@ public:
     Q_INVOKABLE QVariantMap saveExercise(const QVariantMap &exercise);   // id < 0 : création
     Q_INVOKABLE QVariantMap setExerciseArchived(int id, bool archived);
     Q_INVOKABLE QVariantMap deleteExercise(int id);      // refusé si l'exercice est dans un plan
+    // Animation d'un schéma (16/11/2026) : GIF animé assemblé image par image (captures du terrain faites par le QML).
+    Q_INVOKABLE bool gifBegin(int width, int height, int delayCs);
+    Q_INVOKABLE bool gifAddFrame(const QImage &image);
+    // Écrit le GIF à l'adresse donnée (fichier local ou content://). Résultat {ok, error, bytes, frames}.
+    Q_INVOKABLE QVariantMap gifFinish(const QString &url);
+    Q_INVOKABLE void gifCancel();
+    // Nom de fichier proposé : « animation-<titre>.gif ».
+    Q_INVOKABLE QString animationFileName(const QString &title);
     // Schéma 13 : fiche exercice A4 paysage (PDF couleur). Nom de fichier proposé : « fiche-<titre>.pdf ».
     Q_INVOKABLE QString exerciseSheetFileName(int exerciseId);
     // Crée la fiche de l'exercice (avec son schéma de référence s'il en a un) à l'adresse donnée (fichier local ou
@@ -334,6 +343,7 @@ private:
     PlanRepository m_plan;
     VenueRepository m_venues;
     EducatorRepository m_educators;
+    GifWriter m_gif;
     QNetworkAccessManager *m_net = nullptr;     // créé au premier téléchargement des stades
     QNetworkReply *m_venueReply = nullptr;
     QString m_lastError;

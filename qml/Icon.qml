@@ -66,6 +66,7 @@ Item {
         "pitch": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M3 10h3v4H3M21 10h-3v4h3"/>',
         // Outils du terrain : pictogrammes en couleur (indépendants de la couleur demandée).
         "t-select": '<path d="M6 3l13 7-6 2.2L10.5 19z" fill="C"/>',
+        "share": '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
         "play": '<path d="M8 5.5v13l11-6.5z"/>',
         "pause": '<path d="M8.5 5v14M15.5 5v14"/>',
         "skip": '<path d="M6 5.5v13l9-6.5z"/><path d="M18.5 5v14"/>',
