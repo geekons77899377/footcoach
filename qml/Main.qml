@@ -346,7 +346,11 @@ ApplicationWindow {
             SquadPage { id: squadPage }
             CalendarPage { id: calendarPage; onPlanRequested: (s) => win.openSessionPlan(s); onMatchRequested: (m) => win.openMatch(m) }
             AttendancePage { id: attendancePage }
-            ExercisesPage { id: exercisesPage; onOpenBoard: (id) => win.goFrom("tactics", id) }
+            ExercisesPage {
+                id: exercisesPage
+                onOpenBoard: (id) => win.goFrom("tactics", id)
+                onAnimateBoard: (id) => { tactics.animateOnOpen = true; win.goFrom("tactics", id); }
+            }
             SessionsPage { id: sessionsPage }
             MatchesPage { id: matchesPage }
             TacticsPage { id: tactics }

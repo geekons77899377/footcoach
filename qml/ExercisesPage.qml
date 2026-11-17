@@ -8,6 +8,7 @@ Item {
     id: page
 
     signal openBoard(int boardId)      // ouvre le terrain de l'exercice dans la section Tactique
+    signal animateBoard(int boardId)   // idem, et lance l'animation
 
     property var activities: []        // échauffement, technique...
     property var categories: []        // catégories de l'utilisateur (ex. U10-U11) : [{id, name, count}]
@@ -529,6 +530,7 @@ Item {
         showBack: !page.split
         onCloseRequested: page.backFromForm()
         onOpenBoardRequested: (id) => page.openBoard(id)
+        onAnimateBoardRequested: (id) => page.animateBoard(id)
         onSavedInPlace: {
             page.currentId = form.exerciseId;
             page.refresh();

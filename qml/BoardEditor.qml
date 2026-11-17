@@ -12,6 +12,7 @@ Item {
     property int boardId: -1
     property string title: ""
     property bool editable: true
+    readonly property bool hasArrows: board.arrows.length > 0     // le schéma peut être animé
     property string loadError: ""
     property string tool: "select"
     property bool showBack: true
@@ -526,13 +527,20 @@ Item {
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             spacing: 0
-            IconButton {
+            // Bouton vert libellé (17/11/2026) : la seule icône ▶ passait inaperçue à côté d'annuler / rétablir.
+            AppButton {
                 objectName: "animateButton"
                 visible: editor.editable && !editor.animating && board.arrows.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                kind: "primary"
                 iconName: "play"
-                accessibleName: "Animer le schéma"
+                text: "Animer"
+                implicitHeight: 38
+                implicitWidth: contentItem.children[0].implicitWidth + 28
+                Accessible.name: "Animer le schéma"
                 onClicked: editor.startAnimation()
             }
+            Item { width: 6; height: 1; visible: editor.editable && !editor.animating && board.arrows.length > 0 }
             IconButton {
                 iconName: "undo"
                 accessibleName: "Annuler"
@@ -649,7 +657,7 @@ Item {
             anchors.top: view.top
             anchors.topMargin: 12
             spacing: 8
-            visible: editor.editable
+            visible: editor.editable && !editor.animating     // pendant l'animation le terrain est figé sur sa vue entière
             IconButton {
                 diameter: editor.zoomButton
                 iconName: "zoomin"
@@ -721,6 +729,17 @@ Item {
                 borderColor: Theme.border
                 enabled: board.canRedo
                 onClicked: board.redo()
+            }
+            IconButton {                       // en plein écran l'en-tête est masqué : l'animation reste accessible ici
+                objectName: "animateButtonFullscreen"
+                visible: board.arrows.length > 0
+                diameter: editor.zoomButton
+                iconName: "play"
+                iconColor: Theme.textOnAccent
+                accessibleName: "Animer le schéma"
+                fillColor: Theme.accent
+                borderColor: Theme.accent
+                onClicked: editor.startAnimation()
             }
         }
 

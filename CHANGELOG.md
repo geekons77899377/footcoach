@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## Non publié — animation des schémas : bouton visible
+- **Constat du 17/11/2026** : « je vois pas les boutons d'animation ». Le seul accès était une petite icône ▶ dans l'en-tête de l'éditeur, à côté d'annuler / rétablir, absente en plein écran et depuis la fiche de l'exercice.
+- En-tête de l'éditeur : bouton vert libellé « ▶ Animer » (visible dès que le schéma a une flèche).
+- Plein écran : bouton ▶ vert sous annuler / rétablir.
+- Fiche d'un exercice : bouton « ▶ Animer le terrain » (si le terrain a des flèches) : ouvre le terrain et lance la lecture.
+- Pendant l'animation, les boutons de zoom sont masqués (défaut mineur signalé à la livraison précédente).
+- Tests : `t_animation.py` (84 vérifications). **Non vérifié** sur Android.
+
 ## Non publié — animation des schémas
 - **Demande du 16/11/2026** : les terrains des exercices sont figés ; les animer pour mieux comprendre l'exercice. Choix de l'utilisateur : animation calculée depuis les flèches existantes, commandes lecture / pause, pas à pas et vitesse, partage en vidéo (GIF animé). Aucun changement du schéma SQLite ni du format des schémas.
 - Éditeur de schéma : bouton ▶ « Animer » dans l'en-tête (visible dès qu'il y a une flèche). Barre de lecture à la place de la barre d'outils : fermer, précédent, lecture / pause, suivant, compteur « mouvement k / n », vitesse (Lent ×0,5, Normal, Rapide ×2), partager. Lecture en boucle ; pendant l'animation le terrain n'est pas modifiable et le schéma n'est jamais modifié.

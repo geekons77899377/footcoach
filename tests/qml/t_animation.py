@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "t_live.py")).read().split("errs=[]")[0])
 from PySide6.QtCore import QMetaObject, Q_ARG, QObject
 from PySide6.QtGui import QImage
+from PySide6.QtCore import QPointF
 
 SCENE = json.dumps({"version": 1, "pitch": "half", "items": [
     {"kind": "player", "x": 0.30, "y": 0.40, "label": "7", "color": "#1565c0"},     # 0 : conduit puis passe
@@ -76,11 +77,19 @@ for W, H_, tag in [(412, 892, "tel"), (1280, 800, "bureau")]:
     view = named(ed, "boardView")
     btn = named(ed, "animateButton")
     check(btn is not None and btn.property("visible") is True, f"[{tag}] bouton « Animer le schéma » visible (le schéma a des flèches)")
+    check(btn.property("text") == "Animer" and btn.property("width") > 70, f"[{tag}] bouton vert libellé « Animer » ({btn.property('text')}, {btn.property('width')} px)")
+    if tag == "tel": h.shot("anim_0_bouton_animer")
+    ed.setProperty("fullscreen", True); h.spin(200)
+    fsb = named(ed, "animateButtonFullscreen")
+    check(fsb is not None and fsb.isVisible(), f"[{tag}] plein écran : bouton ▶ sur le terrain (l'en-tête est masqué)")
+    ed.setProperty("fullscreen", False); h.spin(200)
     before = tokens(view)
     QMetaObject.invokeMethod(btn, "clicked"); h.spin(300)
     player = named(ed, "boardPlayer")
     check(ed.property("animating") is True and player.property("visible") is True, f"[{tag}] mode animation : barre de lecture affichée")
     check(view.property("enabled") is False, f"[{tag}] gestes du terrain coupés pendant l'animation")
+    zin = [o for o in ed.findChildren(QObject) if o.property("accessibleName") == "Zoom avant"]
+    check(zin and not zin[0].isVisible(), f"[{tag}] boutons de zoom masqués pendant l'animation")
     tl = jv(view.property("anim"))
     steps = tl["steps"]
     check(len(steps) == 4, f"[{tag}] 4 mouvements, un par flèche ({len(steps)})")
@@ -187,6 +196,49 @@ for W, H_, tag in [(412, 892, "tel"), (1280, 800, "bureau")]:
     check(json.loads(b._boards[bid]["json"])["items"][0]["x"] == 0.30, f"[{tag}] schéma enregistré inchangé")
     bad = [w for w in h.warnings if "Board" in w]
     check(not bad, f"[{tag}] aucun avertissement QML sur le terrain ({bad[:3]})")
+
+# Depuis la fiche d'un exercice : « Animer le terrain » ouvre le terrain et lance la lecture.
+class B11(B10):
+    @Slot(int, result="QVariantMap")
+    def exerciseBoard(self, ex):
+        return {"boardId": 501, "title": "Une-deux", "readable": True, "json": SCENE if ex == 10 else NOARROW}
+    @Slot(int, result="QVariantMap")
+    def board(self, i):
+        return {"id": i, "title": "Une-deux", "readable": True, "error": "", "json": SCENE}
+NOARROW = json.dumps({"version": 1, "pitch": "half", "items": [{"kind": "player", "x": 0.5, "y": 0.5, "label": "1"}], "arrows": []})
+def item(h, name):
+    todo = [h.win.contentItem()]
+    while todo:
+        it = todo.pop()
+        if it.objectName() == name: return it
+        todo.extend(it.childItems())
+for W, H_, tag in [(412, 892, "tel"), (1280, 800, "bureau")]:
+    B2.mode = "now"; b = B11(); b.keep = []
+    h = Harness(W, H_, backend=b)
+    QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "exercises"), Q_ARG("QVariant", -1)); h.spin(500)
+    QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "exercises"), Q_ARG("QVariant", 11)); h.spin(500)
+    ab = item(h, "animateExerciseBoard")
+    check(ab is not None and not ab.isVisible(), f"[{tag}] fiche : pas de « Animer le terrain » sans flèche")
+    QMetaObject.invokeMethod(h.win, "go", Q_ARG("QVariant", "exercises"), Q_ARG("QVariant", 10)); h.spin(500)
+    ab = item(h, "animateExerciseBoard")
+    check(ab is not None and ab.isVisible() and ab.property("text") == "Animer le terrain", f"[{tag}] fiche : bouton « Animer le terrain »")
+    if tag == "tel":
+        fl = None
+        it = ab
+        while it is not None:
+            if it.metaObject().className().startswith("QQuickFlickable"): fl = it; break
+            it = it.parentItem()
+        if fl is not None:
+            y = ab.mapToItem(fl, QPointF(0, 0)).y()
+            fl.setProperty("contentY", max(0, fl.property("contentY") + y - 250)); h.spin(200)
+        h.shot("anim_4_fiche_exercice")
+    QMetaObject.invokeMethod(ab, "clicked"); h.spin(800)
+    ed = find(h, lambda o: o.objectName() == "editor")
+    pl = named(ed, "boardPlayer")
+    check(h.win.property("section") == "tactics" and ed.property("animating") is True and pl.property("playing") is True,
+          f"[{tag}] fiche : le terrain s'ouvre et l'animation démarre ({h.win.property('section')})")
+    tp = find(h, lambda o: o.property("animateOnOpen") is not None and o.metaObject().className().startswith("TacticsPage"))
+    check(tp is not None and tp.property("animateOnOpen") is False, f"[{tag}] fiche : demande d'animation consommée")
 
 print("\n%s" % ("ECHECS : %d" % len(errs) if errs else "TOUT PASSE"))
 for e in errs: print("   KO ", e)

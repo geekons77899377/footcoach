@@ -17,12 +17,17 @@ Item {
 
     // Ouvre un schéma. Si le schéma déjà ouvert a des modifications qui ne s'enregistrent pas, on reste dessus
     // (dialogue : réessayer ou quitter sans enregistrer).
+    property bool animateOnOpen: false    // « Animer le terrain » depuis la fiche d'un exercice : lecture dès l'ouverture
+
     function openBoard(id) {
         editor.leaveGuarded(function () {
             AppState.clearReturn();       // ouverture depuis la liste : « retour » revient à la liste
             refresh();
             currentId = id;
             editor.open(id);
+            if (animateOnOpen && editor.hasArrows)
+                Qt.callLater(editor.startAnimation);
+            animateOnOpen = false;
         });
     }
 

@@ -19,6 +19,10 @@ Item {
 
     signal closeRequested()
     signal openBoardRequested(int boardId)
+    signal animateBoardRequested(int boardId)
+    readonly property bool boardHasArrows: {
+        try { var s = JSON.parse(boardJson); return !!(s.arrows && s.arrows.length > 0); } catch (e) { return false; }
+    }
     signal savedInPlace()                  // enregistré sans quitter la fiche
     signal saved()
     signal categoryAdded(int id)          // la liste des catégories a changé : l'appelant la recharge
@@ -408,6 +412,16 @@ Item {
                         anchors.fill: parent
                         onClicked: root.openBoardRequested(root.boardId)
                     }
+                }
+                AppButton {
+                    objectName: "animateExerciseBoard"
+                    visible: root.boardId > 0 && root.boardHasArrows
+                    width: parent.width
+                    kind: "outline"                // le vert plein reste réservé à « Enregistrer »
+                    fg: Theme.accent
+                    iconName: "play"
+                    text: "Animer le terrain"
+                    onClicked: root.animateBoardRequested(root.boardId)
                 }
                 AppButton {
                     objectName: root.boardId > 0 ? "openExerciseBoard" : "createExerciseBoard"
